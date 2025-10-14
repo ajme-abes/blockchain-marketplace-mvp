@@ -18,6 +18,4 @@
 
 # Hardhat coverage reports
 /coverage
-
-/package-lock.json
-/package.json
+.env

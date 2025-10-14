@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  passwordHash       String
+  name               String
+  phone              String?
+  role               UserRole @default(BUYER)
+  address            String?
+  languagePreference String   @default("en")
+  registrationDate   DateTime @default(now())
+
+  // Relations
+  producerProfile      Producer?
+  buyerProfile         Buyer?
+  orders               Order[]               @relation("UserOrders")
+  paymentConfirmations PaymentConfirmation[] @relation("UserPaymentConfirmations")
+  notifications        Notification[]
+
+  @@map("users")
+}
+
+model Producer {
+  id                 String             @id @default(uuid())
+  businessName       String
+  location           String
+  verificationStatus VerificationStatus @default(PENDING)
+
+  // Relations
+  userId   String    @unique
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@map("producers")
+}
+
+model Buyer {
+  id                     String @id @default(uuid())
+  preferredPaymentMethod String @default("chapa")
+
+  // Relations
+  userId  String   @unique
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders  Order[]  @relation("BuyerOrders")
+  reviews Review[]
+
+  @@map("buyers")
+}
+
+model Product {
+  id                String        @id @default(uuid())
+  name              String
+  category          String
+  price             Float
+  quantityAvailable Int
+  description       String?
+  imageUrl          String?
+  status            ProductStatus @default(ACTIVE)
+  listingDate       DateTime      @default(now())
+
+  // Relations
+  producerId String
+  producer   Producer    @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@map("products")
+}
+
+model Order {
+  id               String         @id @default(uuid())
+  totalAmount      Float
+  paymentStatus    PaymentStatus  @default(PENDING)
+  deliveryStatus   DeliveryStatus @default(PENDING)
+  orderDate        DateTime       @default(now())
+  blockchainTxHash String?
+
+  // Relations
+  buyerId              String
+  buyer                Buyer                 @relation(fields: [buyerId], references: [id], onDelete: Cascade, name: "BuyerOrders")
+  userId               String? // For the User relation
+  user                 User?                 @relation(fields: [userId], references: [id], name: "UserOrders")
+  orderItems           OrderItem[]
+  paymentConfirmations PaymentConfirmation[]
+  blockchainRecords    BlockchainRecord[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  quantity Int
+  subtotal Float
+
+  // Relations
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([orderId, productId])
+  @@map("order_items")
+}
+
+model PaymentConfirmation {
+  id                 String        @id @default(uuid())
+  confirmationMethod PaymentMethod
+  confirmedAt        DateTime      @default(now())
+  proofImageUrl      String?
+  blockchainTxHash   String?
+
+  // Relations
+  orderId       String
+  order         Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  confirmedById String
+  confirmedBy   User   @relation(fields: [confirmedById], references: [id], name: "UserPaymentConfirmations")
+
+  @@map("payment_confirmations")
+}
+
+model BlockchainRecord {
+  id          String    @id @default(uuid())
+  txHash      String    @unique
+  blockNumber String?
+  timestamp   DateTime?
+  status      String    @default("pending")
+
+  // Relations
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("blockchain_records")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  rating     Int // 1-5 stars
+  comment    String?
+  reviewDate DateTime @default(now())
+
+  // Relations
+  buyerId   String
+  buyer     Buyer   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([buyerId, productId])
+  @@map("reviews")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  message   String
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
+  createdAt DateTime           @default(now())
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// Enums
+enum UserRole {
+  BUYER
+  PRODUCER
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CHAPA
+  ARIFPAY
+  MANUAL
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  PAYMENT_CONFIRMED
+  ORDER_SHIPPED
+  DISPUTE_RAISED
+  GENERAL
+}
+
+enum NotificationStatus {
+  READ
+  UNREAD
+}
