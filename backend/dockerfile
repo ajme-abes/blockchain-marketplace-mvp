@@ -1,14 +1,20 @@
-FROM node:18-alpine
+FROM node:18-bullseye
 
 WORKDIR /app
 
+# Copy package files first for caching
 COPY package*.json ./
-RUN npm install
+COPY prisma ./prisma/
 
+# Install dependencies
+RUN npm install --legacy-peer-deps --fetch-retries=5 --fetch-retry-factor=2 --fetch-retry-mintimeout=2000
+
+# Copy all project files AFTER installing dependencies
 COPY . .
 
-RUN npx prisma generate
-
+# Expose backend port
 EXPOSE 5000
 
-CMD ["npm", "start"]
+# For development, do NOT run prisma generate inside Docker
+# Generate Prisma client locally and mount node_modules
+CMD ["npm", "run", "dev"]

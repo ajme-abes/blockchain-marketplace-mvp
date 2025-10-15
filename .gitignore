@@ -45,3 +45,7 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 /generated/prisma
+docker-compose.dev.yml
+docker-compose.yml
+frontend/.dockerignore
+/database/init.sql
