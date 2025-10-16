@@ -20,4 +20,5 @@
 /coverage
 .env
 .env.docker
-/.env.docker --- IGNORE ---
+.env.local
+.env.*.local
