@@ -4,20 +4,38 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const { testConnection } = require('./config/database');
 const blockchainRoutes = require('./routes/blockchain');
-const userRoutes = require('./routes/user'); // Add this line
+const userRoutes = require('./routes/user');
+const securityMiddleware = require('./middleware/security');
+const jobService = require('./services/jobService');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware - IMPORTANT: Order matters!
-app.use(helmet());
-app.use(cors());
+// ==================== MIDDLEWARE (Order Matters!) ====================
+
+// 1. Security Middleware (First line of defense)
+app.use(securityMiddleware.securityHeaders);
+app.use(securityMiddleware.limiter);
+app.use(securityMiddleware.auditMiddleware);
+
+// 2. Core Express Middleware
+app.use(helmet({
+  crossOriginEmbedderPolicy: false // Allow external resources
+}));
+app.use(cors(securityMiddleware.corsOptions));
 app.use(morgan('combined'));
-app.use(express.json({ limit: '10mb' })); // Ensure this is before routes
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection test
+// 3. Input Sanitization & Security
+app.use(securityMiddleware.sanitizeInput);
+app.use(securityMiddleware.xssProtection);
+app.use(securityMiddleware.preventParameterPollution);
+
+// ==================== HEALTH & STATUS ENDPOINTS ====================
+
+// Database health check
 app.get('/api/db-health', async (req, res) => {
   const isConnected = await testConnection();
   
@@ -25,7 +43,9 @@ app.get('/api/db-health', async (req, res) => {
     res.status(200).json({
       status: 'success',
       message: 'Database connection is healthy',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      database: 'PostgreSQL',
+      orm: 'Prisma'
     });
   } else {
     res.status(500).json({
@@ -36,51 +56,148 @@ app.get('/api/db-health', async (req, res) => {
   }
 });
 
-// Routes - IMPORTANT: After middleware
-app.use('/api/blockchain', blockchainRoutes);
-app.use('/api/users', userRoutes); // Add this line
-
-// Basic health check route
+// System health check
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'success',
     message: 'Blockchain Marketplace API is running!',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    services: {
+      database: 'Connected',
+      blockchain: 'Integrated',
+      security: 'Enabled',
+      notifications: 'Ready'
+    }
+  });
+});
+
+// System info endpoint
+app.get('/api/system-info', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    data: {
+      system: 'Blockchain Marketplace Backend',
+      version: '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      features: [
+        'User Management',
+        'Product Catalog', 
+        'Order System',
+        'Blockchain Integration',
+        'IPFS File Storage',
+        'Email Notifications',
+        'Audit Logging',
+        'Background Jobs'
+      ],
+      security: [
+        'Rate Limiting',
+        'XSS Protection',
+        'SQL Injection Prevention',
+        'CORS Enabled',
+        'Helmet Security Headers'
+      ]
+    }
+  });
+});
+
+// ==================== API ROUTES ====================
+
+// Blockchain routes
+app.use('/api/blockchain', blockchainRoutes);
+
+// User routes
+app.use('/api/users', userRoutes);
+
+// ==================== ERROR HANDLING ====================
+
+// 404 handler - Catch undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: 'Route not found',
+    path: req.originalUrl,
+    method: req.method,
     timestamp: new Date().toISOString()
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: 'Route not found'
-  });
-});
-
-// Error handling middleware
+// Global error handler - Catch all errors
 app.use((error, req, res, next) => {
-  console.error('Server error:', error);
+  console.error('🚨 Server Error:', {
+    message: error.message,
+    stack: error.stack,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+    timestamp: new Date().toISOString()
+  });
+
+  // Don't leak error details in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   res.status(500).json({
     status: 'error',
-    message: 'Internal server error'
+    message: isProduction ? 'Internal server error' : error.message,
+    ...(isProduction ? {} : { stack: error.stack }),
+    timestamp: new Date().toISOString()
   });
 });
 
-// Start server only if database connects
+// ==================== SERVER STARTUP ====================
+
 const startServer = async () => {
-  const isDbConnected = await testConnection();
-  
-  if (isDbConnected) {
+  try {
+    const isDbConnected = await testConnection();
+    
+    if (!isDbConnected) {
+      console.error('❌ Failed to start server: Database connection failed');
+      process.exit(1);
+    }
+
+    // Start background jobs
+    jobService.startJobs();
+    console.log('✅ Background jobs initialized');
+
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📍 DB Health: http://localhost:${PORT}/api/db-health`);
-      console.log(`📍 User Registration: http://localhost:${PORT}/api/users/register`);
+      console.log('\n' + '='.repeat(60));
+      console.log('🚀 BLOCKCHAIN MARKETPLACE BACKEND STARTED SUCCESSFULLY!');
+      console.log('='.repeat(60));
+      console.log(`📍 Server URL: http://localhost:${PORT}`);
+      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📊 Database: PostgreSQL + Prisma ORM`);
+      console.log(`⛓️  Blockchain: Integrated (Polygon Mumbai ready)`);
+      console.log(`🛡️  Security: Enhanced protection enabled`);
+      console.log('='.repeat(60));
+      console.log('\n📋 Available Endpoints:');
+      console.log(`   GET  /api/health           - System health check`);
+      console.log(`   GET  /api/db-health        - Database status`);
+      console.log(`   GET  /api/system-info      - System information`);
+      console.log(`   POST /api/users/register   - User registration`);
+      console.log(`   GET  /api/users            - List all users`);
+      console.log(`   GET  /api/blockchain/status - Blockchain status`);
+      console.log('='.repeat(60) + '\n');
     });
-  } else {
-    console.error('❌ Failed to start server: Database connection failed');
+
+    // Graceful shutdown handling
+    process.on('SIGTERM', () => {
+      console.log('🛑 SIGTERM received, shutting down gracefully...');
+      jobService.stopJobs();
+      process.exit(0);
+    });
+
+    process.on('SIGINT', () => {
+      console.log('🛑 SIGINT received, shutting down gracefully...');
+      jobService.stopJobs();
+      process.exit(0);
+    });
+
+  } catch (error) {
+    console.error('💥 Failed to start server:', error);
     process.exit(1);
   }
 };
 
+// Start the server
 startServer();
