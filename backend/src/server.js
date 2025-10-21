@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { testConnection } = require('./config/database');
 const blockchainRoutes = require('./routes/blockchain');
 const userRoutes = require('./routes/user');
+const authRoutes = require('./routes/auth'); // NEW
 const securityMiddleware = require('./middleware/security');
 const jobService = require('./services/jobService');
 require('dotenv').config();
@@ -68,7 +69,8 @@ app.get('/api/health', (req, res) => {
       database: 'Connected',
       blockchain: 'Integrated',
       security: 'Enabled',
-      notifications: 'Ready'
+      notifications: 'Ready',
+      authentication: 'JWT Enabled' // UPDATED
     }
   });
 });
@@ -89,14 +91,16 @@ app.get('/api/system-info', (req, res) => {
         'IPFS File Storage',
         'Email Notifications',
         'Audit Logging',
-        'Background Jobs'
+        'Background Jobs',
+        'JWT Authentication' // UPDATED
       ],
       security: [
         'Rate Limiting',
         'XSS Protection',
         'SQL Injection Prevention',
         'CORS Enabled',
-        'Helmet Security Headers'
+        'Helmet Security Headers',
+        'JWT Token Authentication' // UPDATED
       ]
     }
   });
@@ -109,6 +113,9 @@ app.use('/api/blockchain', blockchainRoutes);
 
 // User routes
 app.use('/api/users', userRoutes);
+
+// Auth routes - NEW
+app.use('/api/auth', authRoutes);
 
 // ==================== ERROR HANDLING ====================
 
@@ -168,14 +175,18 @@ const startServer = async () => {
       console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Database: PostgreSQL + Prisma ORM`);
       console.log(`⛓️  Blockchain: Integrated (Polygon Mumbai ready)`);
+      console.log(`🔐 Authentication: JWT Enabled`); // UPDATED
       console.log(`🛡️  Security: Enhanced protection enabled`);
       console.log('='.repeat(60));
       console.log('\n📋 Available Endpoints:');
       console.log(`   GET  /api/health           - System health check`);
       console.log(`   GET  /api/db-health        - Database status`);
       console.log(`   GET  /api/system-info      - System information`);
-      console.log(`   POST /api/users/register   - User registration`);
-      console.log(`   GET  /api/users            - List all users`);
+      console.log(`   POST /api/auth/login       - User login`); // NEW
+      console.log(`   POST /api/auth/register    - User registration`); // NEW
+      console.log(`   GET  /api/auth/me          - Get current user`); // NEW
+      console.log(`   POST /api/auth/logout      - User logout`); // NEW
+      console.log(`   GET  /api/users            - List all users (Admin)`);
       console.log(`   GET  /api/blockchain/status - Blockchain status`);
       console.log('='.repeat(60) + '\n');
     });

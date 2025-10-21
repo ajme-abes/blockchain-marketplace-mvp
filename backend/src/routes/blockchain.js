@@ -28,7 +28,7 @@ router.post('/record-transaction', async (req, res) => {
       buyerAddress,
       sellerAddress,
       amount,
-      paymentMethod = 'chapa',
+      paymentMethod = 'CHAPA',
       status = 'confirmed'
     } = req.body;
 
