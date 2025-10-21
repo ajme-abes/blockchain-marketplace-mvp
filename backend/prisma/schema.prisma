@@ -54,7 +54,7 @@ model Producer {
 
 model Buyer {
   id                     String @id @default(uuid())
-  preferredPaymentMethod String @default("chapa")
+  preferredPaymentMethod String @default("CHAPA")
 
   // Relations
   userId  String   @unique

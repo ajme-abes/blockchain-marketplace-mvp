@@ -121,7 +121,7 @@ class BlockchainService {
       buyerAddress,
       sellerAddress,
       amount,
-      paymentMethod = 'chapa',
+      paymentMethod = 'CHAPA',
       status = 'confirmed'
     } = transactionData;
 
