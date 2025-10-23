@@ -27,6 +27,7 @@ model User {
   auditLogs           AuditLog[]
   sessions            Session[]
   ipfsFiles           IPFSMetadata[]
+  statusHistoryChanges OrderStatusHistory[]
 
   @@index([email])
   @@index([role])
@@ -103,6 +104,8 @@ model Order {
   deliveryStatus   DeliveryStatus @default(PENDING)
   orderDate        DateTime       @default(now())
   blockchainTxHash String?
+  shippingAddress Json?       
+  updatedAt       DateTime    @updatedAt
 
   // Relations
   buyerId              String
@@ -112,6 +115,7 @@ model Order {
   orderItems           OrderItem[]
   paymentConfirmations PaymentConfirmation[]
   blockchainRecords    BlockchainRecord[]
+  statusHistory        OrderStatusHistory[]
 
   @@index([buyerId])
   @@index([paymentStatus])
@@ -128,6 +132,7 @@ model OrderItem {
   id       String @id @default(uuid())
   quantity Int
   subtotal Float
+  price    Float
 
   // Relations
   orderId   String
@@ -139,6 +144,25 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id          String         @id @default(uuid())
+  orderId     String
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  DeliveryStatus
+  toStatus    DeliveryStatus
+  changedById String
+  changedBy   User           @relation(fields: [changedById], references: [id])
+  reason      String?
+  createdAt   DateTime       @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@index([changedById])
+  @@index([fromStatus])
+  @@index([toStatus])
+  @@map("order_status_history")
 }
 
 model PaymentConfirmation {
