@@ -339,6 +339,7 @@ enum PaymentStatus {
 
 enum DeliveryStatus {
   PENDING
+  CONFIRMED
   SHIPPED
   DELIVERED
   CANCELLED

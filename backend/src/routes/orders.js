@@ -10,12 +10,12 @@ function validateOrderStatusTransition(currentStatus, newStatus, userRole) {
       'PENDING': ['CANCELLED']
     },
     PRODUCER: {
-      'PENDING': ['CONFIRMED', 'SHIPPED', 'CANCELLED'],
+      'PENDING': ['CONFIRMED', 'CANCELLED'],
       'CONFIRMED': ['SHIPPED', 'CANCELLED'],
       'SHIPPED': ['DELIVERED']
     },
     ADMIN: {
-      'PENDING': ['CONFIRMED', 'SHIPPED', 'CANCELLED'],
+      'PENDING': ['CONFIRMED', 'CANCELLED'],
       'CONFIRMED': ['SHIPPED', 'CANCELLED'],
       'SHIPPED': ['DELIVERED'],
       'CANCELLED': ['PENDING']
@@ -25,6 +25,7 @@ function validateOrderStatusTransition(currentStatus, newStatus, userRole) {
   const roleTransitions = validTransitions[userRole] || {};
   return roleTransitions[currentStatus]?.includes(newStatus) || false;
 }
+
 
 // Create order (BUYER only)
 router.post('/', authenticateToken, requireRole(['BUYER']), async (req, res) => {
