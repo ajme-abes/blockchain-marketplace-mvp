@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth'); // NEW
 const securityMiddleware = require('./middleware/security');
 const jobService = require('./services/jobService');
 const productRoutes = require('./routes/products');
+const orderRoutes = require('./routes/orders');
 require('dotenv').config();
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 
 app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
 
 // ==================== ERROR HANDLING ====================
 
