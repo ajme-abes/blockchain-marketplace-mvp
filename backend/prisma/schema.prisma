@@ -116,6 +116,7 @@ model Order {
   paymentConfirmations PaymentConfirmation[]
   blockchainRecords    BlockchainRecord[]
   statusHistory        OrderStatusHistory[]
+  paymentReferences PaymentReference[]  
 
   @@index([buyerId])
   @@index([paymentStatus])
@@ -168,7 +169,8 @@ model OrderStatusHistory {
 model PaymentConfirmation {
   id                 String        @id @default(uuid())
   confirmationMethod PaymentMethod
-  confirmedAt        DateTime      @default(now())
+  confirmedAt        DateTime      
+  isConfirmed        Boolean       @default(false)
   proofImageUrl      String?
   blockchainTxHash   String?
 
@@ -183,6 +185,19 @@ model PaymentConfirmation {
   @@index([confirmedAt])
   @@index([confirmationMethod])
   @@map("payment_confirmations")
+}
+model PaymentReference {
+  id           String   @id @default(uuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentCode  String   @unique
+  generatedAt  DateTime @default(now())
+  usedAt       DateTime?
+
+  @@index([orderId])
+  @@index([paymentCode])
+  @@index([generatedAt])
+  @@map("payment_references")
 }
 
 model BlockchainRecord {
