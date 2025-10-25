@@ -268,18 +268,39 @@ const paymentConfirmation = await tx.paymentConfirmation.updateMany({
       console.log('✅ Marked payment reference as used');
 
       // Create status history for payment confirmation
-      if (status === 'success') {
-        await tx.orderStatusHistory.create({
-          data: {
-            orderId: orderId,
-            fromStatus: updatedOrder.deliveryStatus,
-            toStatus: updatedOrder.deliveryStatus, // Delivery status remains same
-            changedById: updatedOrder.buyer.user.id,
-            reason: `Payment confirmed via Chapa - TX: ${transaction_id}`
-          }
-        });
-        console.log('✅ Created payment status history');
-      }
+      // if (status === 'success') {
+      //   await tx.orderStatusHistory.create({
+      //     data: {
+      //       orderId: orderId,
+      //       fromStatus: updatedOrder.deliveryStatus,
+      //       toStatus: updatedOrder.deliveryStatus, // Delivery status remains same
+      //       changedById: updatedOrder.buyer.user.id,
+      //       reason: `Payment confirmed via Chapa - TX: ${transaction_id}`
+      //     }
+      //   });
+      //   console.log('✅ Created payment status history');
+      // }
+      // After successful payment in handlePaymentWebhook:
+if (status === 'success') {
+  try {
+    const blockchainService = require('./blockchainService');
+    
+    await blockchainService.recordTransaction({
+      orderId: orderId,
+      productId: order.orderItems[0]?.productId || 'unknown',
+      buyerAddress: order.buyer.user.walletAddress, // You'll need to add this field
+      sellerAddress: order.orderItems[0]?.product.producer.walletAddress, // Add this field
+      amount: order.totalAmount,
+      paymentMethod: 'CHAPA',
+      status: 'COMPLETED'
+    });
+    
+    console.log('✅ Payment recorded on blockchain');
+  } catch (blockchainError) {
+    console.error('⚠️ Blockchain recording failed, but payment succeeded:', blockchainError);
+    // Don't fail the payment if blockchain recording fails
+  }
+  }
 
       return { order: updatedOrder };
     });

@@ -43,11 +43,9 @@ class BlockchainService {
         console.log('💡 Make sure contract-info.json exists in project root');
       }
 
-      // Try to connect to local Hardhat node (only if running)
       try {
         this.provider = new ethers.providers.JsonRpcProvider("http://127.0.0.1:8545");
         
-        // Test connection with timeout
         const networkPromise = this.provider.getNetwork();
         const blockNumberPromise = this.provider.getBlockNumber();
         
