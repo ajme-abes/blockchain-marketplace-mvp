@@ -100,4 +100,69 @@ router.get('/transaction/:orderId', async (req, res) => {
   }
 });
 
+// Verify transaction on blockchain
+router.get('/verify/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const verification = await blockchainService.verifyTransaction(orderId);
+    
+    res.json({
+      status: 'success',
+      data: {
+        verified: verification.exists,
+        transaction: verification.exists ? verification : null,
+        message: verification.exists 
+          ? 'Transaction verified on blockchain' 
+          : 'Transaction not found on blockchain'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to verify transaction',
+      error: error.message
+    });
+  }
+});
+// TEST ROUTES - Remove these after testing
+router.post('/test/record-mock', async (req, res) => {
+  try {
+    const { orderId, paymentReference, txHash } = req.body;
+    
+    const result = await blockchainService.recordTransaction({
+      orderId: orderId || 'test-order-' + Date.now(),
+      paymentReference: paymentReference || 'test-ref-' + Math.random(),
+      txHash: txHash || 'test-tx-' + Math.random()
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Mock transaction recorded',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
+router.get('/test/verify/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = await blockchainService.verifyTransaction(orderId);
+    
+    res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
 module.exports = router;

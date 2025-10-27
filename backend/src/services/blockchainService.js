@@ -6,78 +6,94 @@ class BlockchainService {
   constructor() {
     this.isConnected = false;
     this.provider = null;
+    this.contract = null;
     this.contractAddress = null;
     this.init();
   }
 
   async init() {
     try {
-      // Try to read contract info from multiple possible locations
-      const possiblePaths = [
-        '/app/contract-info.json',  // Docker container path
-        path.join(__dirname, '..', '..', 'contract-info.json'), // Local dev path
-        path.join(process.cwd(), 'contract-info.json'), // Current directory
-        path.join(__dirname, '..', '..', '..', 'contract-info.json') // Root from backend
+      // Load contract info from root
+      const contractInfo = this.loadContractInfo();
+      this.contractAddress = contractInfo?.address;
+      
+      if (!this.contractAddress) {
+        console.log('❌ No contract address found - using mock mode');
+        this.isConnected = false;
+        return;
+      }
+
+      // Setup provider and wallet (ethers v5 syntax)
+      const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || "http://127.0.0.1:8545";
+      const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
+      
+      if (!privateKey) {
+        console.log('❌ No private key found - using mock mode');
+        this.isConnected = false;
+        return;
+      }
+
+      this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+      this.wallet = new ethers.Wallet(privateKey, this.provider);
+      
+      // Contract ABI (ethers v5 syntax)
+      const contractABI = [
+        "function recordTransaction(string orderId, string paymentReference, string txHash) external",
+        "function getTransaction(string orderId) external view returns (string orderId, string paymentReference, uint256 timestamp, string txHash)",
+        "function verifyTransaction(string orderId) external view returns (bool)",
+        "function getTransactionCount() external view returns (uint256)",
+        "function transactions(string) public view returns (string orderId, string paymentReference, uint256 timestamp, string txHash)"
       ];
 
-      let contractFound = false;
-      
-      for (const contractPath of possiblePaths) {
-        try {
-          if (fs.existsSync(contractPath)) {
-            const contractInfo = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
-            this.contractAddress = contractInfo.address;
-            console.log(`📄 Loaded contract address: ${this.contractAddress}`);
-            console.log(`📁 From path: ${contractPath}`);
-            contractFound = true;
-            break;
-          }
-        } catch (e) {
-          // Continue to next path
-          console.log(`📁 Path not found: ${contractPath}`);
-        }
-      }
+      this.contract = new ethers.Contract(this.contractAddress, contractABI, this.wallet);
 
-      if (!contractFound) {
-        console.log('📄 No contract info found - using mock mode');
-        console.log('💡 Make sure contract-info.json exists in project root');
-      }
-
-      try {
-        this.provider = new ethers.providers.JsonRpcProvider("http://127.0.0.1:8545");
-        
-        const networkPromise = this.provider.getNetwork();
-        const blockNumberPromise = this.provider.getBlockNumber();
-        
-        const [network, blockNumber] = await Promise.all([networkPromise, blockNumberPromise]);
-        
-        console.log(`✅ Connected to blockchain: ${network.name} (chainId: ${network.chainId})`);
-        console.log(`📦 Current block: ${blockNumber}`);
-        this.isConnected = true;
-        
-      } catch (error) {
-        console.log('⚠️  Blockchain connection failed (local node not running)');
-        console.log('💡 For full blockchain features, run: cd blockchain && npm run node');
-        console.log('💡 This is normal for Docker development without local node');
-        this.isConnected = false;
-        this.provider = null; // Clear provider if connection failed
-      }
+      // Test connection
+      await this.provider.getBlockNumber();
+      this.isConnected = true;
       
+      console.log(`✅ Connected to blockchain: ${rpcUrl}`);
+      console.log(`📄 Contract: ${this.contractAddress}`);
+      console.log(`👛 Wallet: ${this.wallet.address}`);
+
     } catch (error) {
-      console.log('⚠️  Blockchain service init error:', error.message);
+      console.log('❌ Blockchain connection failed:', error.message);
+      console.log('💡 Make sure:');
+      console.log('   1. Hardhat node is running: cd blockchain && npx hardhat node');
+      console.log('   2. Contract is deployed: cd blockchain && npx hardhat run scripts/deploy.js --network localhost');
+      console.log('   3. Private key in .env matches hardhat account');
       this.isConnected = false;
-      this.provider = null;
     }
   }
 
+  loadContractInfo() {
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', '..', 'contract-info.json'), // Project root
+      path.join(__dirname, '..', '..', 'contract-info.json'), // Backend root
+      '/app/contract-info.json', // Docker
+      path.join(process.cwd(), 'contract-info.json') // Current directory
+    ];
+
+    for (const contractPath of possiblePaths) {
+      try {
+        if (fs.existsSync(contractPath)) {
+          const contractInfo = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+          console.log(`📄 Loaded contract from: ${contractPath}`);
+          return contractInfo;
+        }
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+    return null;
+  }
+
   async getBlockchainStatus() {
-    // If we have a contract address but no connection, it's deployed but node not running
     if (!this.isConnected) {
       return {
         connected: false,
         message: this.contractAddress ? 
-          'Contract deployed but local node not running' : 
-          'Blockchain not connected - local node not running',
+          'Contract deployed but blockchain not connected' : 
+          'Blockchain not connected',
         contractDeployed: !!this.contractAddress,
         contractAddress: this.contractAddress,
         network: null,
@@ -88,6 +104,7 @@ class BlockchainService {
     try {
       const network = await this.provider.getNetwork();
       const blockNumber = await this.provider.getBlockNumber();
+      const walletBalance = await this.provider.getBalance(this.wallet.address);
       
       return {
         connected: true,
@@ -97,6 +114,10 @@ class BlockchainService {
           chainId: network.chainId
         },
         blockNumber: blockNumber,
+        wallet: {
+          address: this.wallet.address,
+          balance: ethers.utils.formatEther(walletBalance) // v5 syntax
+        },
         contractDeployed: !!this.contractAddress,
         contractAddress: this.contractAddress
       };
@@ -113,82 +134,101 @@ class BlockchainService {
   }
 
   async recordTransaction(transactionData) {
-    const {
-      orderId,
-      productId,
-      buyerAddress,
-      sellerAddress,
-      amount,
-      paymentMethod = 'CHAPA',
-      status = 'confirmed'
-    } = transactionData;
+    const { orderId, paymentReference, txHash } = transactionData;
 
-    // Generate transaction hash
-    const txHash = '0x' + Math.random().toString(16).substr(2, 64);
-    
-    let blockNumber;
-    if (this.isConnected && this.provider) {
-      try {
-        blockNumber = (await this.provider.getBlockNumber()).toString();
-      } catch (error) {
-        blockNumber = Math.floor(Math.random() * 1000000).toString();
-      }
-    } else {
-      blockNumber = Math.floor(Math.random() * 1000000).toString();
+    // Validate inputs
+    if (!orderId || !paymentReference || !txHash) {
+      return {
+        success: false,
+        error: 'Missing required fields: orderId, paymentReference, txHash'
+      };
     }
-    
-    console.log('🔗 Recording transaction:', {
-      orderId,
-      amount,
-      paymentMethod,
-      transactionHash: txHash,
-      connected: this.isConnected,
-      contractAddress: this.contractAddress,
-      blockNumber: blockNumber
-    });
-    
-    // Determine the status message
-    let message;
-    if (this.isConnected && this.contractAddress) {
-      message = 'Transaction recorded (connected to blockchain with contract)';
-    } else if (this.contractAddress) {
-      message = 'Transaction recorded (contract deployed but local node not running)';
-    } else {
-      message = 'Transaction recorded (mock mode - no contract deployed)';
+
+    // If not connected, return mock response
+    if (!this.isConnected || !this.contract) {
+      console.log('🔗 [MOCK] Recording transaction:', { orderId, paymentReference, txHash });
+      return {
+        success: true,
+        transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
+        blockNumber: Math.floor(Math.random() * 1000000).toString(),
+        isMock: true,
+        message: 'Transaction recorded (mock mode - blockchain not connected)'
+      };
     }
-    
-    return {
-      success: true,
-      transactionHash: txHash,
-      blockNumber: blockNumber,
-      isMock: !this.isConnected || !this.contractAddress,
-      message: message,
-      contractAddress: this.contractAddress
-    };
+
+    try {
+      console.log('🔗 Recording transaction on blockchain:', { orderId, paymentReference, txHash });
+      
+      // Call the actual smart contract (ethers v5 syntax)
+      const tx = await this.contract.recordTransaction(orderId, paymentReference, txHash);
+      const receipt = await tx.wait();
+      
+      console.log('✅ Transaction mined:', {
+        transactionHash: receipt.transactionHash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString()
+      });
+      
+      return {
+        success: true,
+        transactionHash: receipt.transactionHash,
+        blockNumber: receipt.blockNumber,
+        isMock: false,
+        message: 'Transaction recorded on blockchain'
+      };
+    } catch (error) {
+      console.error('❌ Blockchain recording failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        isMock: false
+      };
+    }
   }
 
-  // Helper method to check if contract file exists
-  checkContractFile() {
-    const possiblePaths = [
-      '/app/contract-info.json',
-      path.join(__dirname, '..', '..', 'contract-info.json'),
-      path.join(process.cwd(), 'contract-info.json'),
-      path.join(__dirname, '..', '..', '..', 'contract-info.json')
-    ];
-
-    for (const contractPath of possiblePaths) {
-      if (fs.existsSync(contractPath)) {
-        return {
-          exists: true,
-          path: contractPath
-        };
-      }
+  async verifyTransaction(orderId) {
+    if (!this.isConnected || !this.contract) {
+      return { 
+        exists: false, 
+        error: 'Blockchain not connected',
+        isMock: true 
+      };
     }
+
+    try {
+      const [storedOrderId, paymentReference, timestamp, txHash] = await this.contract.getTransaction(orderId);
+      
+      return {
+        exists: true,
+        orderId: storedOrderId,
+        paymentReference: paymentReference,
+        timestamp: new Date(Number(timestamp) * 1000),
+        txHash: txHash,
+        isMock: false
+      };
+    } catch (error) {
+      return { 
+        exists: false, 
+        error: 'Transaction not found on blockchain',
+        isMock: false 
+      };
+    }
+  }
+
+  async getTransaction(orderId) {
+    const verification = await this.verifyTransaction(orderId);
     
-    return {
-      exists: false,
-      paths: possiblePaths
-    };
+    if (verification.exists) {
+      return {
+        success: true,
+        data: verification
+      };
+    } else {
+      return {
+        success: false,
+        error: verification.error
+      };
+    }
   }
 }
 

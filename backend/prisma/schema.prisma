@@ -17,6 +17,7 @@ model User {
   address            String?
   languagePreference String   @default("en")
   registrationDate   DateTime @default(now())
+  walletAddress      String?
 
   // Relations
   producerProfile      Producer?

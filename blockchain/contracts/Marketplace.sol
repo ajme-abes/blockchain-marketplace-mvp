@@ -4,73 +4,68 @@ pragma solidity ^0.8.19;
 contract Marketplace {
     struct TransactionRecord {
         string orderId;
-        string productId;
-        address buyer;
-        address seller;
-        uint256 amount;
+        string paymentReference;
         uint256 timestamp;
-        string paymentMethod;
-        string status;
+        string txHash;
     }
     
     mapping(string => TransactionRecord) public transactions;
     string[] public transactionIds;
     
-    address public owner;
-    
     event TransactionRecorded(
         string indexed orderId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 amount,
-        uint256 timestamp
+        string paymentReference,
+        uint256 timestamp,
+        string txHash
     );
-    
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
-    }
-    
-    constructor() {
-        owner = msg.sender;
-    }
     
     function recordTransaction(
         string memory _orderId,
-        string memory _productId,
-        address _buyer,
-        address _seller,
-        uint256 _amount,
-        string memory _paymentMethod,
-        string memory _status
-    ) external onlyOwner {
+        string memory _paymentReference,
+        string memory _txHash
+    ) external {
+        require(bytes(_orderId).length > 0, "Order ID required");
+        require(bytes(_paymentReference).length > 0, "Payment reference required");
         require(bytes(transactions[_orderId].orderId).length == 0, "Transaction already recorded");
         
         transactions[_orderId] = TransactionRecord({
             orderId: _orderId,
-            productId: _productId,
-            buyer: _buyer,
-            seller: _seller,
-            amount: _amount,
+            paymentReference: _paymentReference,
             timestamp: block.timestamp,
-            paymentMethod: _paymentMethod,
-            status: _status
+            txHash: _txHash
         });
         
         transactionIds.push(_orderId);
         
-        emit TransactionRecorded(_orderId, _buyer, _seller, _amount, block.timestamp);
+        emit TransactionRecorded(_orderId, _paymentReference, block.timestamp, _txHash);
     }
     
-    function getTransaction(string memory _orderId) external view returns (TransactionRecord memory) {
-        return transactions[_orderId];
+    function getTransaction(string memory _orderId) external view returns (
+        string memory orderId,
+        string memory paymentReference,
+        uint256 timestamp,
+        string memory txHash
+    ) {
+        TransactionRecord memory txRecord = transactions[_orderId];
+        require(bytes(txRecord.orderId).length > 0, "Transaction not found");
+        
+        return (
+            txRecord.orderId,
+            txRecord.paymentReference,
+            txRecord.timestamp,
+            txRecord.txHash
+        );
     }
     
-    function getAllTransactionIds() external view returns (string[] memory) {
-        return transactionIds;
+    function verifyTransaction(string memory _orderId) external view returns (bool) {
+        return bytes(transactions[_orderId].orderId).length > 0;
     }
     
     function getTransactionCount() external view returns (uint256) {
         return transactionIds.length;
+    }
+    
+    function getAllTransactionIds() external view returns (string[] memory) {
+        return transactionIds;
     }
 }
