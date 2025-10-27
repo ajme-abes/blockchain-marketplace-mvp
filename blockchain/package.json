@@ -7,12 +7,38 @@
       "node": "npx hardhat node",
       "test": "npx hardhat test"
    },
-   "devDependencies": {
-      "@nomicfoundation/hardhat-toolbox": "^6.1.0",
-      "hardhat": "^2.26.3"
-   },
    "dependencies": {
-      "dotenv": "^17.2.3",
-      "ethers": "^5.7.2"
+      "dotenv": "^17.2.3"
+   },
+   "type": "module",
+   "version": "1.0.0",
+   "description": "This project showcases a Hardhat 3 Beta project using the native Node.js test runner (`node:test`) and the `viem` library for Ethereum interactions.",
+   "main": "hardhat.config.js",
+   "directories": {
+      "test": "test"
+   },
+   "keywords": [],
+   "author": "",
+   "license": "ISC",
+   "devDependencies": {
+      "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
+      "@nomicfoundation/hardhat-ethers": "^3.1.0",
+      "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
+      "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+      "@nomicfoundation/hardhat-verify": "^2.1.1",
+      "@nomiclabs/hardhat-ethers": "^2.2.2",
+      "@typechain/ethers-v6": "^0.5.1",
+      "@typechain/hardhat": "^9.1.0",
+      "@types/chai": "^4.3.20",
+      "@types/mocha": "^10.0.10",
+      "@types/node": "^24.9.1",
+      "chai": "^4.5.0",
+      "ethers": "^5.8.0",
+      "hardhat": "^2.26.3",
+      "hardhat-gas-reporter": "^1.0.10",
+      "solidity-coverage": "^0.8.16",
+      "ts-node": "^10.9.2",
+      "typechain": "^8.3.2",
+      "typescript": "^5.9.3"
    }
 }

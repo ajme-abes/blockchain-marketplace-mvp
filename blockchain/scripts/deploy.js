@@ -1,39 +1,40 @@
-const hre = require("hardhat");
-const fs = require("fs");
+import pkg from "hardhat";
+const { ethers } = pkg;
+import fs from "fs";
 
 async function main() {
-  const [deployer] = await hre.ethers.getSigners();
+  console.log("🚀 Deploying Marketplace contract...");
 
-  console.log("Deploying contracts with the account:", deployer.address);
+  // ✅ Get signers
+  const [deployer] = await ethers.getSigners();
+  console.log("👤 Deployer address:", deployer.address);
 
-  // ✅ Corrected balance method for Ethers v6
-  const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", hre.ethers.formatEther(balance), "ETH");
-
-  // ✅ Corrected deployment method
-  const Marketplace = await hre.ethers.getContractFactory("Marketplace");
+  // ✅ Deploy contract (Ethers v5 syntax)
+  const Marketplace = await ethers.getContractFactory("Marketplace");
   const marketplace = await Marketplace.deploy();
 
-  await marketplace.waitForDeployment(); // replaces `.deployed()`
+  // ✅ Wait for deployment (Ethers v5 syntax)
+  await marketplace.deployed();
+  console.log("✅ Marketplace deployed to:", marketplace.address);
 
-  console.log("✅ Marketplace contract deployed successfully!");
-  console.log("Contract address:", marketplace.target);
-  console.log("Deployer address:", deployer.address);
+  // ✅ Get network info
+  const network = await ethers.provider.getNetwork();
 
-  // ✅ Save contract info to file
+  // Save contract info to file
   const contractInfo = {
-    address: marketplace.target,
+    address: marketplace.address,
     deployer: deployer.address,
-    network: "localhost",
+    network: network.name || "localhost",
+    chainId: network.chainId,
+    deploymentTime: new Date().toISOString()
   };
-  fs.writeFileSync("../contract-info.json", JSON.stringify(contractInfo, null, 2));
 
-  return marketplace.target;
+  fs.writeFileSync("contract-info.json", JSON.stringify(contractInfo, null, 2));
+  console.log("📄 Contract info saved to contract-info.json");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("❌ Deployment failed:", error);
-    process.exit(1);
-  });
+// ✅ Always wrap main in catch block
+main().catch((error) => {
+  console.error("❌ Deployment failed:", error);
+  process.exitCode = 1;
+});
