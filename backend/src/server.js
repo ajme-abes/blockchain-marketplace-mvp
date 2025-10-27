@@ -11,6 +11,7 @@ const jobService = require('./services/jobService');
 const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
+const notificationRoutes = require('./routes/notifications');
 require('dotenv').config();
 
 const app = express();
@@ -123,6 +124,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/notifications', notificationRoutes);
+
 
 // ==================== ERROR HANDLING ====================
 

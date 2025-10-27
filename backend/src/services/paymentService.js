@@ -187,6 +187,16 @@ async handlePaymentWebhook(webhookData) {
             paymentConfirmations: {
               orderBy: { confirmedAt: 'desc' },
               take: 1
+            },
+            // ADD: Include order items for producer notification
+            orderItems: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
             }
           }
         }
@@ -208,17 +218,17 @@ async handlePaymentWebhook(webhookData) {
     const result = await prisma.$transaction(async (tx) => {
       console.log('💾 Starting database transaction...');
 
-const paymentConfirmation = await tx.paymentConfirmation.updateMany({
-  where: { 
-    orderId: orderId,
-    isConfirmed: false
-  },
-  data: {
-    confirmedAt: new Date(),
-    blockchainTxHash: status === 'success' ? transaction_id : null,
-    isConfirmed: true
-  }
-});
+      const paymentConfirmation = await tx.paymentConfirmation.updateMany({
+        where: { 
+          orderId: orderId,
+          isConfirmed: false
+        },
+        data: {
+          confirmedAt: new Date(),
+          blockchainTxHash: status === 'success' ? transaction_id : null,
+          isConfirmed: true
+        }
+      });
 
       console.log('✅ Updated payment confirmations:', paymentConfirmation.count);
 
@@ -232,7 +242,8 @@ const paymentConfirmation = await tx.paymentConfirmation.updateMany({
             confirmationMethod: 'CHAPA',
             confirmedAt: new Date(),
             blockchainTxHash: status === 'success' ? transaction_id : null,
-            proofImageUrl: null
+            proofImageUrl: null,
+            isConfirmed: true
           }
         });
         console.log('✅ Created new payment confirmation');
@@ -242,7 +253,9 @@ const paymentConfirmation = await tx.paymentConfirmation.updateMany({
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: {
-          paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED'
+          paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED',
+          // Also update delivery status if payment successful
+          deliveryStatus: status === 'success' ? 'CONFIRMED' : 'PENDING'
         },
         include: {
           buyer: {
@@ -269,57 +282,132 @@ const paymentConfirmation = await tx.paymentConfirmation.updateMany({
 
       console.log('✅ Marked payment reference as used');
 
-      // Create status history for payment confirmation
-      // if (status === 'success') {
-      //   await tx.orderStatusHistory.create({
-      //     data: {
-      //       orderId: orderId,
-      //       fromStatus: updatedOrder.deliveryStatus,
-      //       toStatus: updatedOrder.deliveryStatus, // Delivery status remains same
-      //       changedById: updatedOrder.buyer.user.id,
-      //       reason: `Payment confirmed via Chapa - TX: ${transaction_id}`
-      //     }
-      //   });
-      //   console.log('✅ Created payment status history');
-      // }
-      // After successful payment in handlePaymentWebhook:
-if (status === 'success') {
-  try {
-    const blockchainService = require('./blockchainService');
-    
-    // Get payment reference for blockchain recording
-    const paymentRef = await prisma.paymentReference.findFirst({
-      where: { orderId: orderId }
-    });
+      // ==================== NOTIFICATION INTEGRATION ====================
+      
+      if (status === 'success') {
+        try {
+          const blockchainService = require('./blockchainService');
+          const notificationService = require('./notificationService');
+          
+          // Get payment reference for blockchain recording
+          const paymentRef = await prisma.paymentReference.findFirst({
+            where: { orderId: orderId }
+          });
 
-    if (paymentRef) {
-      // Record on blockchain with correct parameters
-      const blockchainResult = await blockchainService.recordTransaction({
-        orderId: orderId,
-        paymentReference: paymentRef.paymentCode, // Use payment code from reference
-        txHash: transaction_id // Chapa transaction ID
-      });
+          if (paymentRef) {
+            // Record on blockchain with correct parameters
+            const blockchainResult = await blockchainService.recordTransaction({
+              orderId: orderId,
+              paymentReference: paymentRef.paymentCode, // Use payment code from reference
+              txHash: transaction_id // Chapa transaction ID
+            });
 
-      console.log('🔗 Blockchain recording result:', {
-        success: blockchainResult.success,
-        isMock: blockchainResult.isMock,
-        message: blockchainResult.message
-      });
+            console.log('🔗 Blockchain recording result:', {
+              success: blockchainResult.success,
+              isMock: blockchainResult.isMock,
+              message: blockchainResult.message
+            });
 
-      // Update order with blockchain hash if real transaction
-      if (blockchainResult.success && !blockchainResult.isMock) {
-        await tx.order.update({
-          where: { id: orderId },
-          data: { blockchainTxHash: blockchainResult.transactionHash }
-        });
-        console.log('✅ Updated order with blockchain hash');
+            // Update order with blockchain hash if real transaction
+            if (blockchainResult.success && !blockchainResult.isMock) {
+              await tx.order.update({
+                where: { id: orderId },
+                data: { blockchainTxHash: blockchainResult.transactionHash }
+              });
+              console.log('✅ Updated order with blockchain hash');
+            }
+
+            // ========== SEND NOTIFICATIONS ==========
+            
+            // 1. Send payment confirmation to buyer
+            console.log('📢 Sending payment confirmation notification to buyer...');
+            await notificationService.sendPaymentConfirmedNotification(orderId)
+              .then(result => {
+                if (result.success) {
+                  console.log('✅ Payment confirmation notification sent to buyer');
+                } else {
+                  console.log('⚠️ Payment confirmation notification failed:', result.error);
+                }
+              })
+              .catch(error => {
+                console.error('❌ Payment notification error:', error);
+              });
+
+            // 2. Send blockchain verification notification to buyer
+            if (blockchainResult.success && !blockchainResult.isMock) {
+              console.log('📢 Sending blockchain verification notification...');
+              await notificationService.sendBlockchainVerificationNotification(
+                orderId, 
+                blockchainResult.transactionHash
+              )
+                .then(result => {
+                  if (result.success) {
+                    console.log('✅ Blockchain verification notification sent');
+                  } else {
+                    console.log('⚠️ Blockchain notification failed:', result.error);
+                  }
+                })
+                .catch(error => {
+                  console.error('❌ Blockchain notification error:', error);
+                });
+            }
+
+            // 3. Send new order notification to producer(s)
+            console.log('📢 Sending new order notification to producer...');
+            await notificationService.sendNewOrderNotificationToProducer(orderId)
+              .then(result => {
+                if (result.success) {
+                  console.log('✅ New order notification sent to producer');
+                } else {
+                  console.log('⚠️ Producer notification failed:', result.error);
+                }
+              })
+              .catch(error => {
+                console.error('❌ Producer notification error:', error);
+              });
+
+            // 4. Send order status update notification
+            console.log('📢 Sending order status notification...');
+            await notificationService.sendOrderStatusNotification(orderId, 'CONFIRMED')
+              .then(result => {
+                if (result.success) {
+                  console.log('✅ Order status notification sent');
+                } else {
+                  console.log('⚠️ Order status notification failed:', result.error);
+                }
+              })
+              .catch(error => {
+                console.error('❌ Order status notification error:', error);
+              });
+          }
+        } catch (blockchainError) {
+          console.error('⚠️ Blockchain recording failed, but payment succeeded:', blockchainError);
+          // Don't fail the payment process if blockchain fails
+          
+          // Still send payment confirmation even if blockchain fails
+          try {
+            const notificationService = require('./notificationService');
+            await notificationService.sendPaymentConfirmedNotification(orderId);
+            console.log('✅ Payment notification sent (blockchain failed)');
+          } catch (notifError) {
+            console.error('❌ Payment notification also failed:', notifError);
+          }
+        }
+      } else {
+        // Payment failed - send failure notification
+        console.log('📢 Sending payment failure notification...');
+        try {
+          const notificationService = require('./notificationService');
+          await notificationService.createNotification(
+            order.buyer.user.id,
+            `Payment failed for order #${orderId.substring(0, 8)}. Please try again or contact support.`,
+            'GENERAL'
+          );
+          console.log('✅ Payment failure notification sent');
+        } catch (notifError) {
+          console.error('❌ Payment failure notification error:', notifError);
+        }
       }
-    }
-  } catch (blockchainError) {
-    console.error('⚠️ Blockchain recording failed, but payment succeeded:', blockchainError);
-    // Don't fail the payment process if blockchain fails
-  }
-}
 
       return { order: updatedOrder };
     });
