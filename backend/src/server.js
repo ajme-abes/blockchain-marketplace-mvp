@@ -12,6 +12,7 @@ const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const notificationRoutes = require('./routes/notifications');
+const reviewRoutes = require('./routes/reviews');
 require('dotenv').config();
 
 const app = express();
@@ -125,7 +126,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
-
+app.use('/api/reviews', reviewRoutes);
 
 // ==================== ERROR HANDLING ====================
 

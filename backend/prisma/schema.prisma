@@ -78,6 +78,8 @@ model Product {
   imageUrl          String?
   status            ProductStatus @default(ACTIVE)
   listingDate       DateTime      @default(now())
+  averageRating     Float?        @default(0)
+  reviewCount       Int?          @default(0)
 
   // Relations
   producerId String
