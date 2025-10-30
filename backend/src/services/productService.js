@@ -2,49 +2,59 @@
 const { prisma } = require('../config/database');
 
 class ProductService {
-  async createProduct(productData) {
-    const { name, description, price, category, quantity, producerId, imageCid } = productData;
+async createProduct(productData) {
+  const { name, description, price, category, quantity, producerId, imageCid } = productData;
 
-    console.log('🔧 Creating product with producerId:', producerId);
+  console.log('🔧 Creating product with producerId:', producerId);
 
-    // First, find the producer profile for this user
-    const producer = await prisma.producer.findUnique({
-      where: { userId: producerId }
-    });
+  // First, find the producer profile for this user
+  const producer = await prisma.producer.findUnique({
+    where: { userId: producerId }
+  });
 
-    if (!producer) {
-      throw new Error('Producer profile not found. User must have a producer profile to create products.');
-    }
+  if (!producer) {
+    throw new Error('Producer profile not found. User must have a producer profile to create products.');
+  }
 
-    console.log('🔧 Found producer profile:', producer.id);
+  console.log('🔧 Found producer profile:', producer.id);
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        description,
-        price,
-        category,
-        quantityAvailable: quantity,
-        producerId: producer.id, // Use the producer.id, not user.id
-        imageUrl: imageCid ? `ipfs://${imageCid}` : null,
-      },
-      include: {
-        producer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
+  // Create product with IPFS file relation if imageCid exists
+  const product = await prisma.product.create({
+    data: {
+      name,
+      description,
+      price,
+      category,
+      quantityAvailable: quantity,
+      producerId: producer.id,
+      imageUrl: imageCid ? `ipfs://${imageCid}` : null,
+      // Link existing IPFS file if imageCid was provided
+      ...(imageCid && {
+        ipfsFiles: {
+          connect: {
+            cid: imageCid
+          }
+        }
+      })
+    },
+    include: {
+      producer: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
             }
           }
         }
-      }
-    });
+      },
+      ipfsFiles: true // Make sure to include IPFS files
+    }
+  });
 
-    return this.formatProductResponse(product);
-  }
+  return this.formatProductResponse(product);
+}
 
 async getProducts(filters = {}) {
   const { 
@@ -53,14 +63,16 @@ async getProducts(filters = {}) {
     minPrice, 
     maxPrice, 
     page = 1, 
-    limit = 10
+    limit = 10,
+    sortBy = 'listingDate', 
+    sortOrder = 'desc' 
   } = filters;
 
   const where = {
     status: 'ACTIVE'
   };
 
-  // Apply filters
+  // Apply filters (your existing code remains the same)
   if (category) where.category = category;
   if (minPrice !== undefined || maxPrice !== undefined) {
     where.price = {};
@@ -74,6 +86,11 @@ async getProducts(filters = {}) {
       { category: { contains: search, mode: 'insensitive' } }
     ];
   }
+
+  // Define allowed sort fields for security
+  const allowedSortFields = ['listingDate', 'price', 'name', 'averageRating'];
+  const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'listingDate';
+  const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
 
   const [products, totalCount] = await Promise.all([
     prisma.product.findMany({
@@ -97,7 +114,7 @@ async getProducts(filters = {}) {
         },
         ipfsFiles: true
       },
-      orderBy: { listingDate: 'desc' }, // HARDCODED - remove dynamic [sortBy]
+      orderBy: { [sortField]: orderDirection }, // Now dynamic and secure
       skip: (page - 1) * limit,
       take: limit
     }),
@@ -257,14 +274,34 @@ async getProducerProducts(userId, pagination = {}) {
   };
 }
 
+// In productService.js - Update the formatProductResponse method
 formatProductResponse(product) {
   const avgRating = product.reviews && product.reviews.length > 0 
     ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
     : null;
 
-  // Get IPFS CID from ipfsFiles relationship or from imageUrl
+  // Get IPFS CID and construct proper gateway URL
   const ipfsFile = product.ipfsFiles && product.ipfsFiles[0];
   const imageCid = ipfsFile ? ipfsFile.cid : (product.imageUrl ? product.imageUrl.replace('ipfs://', '') : null);
+  
+  // Construct proper IPFS gateway URLs (multiple options for fallback)
+  const getImageUrl = (cid) => {
+    if (!cid) return null;
+    
+    const gateways = [
+      `https://ipfs.io/ipfs/${cid}`,          // Public IPFS gateway
+      `https://gateway.pinata.cloud/ipfs/${cid}`, // Pinata gateway
+      `https://cloudflare-ipfs.com/ipfs/${cid}`,  // Cloudflare gateway
+    ];
+    
+    return {
+      primary: gateways[0],
+      alternatives: gateways.slice(1),
+      ipfs: `ipfs://${cid}` // Native IPFS URI
+    };
+  };
+
+  const imageUrls = imageCid ? getImageUrl(imageCid) : null;
 
   return {
     id: product.id,
@@ -274,8 +311,20 @@ formatProductResponse(product) {
     category: product.category,
     quantityAvailable: product.quantityAvailable,
     status: product.status,
-    imageUrl: product.imageUrl,
-    imageCid: imageCid,
+    images: {
+      url: imageUrls ? imageUrls.primary : product.imageUrl, // Main URL for display
+      ipfsCid: imageCid,
+      ipfsUri: imageUrls ? imageUrls.ipfs : null,
+      alternatives: imageUrls ? imageUrls.alternatives : []
+    },
+    ipfsMetadata: ipfsFile ? {
+      cid: ipfsFile.cid,
+      name: ipfsFile.name,
+      mimeType: ipfsFile.mimeType,
+      size: ipfsFile.size,
+      category: ipfsFile.category,
+      createdAt: ipfsFile.createdAt
+    } : null,
     averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
     reviewCount: product.reviews ? product.reviews.length : 0,
     producer: product.producer ? {
@@ -285,7 +334,7 @@ formatProductResponse(product) {
       verificationStatus: product.producer.verificationStatus,
       user: product.producer.user
     } : null,
-    listingDate: product.listingDate, // Changed from createdAt
+    listingDate: product.listingDate,
     updatedAt: product.updatedAt
   };
 }

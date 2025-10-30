@@ -14,6 +14,7 @@ const paymentRoutes = require('./routes/payments');
 const notificationRoutes = require('./routes/notifications');
 const reviewRoutes = require('./routes/reviews');
 const adminRoutes = require('./routes/admin');
+const ipfsRoutes = require('./routes/ipfs');
 require('dotenv').config();
 
 const app = express();
@@ -129,6 +130,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ipfs', ipfsRoutes);
 
 // ==================== ERROR HANDLING ====================
 
