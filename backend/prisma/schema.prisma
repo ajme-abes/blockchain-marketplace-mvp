@@ -18,6 +18,11 @@ model User {
   languagePreference String   @default("en")
   registrationDate   DateTime @default(now())
   walletAddress      String?
+  emailVerified      Boolean  @default(false)
+  verificationToken  String?  @unique
+  verificationTokenExpires DateTime?
+  resetToken         String?  @unique
+  resetTokenExpires  DateTime?
 
   // Relations
   producerProfile      Producer?

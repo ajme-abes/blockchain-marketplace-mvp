@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notifications');
 const reviewRoutes = require('./routes/reviews');
 const adminRoutes = require('./routes/admin');
 const ipfsRoutes = require('./routes/ipfs');
+const emailVerificationRoutes = require('./routes/emailVerification');
 require('dotenv').config();
 
 const app = express();
@@ -131,7 +132,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ipfs', ipfsRoutes);
-
+app.use('/api/email-verification', emailVerificationRoutes);
 // ==================== ERROR HANDLING ====================
 
 // 404 handler - Catch undefined routes

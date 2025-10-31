@@ -139,5 +139,6 @@ const optionalAuth = async (req, res, next) => {
 module.exports = { 
   authenticateToken, 
   requireRole, 
-  optionalAuth 
+  optionalAuth,
+  requireVerifiedEmail: require('./requireVerifiedEmail').requireVerifiedEmail 
 };

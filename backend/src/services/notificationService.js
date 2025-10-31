@@ -7,6 +7,51 @@ class NotificationService {
     this.initEmailTransporter();
   }
 
+    // === ADD THIS NEW METHOD RIGHT HERE ===
+  async sendEmail(emailData) {
+    try {
+      const { to, subject, html, text } = emailData;
+      
+      if (!this.isEmailConfigured) {
+        return { 
+          success: false, 
+          error: 'Email not configured',
+          note: 'Set EMAIL_USER and EMAIL_PASSWORD in .env'
+        };
+      }
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || `"Blockchain Marketplace" <${process.env.EMAIL_USER}>`,
+        to: to,
+        subject: subject,
+        html: html,
+        text: text || this.htmlToText(html)
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`📧 Email sent to ${to}: ${subject}`);
+      
+      return { 
+        success: true, 
+        messageId: result.messageId 
+      };
+    } catch (error) {
+      console.error('❌ Email sending error:', error);
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    }
+  }
+
+  // === ALSO ADD THIS HELPER METHOD ===
+  htmlToText(html) {
+    return html
+      .replace(/<[^>]*>/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   initEmailTransporter() {
     // Check if email configuration exists
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
@@ -43,6 +88,8 @@ class NotificationService {
       this.isEmailConfigured = false;
     }
   }
+
+  
 
   // ==================== CORE NOTIFICATION METHODS ====================
 
