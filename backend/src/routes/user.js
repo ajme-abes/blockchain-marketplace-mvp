@@ -55,7 +55,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Create user using the original createUser method
+    // Create user using the UPDATED createUser method (with email verification)
     const user = await userService.createUser({
       email,
       password,
@@ -76,7 +76,9 @@ router.post('/register', async (req, res) => {
         role: user.role,
         phone: user.phone,
         address: user.address,
-        registrationDate: user.registrationDate
+        registrationDate: user.registrationDate,
+        emailVerified: user.emailVerified || false, // ADD THIS
+        verificationEmailSent: user.verificationEmailSent || false // ADD THIS
       };
 
       return res.status(201).json({
@@ -101,16 +103,26 @@ router.post('/register', async (req, res) => {
       role: user.role,
       phone: user.phone,
       address: user.address,
-      registrationDate: user.registrationDate
+      registrationDate: user.registrationDate,
+      emailVerified: user.emailVerified || false, // ADD THIS
+      verificationEmailSent: user.verificationEmailSent || false // ADD THIS
     };
+
+    // Customize success message based on email verification status
+    let successMessage = 'User registered successfully with JWT token (session creation disabled)';
+    if (user.verificationEmailSent) {
+      successMessage = 'User registered successfully. Please check your email for verification.';
+    } else if (user.note) {
+      successMessage = `User registered successfully. ${user.note}`;
+    }
 
     res.status(201).json({
       status: 'success',
-      message: 'User registered successfully with JWT token (session creation disabled)',
+      message: successMessage,
       data: {
         user: userResponse,
         token: token,
-        note: "Session creation temporarily disabled - database migration needed"
+        note: user.note || "Session creation temporarily disabled - database migration needed"
       }
     });
 

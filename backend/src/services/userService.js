@@ -1,3 +1,4 @@
+// backend/src/services/userService.js
 const { prisma } = require('../config/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
 
@@ -57,16 +58,45 @@ class UserService {
       
       console.log('✅ Transaction completed successfully');
       
+      // Email verification integration
+      let emailResult;
+      try {
+        console.log('🔧 Loading email verification service...');
+        const emailVerificationService = require('./emailVerificationService');
+        console.log('✅ Email verification service loaded');
+        
+        console.log('🔧 Sending verification email...');
+        emailResult = await emailVerificationService.sendVerificationEmail(user);
+        console.log('🔧 Email service result:', emailResult);
+      } catch (emailError) {
+        console.warn('⚠️ Email verification service failed:', emailError.message);
+        emailResult = {
+          success: false,
+          error: emailError.message,
+          note: 'Email service not available'
+        };
+      }
+      
       // Return user without password
-      return {
+      const response = {
         id: user.id,
         email: user.email,
         name: user.name,
         phone: user.phone,
         role: user.role,
         address: user.address,
-        registrationDate: user.registrationDate
+        registrationDate: user.registrationDate,
+        emailVerified: false,
+        verificationEmailSent: emailResult ? emailResult.success : false
       };
+
+      // Add note if email failed
+      if (emailResult && !emailResult.success) {
+        response.note = emailResult.error || 'Verification email not sent';
+      }
+
+      return response;
+
     } catch (error) {
       console.error('❌ createUser error:', error);
       throw error;
@@ -126,8 +156,26 @@ class UserService {
       
       console.log('✅ Profile transaction completed successfully');
       
+      // Email verification integration
+      let emailResult;
+      try {
+        console.log('🔧 Loading email verification service for profile creation...');
+        const emailVerificationService = require('./emailVerificationService');
+        console.log('✅ Email verification service loaded');
+        
+        console.log('🔧 Sending verification email...');
+        emailResult = await emailVerificationService.sendVerificationEmail(user);
+        console.log('🔧 Email service result:', emailResult);
+      } catch (emailError) {
+        console.warn('⚠️ Email verification service failed:', emailError.message);
+        emailResult = {
+          success: false,
+          error: emailError.message
+        };
+      }
+      
       // Return user with profile information
-      return {
+      const response = {
         id: user.id,
         email: user.email,
         name: user.name,
@@ -136,8 +184,18 @@ class UserService {
         address: user.address,
         registrationDate: user.registrationDate,
         hasProducerProfile: role === 'PRODUCER',
-        hasBuyerProfile: role === 'BUYER'
+        hasBuyerProfile: role === 'BUYER',
+        emailVerified: false,
+        verificationEmailSent: emailResult ? emailResult.success : false
       };
+
+      // Add note if email failed
+      if (emailResult && !emailResult.success) {
+        response.note = emailResult.error || 'Verification email not sent';
+      }
+
+      return response;
+
     } catch (error) {
       console.error('❌ createUserWithProfile error:', error);
       throw error;
@@ -158,6 +216,7 @@ class UserService {
           role: true,
           address: true,
           registrationDate: true,
+          emailVerified: true, // ADD THIS
           producerProfile: {
             select: {
               id: true,
@@ -191,6 +250,7 @@ class UserService {
           role: true,
           address: true,
           registrationDate: true,
+          emailVerified: true, // ADD THIS
           producerProfile: {
             select: {
               businessName: true,
@@ -255,7 +315,8 @@ class UserService {
           role: true,
           address: true,
           languagePreference: true,
-          registrationDate: true
+          registrationDate: true,
+          emailVerified: true // ADD THIS
         }
       });
     } catch (error) {
