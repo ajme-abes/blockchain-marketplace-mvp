@@ -1,3 +1,4 @@
+// src/components/Register.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,24 +10,66 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const Register = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'producer' | 'buyer'>('buyer');
-  const { login } = useAuth();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    address: '',
+    role: 'BUYER' as 'BUYER' | 'PRODUCER',
+  });
+  
+  const { register, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      // Mock registration - in real app would call registration API
-      await login(email, password, role);
-      toast.success('Registration successful! Welcome to EthioTrust.');
-      navigate('/dashboard');
-    } catch (error) {
-      toast.error('Registration failed. Please try again.');
+    clearError();
+
+    // Validation
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
     }
+
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      const { confirmPassword, ...registerData } = formData;
+      const response = await register(registerData);
+      
+      if (response?.status === 'success') {
+        if (response.data?.user?.verificationEmailSent) {
+          toast.success('Registration successful! Please check your email for verification.');
+          navigate('/verify-email-notice', { 
+            state: { email: formData.email } 
+          });
+        } else {
+          toast.success('Registration successful! Welcome to EthioTrust.');
+          
+          // Redirect based on role
+          if (formData.role === 'PRODUCER') {
+            navigate('/producer/dashboard');
+          } else {
+            navigate('/buyer/dashboard');
+          }
+        }
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Registration failed. Please try again.');
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (error) clearError();
   };
 
   return (
@@ -42,6 +85,12 @@ const Register = () => {
           <CardDescription>Join EthioTrust today</CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">Full Name</Label>
@@ -49,9 +98,10 @@ const Register = () => {
                 id="name"
                 type="text"
                 placeholder="John Doe"
-                value={name}
-                onChange={e => setName(e.target.value)}
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div>
@@ -60,9 +110,10 @@ const Register = () => {
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div>
@@ -71,9 +122,21 @@ const Register = () => {
                 id="phone"
                 type="tel"
                 placeholder="+251911234567"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
                 required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                type="text"
+                placeholder="Your address"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                disabled={loading}
               />
             </div>
             <div>
@@ -82,9 +145,22 @@ const Register = () => {
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
                 required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                required
+                disabled={loading}
               />
             </div>
             <div>
@@ -92,15 +168,21 @@ const Register = () => {
               <select
                 id="role"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={role}
-                onChange={e => setRole(e.target.value as any)}
+                value={formData.role}
+                onChange={(e) => handleInputChange('role', e.target.value)}
+                disabled={loading}
               >
-                <option value="buyer">Buyer</option>
-                <option value="producer">Producer</option>
+                <option value="BUYER">Buyer</option>
+                <option value="PRODUCER">Producer</option>
               </select>
             </div>
-            <Button type="submit" variant="hero" className="w-full">
-              Create Account
+            <Button 
+              type="submit" 
+              variant="hero" 
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
           <div className="mt-6 text-center text-sm">

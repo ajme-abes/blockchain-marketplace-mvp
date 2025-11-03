@@ -1,3 +1,4 @@
+// In Dashboard.tsx - Fix the role comparison
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -16,16 +17,31 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  if (!user) return null;
+  console.log('🔧 Dashboard: Current user:', user); // Add this for debugging
 
-  const stats = user.role === 'producer' 
+  if (!user) {
+    console.log('🔧 Dashboard: No user found, showing loading state');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Convert role to lowercase for comparison with your existing code
+  const userRole = user.role.toLowerCase() as 'buyer' | 'producer' | 'admin';
+
+  const stats = userRole === 'producer' 
     ? [
         { title: 'Total Listings', value: '12', icon: Package, color: 'text-primary' },
         { title: 'Pending Orders', value: '5', icon: ShoppingCart, color: 'text-secondary' },
         { title: 'Monthly Earnings', value: '45,230 ETB', icon: DollarSign, color: 'text-accent' },
         { title: 'Growth', value: '+12%', icon: TrendingUp, color: 'text-primary' },
       ]
-    : user.role === 'buyer'
+    : userRole === 'buyer'
     ? [
         { title: 'Total Orders', value: '8', icon: ShoppingCart, color: 'text-primary' },
         { title: 'Pending', value: '2', icon: Package, color: 'text-secondary' },
@@ -47,8 +63,8 @@ const Dashboard = () => {
           <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
             <SidebarTrigger />
             <h1 className="text-xl font-bold ml-4">
-              {user.role === 'producer' ? 'Producer Dashboard' :
-               user.role === 'buyer' ? 'Buyer Dashboard' :
+              {userRole === 'producer' ? 'Producer Dashboard' :
+               userRole === 'buyer' ? 'Buyer Dashboard' :
                'Admin Dashboard'}
             </h1>
           </header>
