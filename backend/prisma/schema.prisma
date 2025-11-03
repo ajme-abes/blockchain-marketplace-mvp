@@ -8,21 +8,21 @@ datasource db {
 }
 
 model User {
-  id                 String   @id @default(uuid())
-  email              String   @unique
-  passwordHash       String
-  name               String
-  phone              String?
-  role               UserRole @default(BUYER)
-  address            String?
-  languagePreference String   @default("en")
-  registrationDate   DateTime @default(now())
-  walletAddress      String?
-  emailVerified      Boolean  @default(false)
-  verificationToken  String?  @unique
+  id                       String    @id @default(uuid())
+  email                    String    @unique
+  passwordHash             String
+  name                     String
+  phone                    String?
+  role                     UserRole  @default(BUYER)
+  address                  String?
+  languagePreference       String    @default("en")
+  registrationDate         DateTime  @default(now())
+  walletAddress            String?
+  emailVerified            Boolean   @default(false)
+  verificationToken        String?   @unique
   verificationTokenExpires DateTime?
-  resetToken         String?  @unique
-  resetTokenExpires  DateTime?
+  resetToken               String?   @unique
+  resetTokenExpires        DateTime?
 
   // Relations
   producerProfile      Producer?
@@ -30,10 +30,15 @@ model User {
   orders               Order[]               @relation("UserOrders")
   paymentConfirmations PaymentConfirmation[] @relation("UserPaymentConfirmations")
   notifications        Notification[]
-  auditLogs           AuditLog[]
-  sessions            Session[]
-  ipfsFiles           IPFSMetadata[]
+  auditLogs            AuditLog[]
+  sessions             Session[]
+  ipfsFiles            IPFSMetadata[]
   statusHistoryChanges OrderStatusHistory[]
+
+  disputesRaised   Dispute[]         @relation("UserDisputesRaised")
+  disputesResolved Dispute[]         @relation("UserDisputesResolved")
+  disputeEvidences DisputeEvidence[]
+  disputeMessages  DisputeMessage[]
 
   @@index([email])
   @@index([role])
@@ -88,7 +93,7 @@ model Product {
 
   // Relations
   producerId String
-  producer   Producer    @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  producer   Producer       @relation(fields: [producerId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
   reviews    Review[]
   ipfsFiles  IPFSMetadata[]
@@ -112,8 +117,8 @@ model Order {
   deliveryStatus   DeliveryStatus @default(PENDING)
   orderDate        DateTime       @default(now())
   blockchainTxHash String?
-  shippingAddress Json?       
-  updatedAt       DateTime    @updatedAt
+  shippingAddress  Json?
+  updatedAt        DateTime       @updatedAt
 
   // Relations
   buyerId              String
@@ -124,7 +129,9 @@ model Order {
   paymentConfirmations PaymentConfirmation[]
   blockchainRecords    BlockchainRecord[]
   statusHistory        OrderStatusHistory[]
-  paymentReferences PaymentReference[]  
+  paymentReferences    PaymentReference[]
+
+  dispute Dispute?
 
   @@index([buyerId])
   @@index([paymentStatus])
@@ -177,7 +184,7 @@ model OrderStatusHistory {
 model PaymentConfirmation {
   id                 String        @id @default(uuid())
   confirmationMethod PaymentMethod
-  confirmedAt        DateTime      
+  confirmedAt        DateTime
   isConfirmed        Boolean       @default(false)
   proofImageUrl      String?
   blockchainTxHash   String?
@@ -194,13 +201,14 @@ model PaymentConfirmation {
   @@index([confirmationMethod])
   @@map("payment_confirmations")
 }
+
 model PaymentReference {
-  id           String   @id @default(uuid())
-  orderId      String
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentCode  String   @unique
-  generatedAt  DateTime @default(now())
-  usedAt       DateTime?
+  id          String    @id @default(uuid())
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentCode String    @unique
+  generatedAt DateTime  @default(now())
+  usedAt      DateTime?
 
   @@index([orderId])
   @@index([paymentCode])
@@ -279,7 +287,7 @@ model AuditLog {
   ipAddress String?
   userAgent String?
   timestamp DateTime @default(now())
-  
+
   @@index([action])
   @@index([entity, entityId])
   @@index([timestamp])
@@ -313,17 +321,17 @@ model Session {
 }
 
 model IPFSMetadata {
-  id        String   @id @default(uuid())
-  cid       String   @unique
+  id        String       @id @default(uuid())
+  cid       String       @unique
   name      String?
   mimeType  String?
   size      Int?
   category  IPFSCategory
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: NoAction)
+  user      User?        @relation(fields: [userId], references: [id], onDelete: NoAction)
   productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: NoAction)
-  createdAt DateTime @default(now())
+  product   Product?     @relation(fields: [productId], references: [id], onDelete: NoAction)
+  createdAt DateTime     @default(now())
 
   @@index([cid])
   @@index([category])
@@ -396,4 +404,95 @@ enum IPFSCategory {
   DOCUMENT
   PAYMENT_PROOF
   BUSINESS_LICENSE
+}
+
+model Dispute {
+  id           String        @id @default(uuid())
+  orderId      String        @unique
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  raisedById   String
+  raisedBy     User          @relation("UserDisputesRaised", fields: [raisedById], references: [id], onDelete: Cascade)
+  reason       String
+  description  String?
+  status       DisputeStatus @default(OPEN)
+  resolution   String?
+  resolvedById String?
+  resolvedBy   User?         @relation("UserDisputesResolved", fields: [resolvedById], references: [id], onDelete: NoAction)
+  resolvedAt   DateTime?
+  refundAmount Float?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  evidence DisputeEvidence[]
+  messages DisputeMessage[]
+
+  @@index([orderId])
+  @@index([raisedById])
+  @@index([status])
+  @@index([createdAt])
+  @@index([raisedById, status])
+  @@map("disputes")
+}
+
+model DisputeEvidence {
+  id           String       @id @default(uuid())
+  disputeId    String
+  dispute      Dispute      @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  type         EvidenceType
+  url          String // IPFS URL for files
+  filename     String?
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedAt   DateTime     @default(now())
+  description  String?
+
+  @@index([disputeId])
+  @@index([type])
+  @@index([uploadedById])
+  @@map("dispute_evidence")
+}
+
+model DisputeMessage {
+  id         String             @id @default(uuid())
+  disputeId  String
+  dispute    Dispute            @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content    String
+  type       DisputeMessageType @default(MESSAGE)
+  isInternal Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+
+  @@index([disputeId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@index([disputeId, createdAt])
+  @@map("dispute_messages")
+}
+
+// Add these enums to your existing enums
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CANCELLED
+  REFUNDED
+}
+
+enum EvidenceType {
+  IMAGE
+  DOCUMENT
+  VIDEO
+  SCREENSHOT
+  OTHER
+}
+
+enum DisputeMessageType {
+  MESSAGE
+  INTERNAL_NOTE
+  RESOLUTION_UPDATE
+  STATUS_CHANGE
 }

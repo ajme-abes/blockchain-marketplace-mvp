@@ -549,6 +549,70 @@ async createOrder(orderData, userId) { // Add userId parameter
     }));
   }
 
+  // Add to your existing orderService.js
+async validateOrderForDispute(orderId, userId) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        buyer: {
+          include: {
+            user: true
+          }
+        },
+        orderItems: {
+          include: {
+            product: {
+              include: {
+                producer: {
+                  include: {
+                    user: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!order) {
+      return { valid: false, error: 'Order not found' };
+    }
+
+    // Check if user is involved in the order
+    const isBuyer = order.buyer.userId === userId;
+    const isProducer = order.orderItems.some(item => 
+      item.product.producer.userId === userId
+    );
+
+    if (!isBuyer && !isProducer) {
+      return { valid: false, error: 'You are not authorized to raise a dispute for this order' };
+    }
+
+    // Check if order is in a state that allows disputes
+    const allowedStatuses = ['CONFIRMED', 'SHIPPED', 'DELIVERED'];
+    if (!allowedStatuses.includes(order.deliveryStatus)) {
+      return { valid: false, error: 'Disputes can only be raised for confirmed, shipped, or delivered orders' };
+    }
+
+    // Check if dispute already exists
+    const existingDispute = await prisma.dispute.findUnique({
+      where: { orderId }
+    });
+
+    if (existingDispute) {
+      return { valid: false, error: 'A dispute already exists for this order' };
+    }
+
+    return { valid: true, order };
+
+  } catch (error) {
+    console.error('Validate order for dispute error:', error);
+    return { valid: false, error: error.message };
+  }
+}
+
   // Helper function to map string status to Prisma enum
   mapStatusToEnum(status) {
     const upper = status.toUpperCase();
