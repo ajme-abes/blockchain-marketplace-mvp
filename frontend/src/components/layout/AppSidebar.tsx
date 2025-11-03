@@ -63,9 +63,9 @@ export const AppSidebar = () => {
   ];
 
   let roleLinks: typeof commonLinks = [];
-  if (user?.role === 'producer') roleLinks = producerLinks;
-  if (user?.role === 'buyer') roleLinks = buyerLinks;
-  if (user?.role === 'admin') roleLinks = adminLinks;
+  if (user?.role === 'PRODUCER') roleLinks = producerLinks;
+  if (user?.role === 'BUYER') roleLinks = buyerLinks;
+  if (user?.role === 'ADMIN') roleLinks = adminLinks;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -110,7 +110,7 @@ export const AppSidebar = () => {
 
         {roleLinks.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>{user?.role === 'admin' ? 'Admin' : 'My Activity'}</SidebarGroupLabel>
+            <SidebarGroupLabel>{user?.role === 'ADMIN' ? 'Admin' : 'My Activity'}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {roleLinks.map((item) => (

@@ -38,11 +38,18 @@ const preventParameterPollution = hpp();
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:8080', 
+    'http://localhost:8081', // ADD YOUR FRONTEND PORT
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8081'  // ADD YOUR FRONTEND PORT
+  ],
   credentials: true,
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
-
 // Audit logging middleware
 const auditMiddleware = (req, res, next) => {
   const start = Date.now();
