@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,10 +92,7 @@ const DisputeManagement = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
-            <SidebarTrigger />
-            <h1 className="text-xl font-bold ml-4">Dispute Management</h1>
-          </header>
+          <PageHeader title="Dispute Management" />
 
           <main className="flex-1 p-6">
             <Card className="shadow-card">

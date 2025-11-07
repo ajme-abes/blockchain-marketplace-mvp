@@ -19,6 +19,7 @@ import Profile from "./pages/Profile";
 import About from "./pages/common/About";
 import Contact from "./pages/common/Contact";
 import Checkout from "./pages/buyer/Checkout";
+import Cart from "./pages/buyer/Cart";
 import SellerContact from "./pages/producer/SellerContact";
 import Chats from "./pages/Chats";
 import Orders from "./pages/buyer/Orders";
@@ -33,6 +34,10 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
+import ProducerOrders from "./pages/producer/ProducerOrders";
+import ProducerReviews from "./pages/producer/ProducerReviews";
+import ProducerAnalytics from "./pages/producer/ProducerAnalytics";
+import StoreSettings from "./pages/producer/StoreSettings";
 import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -124,6 +129,11 @@ const App = () => (
   } />
 
   {/* Buyer-only Routes */}
+  <Route path="/cart" element={
+    <RoleRoute allowedRoles={['buyer']}>
+      <Cart />
+    </RoleRoute>
+  } />
   <Route path="/checkout/:id" element={
     <RoleRoute allowedRoles={['buyer']}>
       <Checkout />
@@ -164,6 +174,26 @@ const App = () => (
   </RoleRoute>
 } />
 
+<Route path="/producer/orders" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <ProducerOrders />
+  </RoleRoute>
+} />
+<Route path="/producer/reviews" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <ProducerReviews />
+  </RoleRoute>
+} />
+<Route path="/producer/analytics" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <ProducerAnalytics />
+  </RoleRoute>
+} />
+<Route path="/producer/store-settings" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <StoreSettings />
+  </RoleRoute>
+} />
   {/* Admin-only Routes */}
   <Route path="/admin" element={
     <RoleRoute allowedRoles={['admin']}>

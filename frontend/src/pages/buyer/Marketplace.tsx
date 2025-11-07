@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { ShieldCheck, Star, Filter } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ShieldCheck, Star, Filter, Search, X } from 'lucide-react';
 import { mockProducts, categories, regions } from '@/lib/mockData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,11 +20,29 @@ const Marketplace = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const filteredProducts = mockProducts.filter(product => {
+    // Search filter - search in name, producer name, category, and description
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = 
+        product.name.toLowerCase().includes(query) ||
+        product.producerName.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query) ||
+        (product.description && product.description.toLowerCase().includes(query));
+      if (!matchesSearch) return false;
+    }
+    
+    // Category filter
     if (selectedCategory && product.category !== selectedCategory) return false;
+    
+    // Region filter
     if (selectedRegion && product.region !== selectedRegion) return false;
+    
+    // Price range filter
     if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
+    
     return true;
   });
 
@@ -30,9 +50,33 @@ const Marketplace = () => {
     <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Marketplace</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-6">
             Browse verified Ethiopian products from local producers
           </p>
+          
+          {/* Search Bar - Only show for authenticated users */}
+          {isAuthenticated && (
+            <div className="relative max-w-2xl">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search products by name, producer, category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-12 text-base"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -94,9 +138,10 @@ const Marketplace = () => {
                       setSelectedCategory(null);
                       setSelectedRegion(null);
                       setPriceRange([0, 1000]);
+                      setSearchQuery('');
                     }}
                   >
-                    Clear Filters
+                    Clear All Filters
                   </Button>
                 </div>
               </CardContent>
@@ -104,8 +149,31 @@ const Marketplace = () => {
           </aside>
 
           <div className="lg:col-span-3">
-            <div className="mb-4 text-sm text-muted-foreground">
-              Showing {filteredProducts.length} products
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                {searchQuery && (
+                  <span className="ml-2">
+                    for "<span className="font-semibold text-foreground">{searchQuery}</span>"
+                  </span>
+                )}
+              </div>
+              {(searchQuery || selectedCategory || selectedRegion || priceRange[1] < 1000) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory(null);
+                    setSelectedRegion(null);
+                    setPriceRange([0, 1000]);
+                  }}
+                  className="text-xs"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -170,10 +238,7 @@ const Marketplace = () => {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">
-            <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold ml-4">Marketplace</h1>
-            </header>
+            <PageHeader title="Marketplace" />
             {content}
           </div>
         </div>

@@ -12,6 +12,8 @@ import {
   Wrench,
   Scale,
   Info,
+  Star,
+  BarChart2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -50,6 +52,10 @@ export const AppSidebar = () => {
   const producerLinks = [
     { title: 'My Products', url: '/my-products', icon: Package },
     { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
+    { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
+    { title: 'Transaction History', url: '/producer/transactionhistory', icon: Package },
+    { title: 'Analytics', url: '/producer/analytics', icon: BarChart2 },
+    { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
   ];
 
   const buyerLinks = [
@@ -113,8 +119,8 @@ export const AppSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* New Transactions group */}
-        {user && (
+        {/* Transactions group - Only for producers */}
+        {user && user.role === 'PRODUCER' && (
           <SidebarGroup>
             <SidebarGroupLabel>Transactions</SidebarGroupLabel>
             <SidebarGroupContent>

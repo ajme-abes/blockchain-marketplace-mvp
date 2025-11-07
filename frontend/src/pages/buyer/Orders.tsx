@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -99,12 +100,7 @@ const Orders = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
-            <SidebarTrigger />
-            <h1 className="text-xl font-bold ml-4">
-              {isProducer ? 'My Sales Orders' : 'My Orders'}
-            </h1>
-          </header>
+          <PageHeader title={isProducer ? 'My Sales Orders' : 'My Orders'} />
 
           <main className="flex-1 p-6">
             <div className="max-w-6xl mx-auto space-y-6">
