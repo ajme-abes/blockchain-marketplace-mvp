@@ -31,7 +31,7 @@ const Login = () => {
       if (user?.role === 'ADMIN') {
         navigate('/admin/dashboard');
       } else if (user?.role === 'PRODUCER') {
-        navigate('/producer/dashboard');
+        navigate('/dashboard');
       } else {
         navigate('/dashboard');
       }

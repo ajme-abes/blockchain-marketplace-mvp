@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Package, Plus, Edit, Trash2, Eye } from 'lucide-react';
 
-const MyProducts = () => {
+const Products = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -16,12 +16,12 @@ const MyProducts = () => {
     if (!isAuthenticated) {
       navigate('/login');
     }
-    if (user?.role !== 'producer') {
+    if (user?.role !== 'PRODUCER') {
       navigate('/dashboard');
     }
   }, [isAuthenticated, user, navigate]);
 
-  if (!user || user.role !== 'producer') return null;
+  if (!user || user.role !== 'PRODUCER') return null;
 
   const mockProducts = [
     {
@@ -59,6 +59,29 @@ const MyProducts = () => {
       : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20';
   };
 
+  // FIX: Add product navigation handler
+  const handleAddProduct = () => {
+    navigate('/products/add'); // Fixed route path
+  };
+
+  // FIX: Edit product navigation handler
+  const handleEditProduct = (productId: string) => {
+    navigate(`/products/edit/${productId}`); // Fixed route path
+  };
+
+  // FIX: View product handler
+  const handleViewProduct = (productId: string) => {
+    navigate(`/products/${productId}`);
+  };
+
+  // FIX: Delete product handler
+  const handleDeleteProduct = (productId: string) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      console.log('Deleting product:', productId);
+      // TODO: Implement actual delete functionality
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -69,7 +92,8 @@ const MyProducts = () => {
               <SidebarTrigger />
               <h1 className="text-xl font-bold ml-4">My Products</h1>
             </div>
-            <Button onClick={() => navigate('/dashboard')}>
+            {/* FIX: Added onClick handler */}
+            <Button onClick={handleAddProduct}>
               <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
@@ -109,15 +133,30 @@ const MyProducts = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1">
+                        {/* FIX: Added onClick handlers to all buttons */}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleViewProduct(product.id)}
+                        >
                           <Eye className="h-3 w-3 mr-1" />
                           View
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleEditProduct(product.id)}
+                        >
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteProduct(product.id)}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -134,7 +173,8 @@ const MyProducts = () => {
                     <p className="text-muted-foreground mb-4">
                       Create your first product listing to start selling.
                     </p>
-                    <Button>
+                    {/* FIX: Added onClick handler to empty state button */}
+                    <Button onClick={handleAddProduct}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Product
                     </Button>
@@ -149,4 +189,4 @@ const MyProducts = () => {
   );
 };
 
-export default MyProducts;
+export default Products;

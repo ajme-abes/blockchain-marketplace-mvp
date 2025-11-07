@@ -62,6 +62,11 @@ export const AppSidebar = () => {
     { title: 'Disputes', url: '/admin/disputes', icon: Scale },
   ];
 
+  // New: transaction links (visible to authenticated users)
+  const transactionLinks = [
+    { title: 'Transaction History', url: '/producer/transactionhistory', icon: Package },
+  ];
+
   let roleLinks: typeof commonLinks = [];
   if (user?.role === 'PRODUCER') roleLinks = producerLinks;
   if (user?.role === 'BUYER') roleLinks = buyerLinks;
@@ -107,6 +112,31 @@ export const AppSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* New Transactions group */}
+        {user && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Transactions</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {transactionLinks.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      className="transition-smooth"
+                    >
+                      <Link to={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {roleLinks.length > 0 && (
           <SidebarGroup>

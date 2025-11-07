@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,26 +7,76 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Marketplace from "./pages/Marketplace";
-import ProductDetail from "./pages/ProductDetail";
+import Home from "./pages/common/Home";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import Marketplace from "./pages/buyer/Marketplace";
+import ProductDetail from "./pages/buyer/ProductDetail";
 import Dashboard from "./pages/Dashboard";
+import { CartProvider } from '@/contexts/CartContext';
+import { ChatProvider } from "./contexts/ChatContext";
 import Profile from "./pages/Profile";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
-import Checkout from "./pages/Checkout";
-import SellerContact from "./pages/SellerContact";
+import About from "./pages/common/About";
+import Contact from "./pages/common/Contact";
+import Checkout from "./pages/buyer/Checkout";
+import SellerContact from "./pages/producer/SellerContact";
 import Chats from "./pages/Chats";
-import MyOrders from "./pages/MyOrders";
-import MyProducts from "./pages/MyProducts";
+import Orders from "./pages/buyer/Orders";
+import Products from "./pages/producer/Products";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import AddProduct from "./pages/producer/AddProduct";
+import EditProduct from "./pages/producer/EditProduct";
+import TransactionHistory from "./pages/producer/TransactionHistory";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
-import NotFound from "./pages/NotFound";
+import NotFound from "./pages/common/NotFound";
+import { useAuth } from './contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
+
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Proper RoleRoute component
+const RoleRoute = ({ allowedRoles, children }: { allowedRoles: string[]; children: ReactNode }) => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user || !allowedRoles.includes(user.role.toLowerCase())) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 const queryClient = new QueryClient();
 
@@ -34,36 +85,114 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
+          <CartProvider>
+             <ChatProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/products/:id" element={<ProductDetail />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/:id" element={<Profile />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/checkout/:id" element={<Checkout />} />
-                <Route path="/sellers/:id/contact" element={<SellerContact />} />
-                <Route path="/chats" element={<Chats />} />
-                <Route path="/my-orders" element={<MyOrders />} />
-                <Route path="/my-products" element={<MyProducts />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/users" element={<UserManagement />} />
-                <Route path="/admin/products" element={<ProductManagement />} />
-                <Route path="/admin/disputes" element={<DisputeManagement />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+<Routes>
+  {/* Public Routes */}
+  <Route path="/" element={<Home />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+  <Route path="/marketplace" element={<Marketplace />} />
+  <Route path="/products/:id" element={<ProductDetail />} />
+  <Route path="/about" element={<About />} />
+  <Route path="/contact" element={<Contact />} />
+
+  {/* Protected Routes - All authenticated users */}
+  <Route path="/dashboard" element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  } />
+  <Route path="/profile" element={
+    <ProtectedRoute>
+      <Profile />
+    </ProtectedRoute>
+  } />
+  <Route path="/chats" element={
+    <ProtectedRoute>
+      <Chats />
+    </ProtectedRoute>
+  } />
+  <Route path="/settings" element={
+    <ProtectedRoute>
+      <Settings />
+    </ProtectedRoute>
+  } />
+
+  {/* Buyer-only Routes */}
+  <Route path="/checkout/:id" element={
+    <RoleRoute allowedRoles={['buyer']}>
+      <Checkout />
+    </RoleRoute>
+  } />
+  <Route path="/my-orders" element={
+    <RoleRoute allowedRoles={['buyer', 'producer']}>
+      <Orders />
+    </RoleRoute>
+  } />
+
+  {/* Producer-only Routes */}
+  <Route path="/my-products" element={
+    <RoleRoute allowedRoles={['producer']}>
+      <Products />
+    </RoleRoute>
+  } />
+  <Route path="/sellers/:id/contact" element={
+    <RoleRoute allowedRoles={['producer']}>
+      <SellerContact />
+    </RoleRoute>
+  } />
+  <Route path="/producer/transactionhistory" element={
+    <RoleRoute allowedRoles={['producer']}>
+      <TransactionHistory />
+    </RoleRoute>
+  } />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+<Route path="/reset-password" element={<ResetPassword />} />
+<Route path="/products/add" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <AddProduct />
+  </RoleRoute>
+} />
+<Route path="/products/edit/:id" element={
+  <RoleRoute allowedRoles={['producer']}>
+    <EditProduct />
+  </RoleRoute>
+} />
+
+  {/* Admin-only Routes */}
+  <Route path="/admin" element={
+    <RoleRoute allowedRoles={['admin']}>
+      <AdminDashboard />
+    </RoleRoute>
+  } />
+  <Route path="/admin/users" element={
+    <RoleRoute allowedRoles={['admin']}>
+      <UserManagement />
+    </RoleRoute>
+  } />
+  <Route path="/admin/products" element={
+    <RoleRoute allowedRoles={['admin']}>
+      <ProductManagement />
+    </RoleRoute>
+  } />
+  <Route path="/admin/disputes" element={
+    <RoleRoute allowedRoles={['admin']}>
+      <DisputeManagement />
+    </RoleRoute>
+  } />
+
+  {/* Fallback */}
+  <Route path="*" element={<NotFound />} />
+</Routes>
             </BrowserRouter>
           </TooltipProvider>
+          </ChatProvider>
+          </CartProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

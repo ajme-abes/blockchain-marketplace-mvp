@@ -1,9 +1,13 @@
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shield, Users, TrendingUp, Heart } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const About = () => {
+  const { isAuthenticated } = useAuth();
   const team = [
     { name: 'Abebe Tadesse', role: 'Founder & CEO', image: 'https://i.pravatar.cc/150?img=11' },
     { name: 'Meron Alemu', role: 'CTO', image: 'https://i.pravatar.cc/150?img=5' },
@@ -11,10 +15,8 @@ const About = () => {
     { name: 'Sara Tesfaye', role: 'Community Manager', image: 'https://i.pravatar.cc/150?img=9' },
   ];
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-12">
+  const content = (
+    <main className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-6">About EthioTrust</h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
@@ -122,6 +124,29 @@ const About = () => {
           </div>
         </div>
       </main>
+  );
+
+  if (isAuthenticated) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
+              <SidebarTrigger />
+              <h1 className="text-xl font-bold ml-4">About Us</h1>
+            </header>
+            {content}
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      {content}
       <Footer />
     </div>
   );

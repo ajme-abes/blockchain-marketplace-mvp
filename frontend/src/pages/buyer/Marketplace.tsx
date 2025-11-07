@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { ShieldCheck, Star, Filter } from 'lucide-react';
 import { mockProducts, categories, regions } from '@/lib/mockData';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Marketplace = () => {
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
@@ -22,10 +26,8 @@ const Marketplace = () => {
     return true;
   });
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
+  const content = (
+    <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Marketplace</h1>
           <p className="text-muted-foreground">
@@ -160,6 +162,29 @@ const Marketplace = () => {
           </div>
         </div>
       </main>
+  );
+
+  if (isAuthenticated) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
+              <SidebarTrigger />
+              <h1 className="text-xl font-bold ml-4">Marketplace</h1>
+            </header>
+            {content}
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      {content}
       <Footer />
     </div>
   );
