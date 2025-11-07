@@ -5,7 +5,7 @@ import { FeaturedProducts } from '@/components/home/FeaturedProducts';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { AboutPreview } from '@/components/home/AboutPreview';
 
-const Index = () => {
+const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -20,4 +20,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Home;

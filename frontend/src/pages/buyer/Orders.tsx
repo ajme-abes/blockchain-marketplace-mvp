@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Package, Eye } from 'lucide-react';
 
-const MyOrders = () => {
+const Orders = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -20,7 +20,38 @@ const MyOrders = () => {
 
   if (!user) return null;
 
-  const mockOrders = [
+  const isProducer = user.role === 'PRODUCER';
+
+  // Different mock data for buyers vs producers
+  const mockOrders = isProducer ? [
+    {
+      id: '1',
+      productName: 'Premium Coffee Beans',
+      quantity: '10 kg',
+      totalPrice: '3,500 ETB',
+      status: 'delivered',
+      date: '2024-03-15',
+      buyer: 'John Doe',
+    },
+    {
+      id: '2',
+      productName: 'Organic Honey',
+      quantity: '5 kg',
+      totalPrice: '1,250 ETB',
+      status: 'shipped',
+      date: '2024-03-18',
+      buyer: 'Sarah Smith',
+    },
+    {
+      id: '3',
+      productName: 'Fresh Teff',
+      quantity: '25 kg',
+      totalPrice: '2,750 ETB',
+      status: 'processing',
+      date: '2024-03-20',
+      buyer: 'Mike Johnson',
+    },
+  ] : [
     {
       id: '1',
       productName: 'Premium Coffee Beans',
@@ -70,7 +101,9 @@ const MyOrders = () => {
         <div className="flex-1 flex flex-col">
           <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
             <SidebarTrigger />
-            <h1 className="text-xl font-bold ml-4">My Orders</h1>
+            <h1 className="text-xl font-bold ml-4">
+              {isProducer ? 'My Sales Orders' : 'My Orders'}
+            </h1>
           </header>
 
           <main className="flex-1 p-6">
@@ -93,8 +126,12 @@ const MyOrders = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Seller</p>
-                        <p className="font-medium">{order.seller}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {isProducer ? 'Buyer' : 'Seller'}
+                        </p>
+                        <p className="font-medium">
+                          {isProducer ? (order as any).buyer : (order as any).seller}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Quantity</p>
@@ -121,11 +158,15 @@ const MyOrders = () => {
                     <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">No Orders Yet</h3>
                     <p className="text-muted-foreground mb-4">
-                      Start shopping to see your orders here.
+                      {isProducer 
+                        ? 'You haven\'t received any orders yet. Your sales will appear here.'
+                        : 'Start shopping to see your orders here.'}
                     </p>
-                    <Button onClick={() => navigate('/marketplace')}>
-                      Browse Marketplace
-                    </Button>
+                    {!isProducer && (
+                      <Button onClick={() => navigate('/marketplace')}>
+                        Browse Marketplace
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -137,4 +178,4 @@ const MyOrders = () => {
   );
 };
 
-export default MyOrders;
+export default Orders;
