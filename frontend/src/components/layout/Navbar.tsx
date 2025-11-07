@@ -1,16 +1,26 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Globe, Shield, Sparkles, Moon, Sun } from 'lucide-react';
+import { Menu, X, Globe, Shield, Sparkles, Moon, Sun, ShoppingCart, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import logo from '@/assets/ethiotrust-logo.png';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 export const Navbar = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { state: cartState } = useCart();
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -70,6 +80,74 @@ export const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="flex items-center gap-4">
+            {/* Notifications - Left side for authenticated users */}
+            {isAuthenticated && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      3
+                    </Badge>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <div className="p-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold">Notifications</h4>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs">
+                        Mark all as read
+                      </Button>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <div className="max-h-96 overflow-y-auto space-y-1">
+                      <DropdownMenuItem className="flex flex-col items-start p-3 cursor-pointer hover:bg-accent">
+                        <div className="text-sm font-medium">New order received</div>
+                        <div className="text-xs text-muted-foreground">You have a new order for Coffee Beans</div>
+                        <div className="text-xs text-muted-foreground mt-1">2 minutes ago</div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="flex flex-col items-start p-3 cursor-pointer hover:bg-accent">
+                        <div className="text-sm font-medium">Payment received</div>
+                        <div className="text-xs text-muted-foreground">Payment of 3,500 ETB has been received</div>
+                        <div className="text-xs text-muted-foreground mt-1">1 hour ago</div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="flex flex-col items-start p-3 cursor-pointer hover:bg-accent">
+                        <div className="text-sm font-medium">Product review</div>
+                        <div className="text-xs text-muted-foreground">John Doe left a review on your product</div>
+                        <div className="text-xs text-muted-foreground mt-1">3 hours ago</div>
+                      </DropdownMenuItem>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <Link to="/notifications" className="block">
+                      <Button variant="ghost" className="w-full justify-center text-sm">
+                        View all notifications
+                      </Button>
+                    </Link>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Cart - Left side for buyers */}
+            {isAuthenticated && user?.role === 'BUYER' && (
+              <Link to="/cart">
+                <Button variant="ghost" size="icon" className="relative">
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartState.itemCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {cartState.itemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            )}
+
             {/* Theme Toggle */}
             <Toggle
               pressed={theme === 'dark'}
@@ -188,6 +266,36 @@ export const Navbar = () => {
                   
                   {/* Mobile Actions */}
                   <div className="border-t border-amber-200 dark:border-amber-800 pt-6 mt-4 space-y-3">
+                    {/* Mobile Notifications */}
+                    {isAuthenticated && (
+                      <Link 
+                        to="/notifications" 
+                        className="flex items-center gap-3 text-lg font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50 rounded-xl p-3 transition-all"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Bell className="h-5 w-5" />
+                        Notifications
+                        <Badge variant="destructive" className="ml-auto">3</Badge>
+                      </Link>
+                    )}
+
+                    {/* Mobile Cart for buyers */}
+                    {isAuthenticated && user?.role === 'BUYER' && (
+                      <Link 
+                        to="/cart" 
+                        className="flex items-center gap-3 text-lg font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50 rounded-xl p-3 transition-all"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <ShoppingCart className="h-5 w-5" />
+                        Cart
+                        {cartState.itemCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto">
+                            {cartState.itemCount}
+                          </Badge>
+                        )}
+                      </Link>
+                    )}
+
                     <div className="flex gap-2">
                       <Toggle
                         pressed={theme === 'dark'}

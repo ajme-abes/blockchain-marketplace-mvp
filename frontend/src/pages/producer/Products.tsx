@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -87,19 +88,16 @@ const Products = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border flex items-center justify-between px-4 bg-background sticky top-0 z-10">
-            <div className="flex items-center">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold ml-4">My Products</h1>
-            </div>
-            {/* FIX: Added onClick handler */}
-            <Button onClick={handleAddProduct}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </header>
+          <PageHeader title="My Products" />
 
           <main className="flex-1 p-6">
+            <div className="flex justify-end mb-4">
+              {/* FIX: Added onClick handler */}
+              <Button onClick={handleAddProduct}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </div>
             <div className="max-w-6xl mx-auto space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {mockProducts.map((product) => (

@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -296,10 +297,7 @@ const Chats: React.FC = () => {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">
-            <header className="h-16 border-b border-border flex items-center px-4 bg-background sticky top-0 z-10">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold ml-4">Chats</h1>
-            </header>
+            <PageHeader title="Chats" />
             {content}
           </div>
         </div>
