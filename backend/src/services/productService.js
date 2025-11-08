@@ -2,60 +2,82 @@
 const { prisma } = require('../config/database');
 
 class ProductService {
-async createProduct(productData) {
-  const { name, description, price, category, quantity, producerId, imageCid } = productData;
 
-  console.log('🔧 Creating product with producerId:', producerId);
-
-  // First, find the producer profile for this user
-  const producer = await prisma.producer.findUnique({
-    where: { userId: producerId }
-  });
-
-  if (!producer) {
-    throw new Error('Producer profile not found. User must have a producer profile to create products.');
-  }
-
-  console.log('🔧 Found producer profile:', producer.id);
-
-  // Create product with IPFS file relation if imageCid exists
-  const product = await prisma.product.create({
-    data: {
-      name,
-      description,
-      price,
-      category,
-      quantityAvailable: quantity,
-      producerId: producer.id,
-      imageUrl: imageCid ? `ipfs://${imageCid}` : null,
-      // Link existing IPFS file if imageCid was provided
-      ...(imageCid && {
-        ipfsFiles: {
-          connect: {
-            cid: imageCid
+  async createProduct(productData) {
+    const { name, description, price, category, quantity, producerId, imageCids = [] } = productData;
+  
+    console.log('🔧 Creating product with producerId:', producerId);
+    console.log('🔧 Image CIDs received:', imageCids);
+  
+    // First, find the producer profile for this user
+    const producer = await prisma.producer.findUnique({
+      where: { userId: producerId }
+    });
+  
+    if (!producer) {
+      throw new Error('Producer profile not found. User must have a producer profile to create products.');
+    }
+  
+    console.log('🔧 Found producer profile:', producer.id);
+  
+    // ✅ DIRECT FIX: Use the first CID in imageUrl field
+    const primaryImageUrl = imageCids.length > 0 ? `https://gateway.pinata.cloud/ipfs/${imageCids[0]}` : null;
+    
+    console.log('🖼️ Setting product imageUrl:', primaryImageUrl);
+  
+    // Create product with direct imageUrl
+    const product = await prisma.product.create({
+      data: {
+        name,
+        description,
+        price,
+        category,
+        quantityAvailable: quantity,
+        producerId: producer.id,
+        imageUrl: primaryImageUrl, // ✅ DIRECTLY SET THE IMAGE URL
+        // Also link IPFS files if they exist
+        ...(imageCids.length > 0 && {
+          ipfsFiles: {
+            connect: await this.getIpfsFileIds(imageCids)
           }
-        }
-      })
-    },
-    include: {
-      producer: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true
+        })
+      },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
             }
           }
-        }
-      },
-      ipfsFiles: true // Make sure to include IPFS files
+        },
+        ipfsFiles: true
+      }
+    });
+  
+    console.log('✅ Product created with imageUrl:', product.imageUrl);
+    console.log('✅ Product IPFS files:', product.ipfsFiles?.length || 0);
+  
+    return this.formatProductResponse(product);
+  }
+  
+  // Helper method to get IPFS file IDs
+  async getIpfsFileIds(cids) {
+    const files = [];
+    for (const cid of cids) {
+      const file = await prisma.iPFSMetadata.findUnique({
+        where: { cid },
+        select: { id: true }
+      });
+      if (file) {
+        files.push({ id: file.id });
+      }
     }
-  });
-
-  return this.formatProductResponse(product);
-}
-
+    return files;
+  }
 async getProducts(filters = {}) {
   const { 
     category, 
@@ -274,34 +296,27 @@ async getProducerProducts(userId, pagination = {}) {
   };
 }
 
-// In productService.js - Update the formatProductResponse method
+
 formatProductResponse(product) {
   const avgRating = product.reviews && product.reviews.length > 0 
     ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
     : null;
 
-  // Get IPFS CID and construct proper gateway URL
-  const ipfsFile = product.ipfsFiles && product.ipfsFiles[0];
-  const imageCid = ipfsFile ? ipfsFile.cid : (product.imageUrl ? product.imageUrl.replace('ipfs://', '') : null);
-  
-  // Construct proper IPFS gateway URLs (multiple options for fallback)
-  const getImageUrl = (cid) => {
-    if (!cid) return null;
-    
-    const gateways = [
-      `https://ipfs.io/ipfs/${cid}`,          // Public IPFS gateway
-      `https://gateway.pinata.cloud/ipfs/${cid}`, // Pinata gateway
-      `https://cloudflare-ipfs.com/ipfs/${cid}`,  // Cloudflare gateway
-    ];
-    
-    return {
-      primary: gateways[0],
-      alternatives: gateways.slice(1),
-      ipfs: `ipfs://${cid}` // Native IPFS URI
-    };
-  };
+  // ✅ PRIORITIZE imageUrl field first
+  let primaryImageUrl = product.imageUrl;
 
-  const imageUrls = imageCid ? getImageUrl(imageCid) : null;
+  // If no imageUrl, try to get from IPFS files
+  if (!primaryImageUrl && product.ipfsFiles && product.ipfsFiles.length > 0) {
+    const firstFile = product.ipfsFiles[0];
+    primaryImageUrl = `https://gateway.pinata.cloud/ipfs/${firstFile.cid}`;
+  }
+
+  console.log('🖼️ Formatting product image:', {
+    productId: product.id,
+    imageUrl: product.imageUrl,
+    ipfsFilesCount: product.ipfsFiles?.length || 0,
+    finalImageUrl: primaryImageUrl
+  });
 
   return {
     id: product.id,
@@ -311,20 +326,21 @@ formatProductResponse(product) {
     category: product.category,
     quantityAvailable: product.quantityAvailable,
     status: product.status,
+    // ✅ SIMPLE IMAGE STRUCTURE - frontend can use this directly
+    imageUrl: primaryImageUrl,
     images: {
-      url: imageUrls ? imageUrls.primary : product.imageUrl, // Main URL for display
-      ipfsCid: imageCid,
-      ipfsUri: imageUrls ? imageUrls.ipfs : null,
-      alternatives: imageUrls ? imageUrls.alternatives : []
+      url: primaryImageUrl,
+      ipfsCid: primaryImageUrl ? primaryImageUrl.split('/').pop() : null,
+      alternatives: []
     },
-    ipfsMetadata: ipfsFile ? {
-      cid: ipfsFile.cid,
-      name: ipfsFile.name,
-      mimeType: ipfsFile.mimeType,
-      size: ipfsFile.size,
-      category: ipfsFile.category,
-      createdAt: ipfsFile.createdAt
-    } : null,
+    ipfsMetadata: product.ipfsFiles?.map(file => ({
+      cid: file.cid,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      category: file.category,
+      createdAt: file.createdAt
+    })) || [],
     averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
     reviewCount: product.reviews ? product.reviews.length : 0,
     producer: product.producer ? {
@@ -337,7 +353,7 @@ formatProductResponse(product) {
     listingDate: product.listingDate,
     updatedAt: product.updatedAt
   };
-}
+ }
 }
 
 module.exports = new ProductService();

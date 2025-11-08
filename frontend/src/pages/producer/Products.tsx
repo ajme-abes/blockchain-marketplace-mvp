@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -7,171 +7,438 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Package, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Package, Plus, Edit, Trash2, Eye, Loader2 } from 'lucide-react';
+import { productService, Product } from '@/services/productService';
 
 const Products = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
+      return;
     }
     if (user?.role !== 'PRODUCER') {
       navigate('/dashboard');
+      return;
     }
+    loadProducts();
   }, [isAuthenticated, user, navigate]);
 
-  if (!user || user.role !== 'PRODUCER') return null;
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading products from backend...');
+      
+      const response = await fetch('http://localhost:5000/api/products/my/products', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-  const mockProducts = [
-    {
-      id: '1',
-      name: 'Premium Coffee Beans',
-      category: 'Coffee',
-      price: '350 ETB/kg',
-      stock: 100,
-      status: 'published',
-      image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e',
-    },
-    {
-      id: '2',
-      name: 'Organic Honey',
-      category: 'Honey',
-      price: '250 ETB/kg',
-      stock: 50,
-      status: 'published',
-      image: 'https://images.unsplash.com/photo-1587049352846-4a222e784422',
-    },
-    {
-      id: '3',
-      name: 'Fresh Teff',
-      category: 'Grains',
-      price: '110 ETB/kg',
-      stock: 200,
-      status: 'draft',
-      image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b',
-    },
-  ];
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-  const getStatusColor = (status: string) => {
-    return status === 'published'
-      ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20'
-      : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20';
+      const data = await response.json();
+      console.log('✅ Backend products response:', data);
+      
+      // Extract products from the nested structure
+      const productsData = data.data?.products || data.data || [];
+      console.log('🔄 Products data extracted:', productsData);
+      
+      setProducts(productsData);
+    } catch (error: any) {
+      console.error('❌ Failed to load products:', error);
+      toast({
+        title: "Error loading products",
+        description: error.message || "Failed to load your products",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // FIX: Add product navigation handler
   const handleAddProduct = () => {
-    navigate('/products/add'); // Fixed route path
+    navigate('/products/add');
   };
 
-  // FIX: Edit product navigation handler
   const handleEditProduct = (productId: string) => {
-    navigate(`/products/edit/${productId}`); // Fixed route path
+    navigate(`/producer/edit-product/${productId}`);
   };
 
-  // FIX: View product handler
   const handleViewProduct = (productId: string) => {
     navigate(`/products/${productId}`);
   };
 
-  // FIX: Delete product handler
-  const handleDeleteProduct = (productId: string) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      console.log('Deleting product:', productId);
-      // TODO: Implement actual delete functionality
+  const handleDeleteProduct = async (productId: string) => {
+    if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeletingId(productId);
+      console.log('🗑️ Deleting product:', productId);
+      
+      await productService.deleteProduct(productId);
+      
+      toast({
+        title: "Product deleted",
+        description: "Product has been successfully deleted",
+      });
+      
+      // Remove from local state
+      setProducts(prev => prev.filter(product => product.id !== productId));
+      
+    } catch (error: any) {
+      console.error('❌ Failed to delete product:', error);
+      toast({
+        title: "Error deleting product",
+        description: error.message || "Failed to delete product",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
+
+  const updateProductStatus = async (productId: string, status: Product['status']) => {
+    try {
+      console.log('🔄 Updating product status:', productId, status);
+      
+      const updatedProduct = await productService.updateProductStatus(productId, status);
+      
+      // Update local state
+      setProducts(prev => 
+        prev.map(product => 
+          product.id === productId ? updatedProduct : product
+        )
+      );
+      
+      toast({
+        title: "Status updated",
+        description: `Product status changed to ${status}`,
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Failed to update status:', error);
+      toast({
+        title: "Error updating status",
+        description: error.message || "Failed to update product status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-500/10 text-green-600 hover:bg-green-500/20';
+      case 'inactive':
+        return 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20';
+      case 'out_of_quantity':
+        return 'bg-red-500/10 text-red-600 hover:bg-red-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20';
+    }
+  };
+
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'inactive':
+        return 'Inactive';
+      case 'out_of_quantity':
+        return 'Out of Stock';
+      default:
+        return status;
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return `${price} ETB`;
+  };
+
+  const getDisplayImage = (product: any) => {
+    console.log('🖼️ Product image data:', {
+      id: product.id,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      images: product.images
+    });
+  
+    // ✅ SIMPLE: Use imageUrl first (this is now guaranteed to be set)
+    if (product.imageUrl) {
+      console.log('✅ Using product.imageUrl:', product.imageUrl);
+      return product.imageUrl;
+    }
+  
+    // Fallback to images.url
+    if (product.images?.url) {
+      console.log('✅ Using product.images.url:', product.images.url);
+      return product.images.url;
+    }
+  
+    // Fallback to IPFS CID
+    if (product.images?.ipfsCid) {
+      const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${product.images.ipfsCid}`;
+      console.log('✅ Using IPFS CID:', ipfsUrl);
+      return ipfsUrl;
+    }
+  
+    console.log('❌ No image found for product:', product.id);
+    return null;
+  };
+  // Transform backend product data to match frontend interface
+  const transformProduct = (product: any): Product => {
+    return {
+      id: product.id,
+      name: product.name || 'Unnamed Product',
+      description: product.description || '',
+      price: product.price || 0,
+      category: product.category || 'other',
+      region: product.region || 'Unknown',
+      images: product.images || product.imageCids || [],
+      producerName: product.producer?.businessName || product.producerName || 'Unknown Producer',
+      producerId: product.producerId,
+      verified: product.verified || false,
+      rating: product.averageRating || product.rating || 0,
+      quantity: product.quantityAvailable || product.quantity || 0,
+      unit: product.unit || 'piece',
+      status: product.status || 'active',
+      createdAt: product.createdAt || product.listingDate || new Date().toISOString(),
+      updatedAt: product.updatedAt || new Date().toISOString(),
+      // Include raw data for image handling
+      ipfsMetadata: product.ipfsMetadata,
+      imageCids: product.imageCids
+    };
+  };
+
+  if (!user || user.role !== 'PRODUCER') return null;
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <PageHeader title="My Products" />
+            <main className="flex-1 p-6 flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
+                <p className="text-muted-foreground">Loading your products...</p>
+              </div>
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // Transform products for display
+  const displayProducts = products.map(transformProduct);
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader title="My Products" />
+          <PageHeader 
+            title="My Products" 
+            description="Manage your product listings and inventory"
+          />
 
           <main className="flex-1 p-6">
-            <div className="flex justify-end mb-4">
-              {/* FIX: Added onClick handler */}
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  My Products ({displayProducts.length})
+                </h2>
+                <p className="text-muted-foreground">
+                  Manage your product listings and inventory
+                </p>
+              </div>
               <Button onClick={handleAddProduct}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Product
               </Button>
             </div>
-            <div className="max-w-6xl mx-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockProducts.map((product) => (
-                  <Card key={product.id} className="shadow-card overflow-hidden">
-                    <div className="aspect-video relative overflow-hidden">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <Badge
-                        variant="outline"
-                        className={`absolute top-2 right-2 ${getStatusColor(product.status)}`}
-                      >
-                        {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                      </Badge>
-                    </div>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{product.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{product.category}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Price</p>
-                          <p className="font-bold text-primary">{product.price}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Stock</p>
-                          <p className="font-medium">{product.stock} kg</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {/* FIX: Added onClick handlers to all buttons */}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1"
-                          onClick={() => handleViewProduct(product.id)}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1"
-                          onClick={() => handleEditProduct(product.id)}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
 
-              {mockProducts.length === 0 && (
+            <div className="max-w-6xl mx-auto space-y-6">
+              {displayProducts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayProducts.map((product) => {
+                    const displayImage = getDisplayImage(product);
+                    const stock = product.quantity || 0;
+                    
+                    console.log(`🖼️ Rendering product ${product.id}:`, {
+                      name: product.name,
+                      displayImage,
+                      hasIpfsMetadata: !!product.ipfsMetadata,
+                      hasImageCids: !!product.imageCids
+                    });
+
+                    return (
+                      <Card key={product.id} className="shadow-card overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="aspect-video relative overflow-hidden">
+                          {displayImage ? (
+                            <img
+                              src={displayImage}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.error(`❌ Image failed to load: ${displayImage}`);
+                                // Fallback if image fails to load
+                                e.currentTarget.src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
+                              }}
+                              onLoad={() => console.log(`✅ Image loaded successfully: ${displayImage}`)}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center">
+                              <Package className="h-12 w-12 text-muted-foreground" />
+                              <span className="sr-only">No image available</span>
+                            </div>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={`absolute top-2 right-2 ${getStatusColor(product.status)}`}
+                          >
+                            {getStatusDisplay(product.status)}
+                          </Badge>
+                          {stock === 0 && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Badge variant="destructive" className="text-sm">
+                                Out of Stock
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg line-clamp-1">{product.name}</CardTitle>
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm text-muted-foreground capitalize">{product.category}</p>
+                            {product.rating > 0 && (
+                              <div className="flex items-center text-sm">
+                                <span className="text-yellow-500">★</span>
+                                <span className="ml-1">{product.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex justify-between items-center mb-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Price</p>
+                              <p className="font-bold text-primary">{formatPrice(product.price)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-muted-foreground">Stock</p>
+                              <p className="font-medium">
+                                {stock} {product.unit || 'units'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Status Toggle Buttons - Temporarily disabled */}
+                          <div className="flex gap-1 mb-3">
+                            <Button
+                              variant={product.status === 'active' ? 'default' : 'outline'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Status update functionality will be implemented next",
+                                });
+                              }}
+                              disabled={stock === 0}
+                            >
+                              Active
+                            </Button>
+                            <Button
+                              variant={product.status === 'inactive' ? 'default' : 'outline'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Status update functionality will be implemented next",
+                                });
+                              }}
+                            >
+                              Inactive
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Product view page will be implemented next",
+                                });
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Product edit functionality will be implemented next",
+                                });
+                              }}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Product delete functionality will be implemented next",
+                                });
+                              }}
+                              disabled={deletingId === product.id}
+                            >
+                              {deletingId === product.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
                 <Card className="shadow-card">
                   <CardContent className="p-12 text-center">
                     <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">No Products Yet</h3>
                     <p className="text-muted-foreground mb-4">
-                      Create your first product listing to start selling.
+                      Create your first product listing to start selling on the marketplace.
                     </p>
-                    {/* FIX: Added onClick handler to empty state button */}
                     <Button onClick={handleAddProduct}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Product

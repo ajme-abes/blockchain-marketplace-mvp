@@ -3,6 +3,7 @@ const multer = require('multer');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const productService = require('../services/productService');
 const ipfsService = require('../services/ipfsService');
+const { prisma } = require('../config/database');
 const router = express.Router();
 
 // Configure multer for file uploads
@@ -98,7 +99,6 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product (PRODUCER only)
-// Create product (PRODUCER only)
 router.post(
   '/',
   authenticateToken,
@@ -110,27 +110,13 @@ router.post(
       console.log('🔧 Product data:', req.body);
       console.log(`🔧 Files received: ${req.files?.length || 0}`);
 
-      const { name, description, price, category, quantity } = req.body;
+      const { name, description, price, category, quantity, region, unit } = req.body;
 
       // Validate required fields
       if (!name || !price || !category || !quantity) {
         return res.status(400).json({
           status: 'error',
           message: 'Missing required fields: name, price, category, quantity'
-        });
-      }
-
-      if (parseFloat(price) <= 0) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Price must be greater than 0'
-        });
-      }
-
-      if (parseInt(quantity) < 0) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Quantity cannot be negative'
         });
       }
 
@@ -158,6 +144,18 @@ router.post(
         }
       }
 
+      // ✅ DEBUG: Check current state before product creation
+      console.log('🔍 DEBUG - Before product creation:');
+      console.log('🔍 imageCids:', imageCids);
+      console.log('🔍 ipfsRecords:', ipfsRecords.map(r => ({ id: r.id, cid: r.cid, productId: r.productId })));
+
+      // Check current state of IPFS files in database
+      const dbFiles = await prisma.iPFSMetadata.findMany({
+        where: { cid: { in: imageCids } },
+        select: { id: true, cid: true, productId: true }
+      });
+      console.log('🔍 Files in database before product creation:', dbFiles);
+
       // ✅ Create product
       const productData = {
         name,
@@ -166,10 +164,40 @@ router.post(
         category,
         quantity: parseInt(quantity),
         producerId: req.user.id,
-        imageCids // Store array of CIDs
+        imageCids // Pass the CIDs to the service
       };
 
       const product = await productService.createProduct(productData);
+
+      // ✅ CRITICAL: Update IPFS records with the product ID
+      if (ipfsRecords.length > 0) {
+        console.log('🔗 Linking IPFS files to product:', product.id);
+        
+        // Update each IPFS record with the product ID
+        await Promise.all(
+          ipfsRecords.map(record =>
+            prisma.iPFSMetadata.update({
+              where: { id: record.id },
+              data: { productId: product.id }
+            })
+          )
+        );
+        
+        // Verify the links were created
+        const updatedRecords = await prisma.iPFSMetadata.findMany({
+          where: { id: { in: ipfsRecords.map(r => r.id) } },
+          select: { id: true, cid: true, productId: true }
+        });
+        
+        console.log('✅ IPFS records linked to product:', updatedRecords);
+        
+        // Also verify the product has the IPFS files connected
+        const productWithFiles = await prisma.product.findUnique({
+          where: { id: product.id },
+          include: { ipfsFiles: true }
+        });
+        console.log('✅ Product IPFS files after linking:', productWithFiles.ipfsFiles.map(f => f.cid));
+      }
 
       console.log('✅ Product created successfully:', product.id);
 
@@ -180,6 +208,20 @@ router.post(
       });
     } catch (error) {
       console.error('Create product error:', error);
+
+      // Cleanup: If product creation fails, delete any IPFS records that were created
+      if (ipfsRecords && ipfsRecords.length > 0) {
+        console.log('🧹 Cleaning up IPFS records due to error');
+        try {
+          await Promise.all(
+            ipfsRecords.map(record =>
+              prisma.iPFSMetadata.delete({ where: { id: record.id } })
+            )
+          );
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
+      }
 
       if (error.code === 'P2002') {
         return res.status(400).json({
@@ -356,6 +398,45 @@ router.get('/my/products', authenticateToken, requireRole(['PRODUCER']), async (
       status: 'error',
       message: 'Failed to fetch your products',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+// Add this temporary debug route to check IPFS state
+router.get('/debug/ipfs-state', async (req, res) => {
+  try {
+    const ipfsFiles = await prisma.iPFSMetadata.findMany({
+      include: {
+        product: {
+          select: { id: true, name: true }
+        },
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        totalFiles: ipfsFiles.length,
+        files: ipfsFiles.map(f => ({
+          id: f.id,
+          cid: f.cid,
+          productId: f.productId,
+          productName: f.product?.name || 'No product',
+          userId: f.userId,
+          userName: f.user?.name || 'No user',
+          createdAt: f.createdAt
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
     });
   }
 });

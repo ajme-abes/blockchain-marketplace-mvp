@@ -33,6 +33,7 @@ const AddProduct: React.FC = () => {
   
   const { register, handleSubmit, formState: { errors } } = useForm<ProductFormData>();
 
+  // In AddProduct.tsx - Update the onSubmit function
   const onSubmit = async (data: ProductFormData) => {
     if (images.length === 0) {
       toast({
@@ -42,7 +43,7 @@ const AddProduct: React.FC = () => {
       });
       return;
     }
-
+  
     setIsSubmitting(true);
     try {
       const productData: CreateProductData = {
@@ -51,7 +52,7 @@ const AddProduct: React.FC = () => {
         quantity: Number(data.quantity),
         images: images,
       };
-
+  
       console.log('🔄 Creating product with data:', {
         ...productData,
         imagesCount: productData.images.length
