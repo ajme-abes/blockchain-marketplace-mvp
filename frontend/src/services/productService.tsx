@@ -125,7 +125,7 @@ export const productService = {
 
   // Get producer's products
   async getMyProducts(): Promise<Product[]> {
-    return api.request('/products/my-products');
+    return api.request('/products/my/products');
   },
 
   // Update product status
