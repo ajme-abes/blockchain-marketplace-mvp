@@ -13,11 +13,11 @@ export interface Product {
   producerId: string;
   verified: boolean;
   rating: number;
-  stock: number;
+  quantity: number;
   unit: string;
   createdAt: string;
   updatedAt: string;
-  status: 'active' | 'inactive' | 'out_of_stock';
+  status: 'active' | 'inactive' | 'out_of_quantity';
 }
 
 export interface ProductFilters {
@@ -35,7 +35,7 @@ export interface CreateProductData {
   price: number;
   category: string;
   region: string;
-  stock: number;
+  quantity: number;
   unit: string;
   images: File[];
 }
@@ -73,7 +73,7 @@ export const productService = {
     formData.append('price', productData.price.toString());
     formData.append('category', productData.category);
     formData.append('region', productData.region);
-    formData.append('stock', productData.stock.toString());
+    formData.append('quantity', productData.quantity.toString());
     formData.append('unit', productData.unit);
     
     // Append images
@@ -100,7 +100,7 @@ export const productService = {
     if (productData.price) formData.append('price', productData.price.toString());
     if (productData.category) formData.append('category', productData.category);
     if (productData.region) formData.append('region', productData.region);
-    if (productData.stock) formData.append('stock', productData.stock.toString());
+    if (productData.quantity) formData.append('quantity', productData.quantity.toString());
     if (productData.unit) formData.append('unit', productData.unit);
     
     // Append new images if provided
