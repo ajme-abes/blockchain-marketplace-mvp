@@ -224,11 +224,35 @@ async getProducts(filters = {}) {
 
   async deleteProduct(id) {
     // Soft delete by setting status to INACTIVE
-    await prisma.product.update({
+    await prisma.product.delete({
       where: { id },
-      data: { status: 'INACTIVE' }
     });
   }
+  // Add this to your productService.js if it doesn't exist
+async updateProductStatus(id, status) {
+  console.log('🔄 Updating product status in service:', { id, status });
+  
+  const product = await prisma.product.update({
+    where: { id },
+    data: { status },
+    include: {
+      producer: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      },
+      ipfsFiles: true
+    }
+  });
+
+  return this.formatProductResponse(product);
+}
 
 async getProducerProducts(userId, pagination = {}) {
   const { page = 1, limit = 10 } = pagination;

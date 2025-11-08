@@ -18,6 +18,7 @@ const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -79,24 +80,29 @@ const Products = () => {
     navigate(`/products/${productId}`);
   };
 
+  // In Products.tsx - Update handleDeleteProduct function
   const handleDeleteProduct = async (productId: string) => {
-    if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this product? It will be hidden from buyers but kept in your records.')) {
       return;
     }
-
+  
     try {
       setDeletingId(productId);
-      console.log('🗑️ Deleting product:', productId);
+      console.log('🗑️ Soft deleting product:', productId);
       
       await productService.deleteProduct(productId);
       
       toast({
         title: "Product deleted",
-        description: "Product has been successfully deleted",
+        description: "Product has been hidden from buyers",
       });
       
-      // Remove from local state
-      setProducts(prev => prev.filter(product => product.id !== productId));
+      // Update local state - mark as inactive instead of removing
+      setProducts(prev => 
+        prev.map(product => 
+          product.id === productId ? { ...product, status: 'inactive' } : product
+        )
+      );
       
     } catch (error: any) {
       console.error('❌ Failed to delete product:', error);
@@ -110,22 +116,39 @@ const Products = () => {
     }
   };
 
-  const updateProductStatus = async (productId: string, status: Product['status']) => {
+  const updateProductStatus = async (productId: string, status: 'ACTIVE' | 'INACTIVE') => {
     try {
+      setUpdatingStatus(productId);
       console.log('🔄 Updating product status:', productId, status);
       
-      const updatedProduct = await productService.updateProductStatus(productId, status);
+      // Call the actual product service with correct status values
+      const response = await fetch(`http://localhost:5000/api/products/${productId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status })
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+  
+      const result = await response.json();
+      console.log('✅ Status update response:', result);
       
-      // Update local state
+      // Update local state immediately for better UX
       setProducts(prev => 
         prev.map(product => 
-          product.id === productId ? updatedProduct : product
+          product.id === productId ? { ...product, status: status.toLowerCase() } : product
         )
       );
       
       toast({
-        title: "Status updated",
-        description: `Product status changed to ${status}`,
+        title: "Status updated!",
+        description: `Product is now ${status === 'ACTIVE' ? 'visible to buyers' : 'hidden from buyers'}`,
       });
       
     } catch (error: any) {
@@ -135,6 +158,11 @@ const Products = () => {
         description: error.message || "Failed to update product status",
         variant: "destructive",
       });
+      
+      // Reload products to reset any incorrect state
+      await loadProducts();
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -169,35 +197,24 @@ const Products = () => {
   };
 
   const getDisplayImage = (product: any) => {
-    console.log('🖼️ Product image data:', {
-      id: product.id,
-      name: product.name,
-      imageUrl: product.imageUrl,
-      images: product.images
-    });
-  
-    // ✅ SIMPLE: Use imageUrl first (this is now guaranteed to be set)
+    // ✅ SIMPLE: Use imageUrl first
     if (product.imageUrl) {
-      console.log('✅ Using product.imageUrl:', product.imageUrl);
       return product.imageUrl;
     }
-  
+
     // Fallback to images.url
     if (product.images?.url) {
-      console.log('✅ Using product.images.url:', product.images.url);
       return product.images.url;
     }
-  
+
     // Fallback to IPFS CID
     if (product.images?.ipfsCid) {
-      const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${product.images.ipfsCid}`;
-      console.log('✅ Using IPFS CID:', ipfsUrl);
-      return ipfsUrl;
+      return `https://gateway.pinata.cloud/ipfs/${product.images.ipfsCid}`;
     }
-  
-    console.log('❌ No image found for product:', product.id);
+
     return null;
   };
+
   // Transform backend product data to match frontend interface
   const transformProduct = (product: any): Product => {
     return {
@@ -217,7 +234,6 @@ const Products = () => {
       status: product.status || 'active',
       createdAt: product.createdAt || product.listingDate || new Date().toISOString(),
       updatedAt: product.updatedAt || new Date().toISOString(),
-      // Include raw data for image handling
       ipfsMetadata: product.ipfsMetadata,
       imageCids: product.imageCids
     };
@@ -279,13 +295,7 @@ const Products = () => {
                   {displayProducts.map((product) => {
                     const displayImage = getDisplayImage(product);
                     const stock = product.quantity || 0;
-                    
-                    console.log(`🖼️ Rendering product ${product.id}:`, {
-                      name: product.name,
-                      displayImage,
-                      hasIpfsMetadata: !!product.ipfsMetadata,
-                      hasImageCids: !!product.imageCids
-                    });
+                    const isUpdating = updatingStatus === product.id;
 
                     return (
                       <Card key={product.id} className="shadow-card overflow-hidden hover:shadow-lg transition-shadow">
@@ -296,11 +306,8 @@ const Products = () => {
                               alt={product.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                console.error(`❌ Image failed to load: ${displayImage}`);
-                                // Fallback if image fails to load
                                 e.currentTarget.src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
                               }}
-                              onLoad={() => console.log(`✅ Image loaded successfully: ${displayImage}`)}
                             />
                           ) : (
                             <div className="w-full h-full bg-muted flex items-center justify-center">
@@ -348,48 +355,40 @@ const Products = () => {
                             </div>
                           </div>
                           
-                          {/* Status Toggle Buttons - Temporarily disabled */}
-                          <div className="flex gap-1 mb-3">
-                            <Button
-                              variant={product.status === 'active' ? 'default' : 'outline'}
-                              size="sm"
-                              className="flex-1 text-xs"
-                              onClick={() => {
-                                toast({
-                                  title: "Feature Coming Soon",
-                                  description: "Status update functionality will be implemented next",
-                                });
-                              }}
-                              disabled={stock === 0}
-                            >
-                              Active
-                            </Button>
-                            <Button
-                              variant={product.status === 'inactive' ? 'default' : 'outline'}
-                              size="sm"
-                              className="flex-1 text-xs"
-                              onClick={() => {
-                                toast({
-                                  title: "Feature Coming Soon",
-                                  description: "Status update functionality will be implemented next",
-                                });
-                              }}
-                            >
-                              Inactive
-                            </Button>
-                          </div>
+                          {/* ✅ FIXED: Real Active/Inactive buttons */}
+<div className="flex gap-1 mb-3">
+  <Button
+    variant={product.status === 'active' ? 'default' : 'outline'}
+    size="sm"
+    className="flex-1 text-xs"
+    onClick={() => updateProductStatus(product.id, 'ACTIVE')}
+    disabled={isUpdating || stock === 0}
+  >
+    {isUpdating && product.status !== 'active' ? (
+      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+    ) : null}
+    Active
+  </Button>
+  <Button
+    variant={product.status === 'inactive' ? 'default' : 'outline'}
+    size="sm"
+    className="flex-1 text-xs"
+    onClick={() => updateProductStatus(product.id, 'INACTIVE')}
+    disabled={isUpdating}
+  >
+    {isUpdating && product.status !== 'inactive' ? (
+      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+    ) : null}
+    Inactive
+  </Button>
+</div>
 
                           <div className="flex gap-2">
                             <Button 
                               variant="outline" 
                               size="sm" 
                               className="flex-1"
-                              onClick={() => {
-                                toast({
-                                  title: "Feature Coming Soon",
-                                  description: "Product view page will be implemented next",
-                                });
-                              }}
+                              onClick={() => handleViewProduct(product.id)}
                             >
                               <Eye className="h-3 w-3 mr-1" />
                               View
@@ -398,33 +397,23 @@ const Products = () => {
                               variant="outline" 
                               size="sm" 
                               className="flex-1"
-                              onClick={() => {
-                                toast({
-                                  title: "Feature Coming Soon",
-                                  description: "Product edit functionality will be implemented next",
-                                });
-                              }}
+                              onClick={() => handleEditProduct(product.id)}
                             >
                               <Edit className="h-3 w-3 mr-1" />
                               Edit
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                toast({
-                                  title: "Feature Coming Soon",
-                                  description: "Product delete functionality will be implemented next",
-                                });
-                              }}
-                              disabled={deletingId === product.id}
-                            >
-                              {deletingId === product.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-3 w-3" />
-                              )}
-                            </Button>
+<Button 
+variant="outline" 
+size="sm"
+onClick={() => handleDeleteProduct(product.id)}
+disabled={deletingId === product.id}
+>
+{deletingId === product.id ? (
+  <Loader2 className="h-3 w-3 animate-spin" />
+) : (
+  <Trash2 className="h-3 w-3" />
+)}
+</Button>
                           </div>
                         </CardContent>
                       </Card>
