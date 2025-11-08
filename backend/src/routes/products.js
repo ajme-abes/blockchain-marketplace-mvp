@@ -98,102 +98,105 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product (PRODUCER only)
-router.post('/', authenticateToken, requireRole(['PRODUCER']), upload.single('image'), async (req, res) => {
-  try {
-    console.log('🔧 Creating product for user:', req.user.id);
-    console.log('🔧 Product data:', req.body);
-    console.log('🔧 File received:', req.file ? `Yes (${req.file.originalname})` : 'No');
+// Create product (PRODUCER only)
+router.post(
+  '/',
+  authenticateToken,
+  requireRole(['PRODUCER']),
+  upload.array('images', 5),
+  async (req, res) => {
+    try {
+      console.log('🔧 Creating product for user:', req.user.id);
+      console.log('🔧 Product data:', req.body);
+      console.log(`🔧 Files received: ${req.files?.length || 0}`);
 
-    const { name, description, price, category, quantity } = req.body;
+      const { name, description, price, category, quantity } = req.body;
 
-    // Validate required fields
-    if (!name || !price || !category || !quantity) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: name, price, category, quantity'
-      });
-    }
-
-    // Validate price and quantity
-    if (parseFloat(price) <= 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Price must be greater than 0'
-      });
-    }
-
-    if (parseInt(quantity) < 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Quantity cannot be negative'
-      });
-    }
-
-    let imageCid = null;
-    let ipfsRecord = null;
-
-    // Upload image to IPFS if provided
-    if (req.file) {
-      console.log('🔧 Uploading image to IPFS...');
-      const uploadResult = await ipfsService.uploadFile(
-        req.file.buffer,
-        req.file.originalname,
-        'PRODUCT_IMAGE',
-        req.user.id
-      );
-
-      if (!uploadResult.success) {
-        return res.status(500).json({
+      // Validate required fields
+      if (!name || !price || !category || !quantity) {
+        return res.status(400).json({
           status: 'error',
-          message: 'Failed to upload product image',
-          error: uploadResult.error
+          message: 'Missing required fields: name, price, category, quantity'
         });
       }
 
-      imageCid = uploadResult.cid;
-      ipfsRecord = uploadResult.ipfsRecord;
-      console.log('✅ Image uploaded to IPFS:', imageCid);
-    }
+      if (parseFloat(price) <= 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Price must be greater than 0'
+        });
+      }
 
-    // Create product
-    const productData = {
-      name,
-      description: description || '',
-      price: parseFloat(price),
-      category,
-      quantity: parseInt(quantity),
-      producerId: req.user.id,
-      imageCid
-    };
+      if (parseInt(quantity) < 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Quantity cannot be negative'
+        });
+      }
 
-    const product = await productService.createProduct(productData);
+      let imageCids = [];
+      let ipfsRecords = [];
 
-    console.log('✅ Product created successfully:', product.id);
+      // ✅ Upload multiple images to IPFS if provided
+      if (req.files && req.files.length > 0) {
+        console.log('🔧 Uploading images to IPFS...');
+        for (const file of req.files) {
+          const uploadResult = await ipfsService.uploadFile(
+            file.buffer,
+            file.originalname,
+            'PRODUCT_IMAGE',
+            req.user.id
+          );
 
-    res.status(201).json({
-      status: 'success',
-      message: 'Product created successfully',
-      data: product
-    });
+          if (uploadResult.success) {
+            imageCids.push(uploadResult.cid);
+            ipfsRecords.push(uploadResult.ipfsRecord);
+            console.log(`✅ Uploaded: ${file.originalname} → ${uploadResult.cid}`);
+          } else {
+            console.warn(`⚠️ Failed to upload ${file.originalname}:`, uploadResult.error);
+          }
+        }
+      }
 
-  } catch (error) {
-    console.error('Create product error:', error);
-    
-    // Handle specific errors
-    if (error.code === 'P2002') {
-      return res.status(400).json({
+      // ✅ Create product
+      const productData = {
+        name,
+        description: description || '',
+        price: parseFloat(price),
+        category,
+        quantity: parseInt(quantity),
+        producerId: req.user.id,
+        imageCids // Store array of CIDs
+      };
+
+      const product = await productService.createProduct(productData);
+
+      console.log('✅ Product created successfully:', product.id);
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Product created successfully',
+        data: product
+      });
+    } catch (error) {
+      console.error('Create product error:', error);
+
+      if (error.code === 'P2002') {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Product with similar details already exists'
+        });
+      }
+
+      res.status(500).json({
         status: 'error',
-        message: 'Product with similar details already exists'
+        message: 'Failed to create product',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
-
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to create product',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
   }
-});
+);
+
 
 // Update product (Owner only)
 router.put('/:id', authenticateToken, upload.single('image'), async (req, res) => {
