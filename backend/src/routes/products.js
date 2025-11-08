@@ -401,44 +401,69 @@ router.get('/my/products', authenticateToken, requireRole(['PRODUCER']), async (
     });
   }
 });
-// Add this temporary debug route to check IPFS state
-router.get('/debug/ipfs-state', async (req, res) => {
+// Add this route to your routes/product.js - Status update endpoint
+router.patch('/:id/status', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
   try {
-    const ipfsFiles = await prisma.iPFSMetadata.findMany({
-      include: {
-        product: {
-          select: { id: true, name: true }
-        },
-        user: {
-          select: { id: true, name: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10
+    const { id } = req.params;
+    const { status } = req.body;
+
+    console.log('🔧 Updating product status:', { id, status });
+
+    // Validate status
+    const validStatuses = ['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK'];
+    if (!validStatuses.includes(status.toUpperCase())) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid status. Must be: ACTIVE, INACTIVE, or OUT_OF_STOCK'
+      });
+    }
+
+    // Check if product exists and belongs to the user
+    const existingProduct = await productService.getProductById(id);
+    if (!existingProduct) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Product not found'
+      });
+    }
+
+    // Verify ownership
+    const { prisma } = require('../config/database');
+    const producer = await prisma.producer.findUnique({
+      where: { id: existingProduct.producer.id }
     });
+
+    if (req.user.role !== 'ADMIN' && producer.userId !== req.user.id) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Access denied. You can only update your own products.'
+      });
+    }
+
+    // Update product status - use the correct status values from your schema
+    const updateData = { status: status.toUpperCase() };
+    const updatedProduct = await productService.updateProduct(id, updateData);
+
+    console.log('✅ Product status updated successfully');
 
     res.json({
       status: 'success',
-      data: {
-        totalFiles: ipfsFiles.length,
-        files: ipfsFiles.map(f => ({
-          id: f.id,
-          cid: f.cid,
-          productId: f.productId,
-          productName: f.product?.name || 'No product',
-          userId: f.userId,
-          userName: f.user?.name || 'No user',
-          createdAt: f.createdAt
-        }))
-      }
+      message: 'Product status updated successfully',
+      data: updatedProduct
     });
+
   } catch (error) {
-    console.error('Debug error:', error);
+    console.error('Update product status error:', error);
     res.status(500).json({
       status: 'error',
-      message: error.message
+      message: 'Failed to update product status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
+});
+// Add this to routes/product.js for testing
+router.get('/test/status', (req, res) => {
+  res.json({ message: 'Status endpoint is working!' });
 });
 
 module.exports = router;
