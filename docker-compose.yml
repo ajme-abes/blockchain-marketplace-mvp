@@ -4,23 +4,28 @@ services:
   # PostgreSQL Database
   database:
     image: postgres:15
-    container_name: marketplace_db
     environment:
       POSTGRES_DB: marketplace_db
       POSTGRES_USER: ${DB_USER:-marketplace_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-marketplace_password}
     ports:
-      - "5433:5433"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - marketplace_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-marketplace_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Backend API
   backend:
-    build: ./backend
-    container_name: marketplace_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${DB_USER:-marketplace_user}:${DB_PASSWORD:-marketplace_password}@database:5432/marketplace_db
@@ -29,18 +34,19 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     networks:
       - marketplace_network
     volumes:
       - ./contract-info.json:/app/contract-info.json
-    command: >
-      sh -c "npx prisma db push && npm start"
+    command: sh -c "npx prisma db push && npm start"
 
   # Frontend React App
   frontend:
-    build: ./frontend
-    container_name: marketplace_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:80"
     depends_on:
