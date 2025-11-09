@@ -16,11 +16,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { productService, Product } from '@/services/productService';
+import { useCart } from '@/contexts/CartContext';
+
 
 const Marketplace = () => {
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const { addToCart } = useCart(); 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -443,59 +446,72 @@ const Marketplace = () => {
                       </CardContent>
 
 <CardFooter className="p-4 pt-0 flex gap-2">
-{isAuthenticated && user?.role === 'BUYER' ? (
-  <>
-    {/* ✅ Buyer sees: Add to Cart + View Details + Buy Now */}
-    <Button 
-      variant="outline" 
-      className="flex-1"
-      onClick={(e) => {
-        e.preventDefault();
-        // TODO: Add to cart functionality
-        toast({
-          title: "Added to cart!",
-          description: `${product.name} added to shopping cart`,
-        });
-      }}
-    >
-      Add to Cart
-    </Button>
-    <Link to={`/products/${product.id}`} className="flex-1">
-      <Button variant="default" className="w-full">
-        Buy Now
+  {isAuthenticated && user?.role === 'BUYER' ? (
+    <>
+      {/* Add to Cart Button */}
+      <Button 
+        variant="outline" 
+        className="flex-1"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          addToCart({
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: 1,
+            image: getDisplayImage(product),
+            category: product.category,
+            region: product.region || 'Local',
+            unit: product.unit || 'unit',
+            stock: product.stock || product.quantityAvailable || 0,
+            producerId: product.producer?.id || '',
+            producerName: getProducerName(product),
+          });
+        }}
+        disabled={!product.stock || product.stock === 0}
+      >
+        {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
       </Button>
-    </Link>
-    <Link to={`/products/${product.id}`} className="flex-1">
-      <Button variant="secondary" className="w-full">
-        View Details
-      </Button>
-    </Link>
-
-  </>
-) : isAuthenticated && user?.role === 'PRODUCER' ? (
-  <>
-    {/* ✅ Producer sees only View Details */}
-    <Link to={`/products/${product.id}`} className="flex-1">
-      <Button variant="default" className="w-full">
-        View Details
-      </Button>
-    </Link>
-  </>
-) : (
-  <>
-    {/* ✅ Guest/Non-authenticated users */}
-    <Link to={`/products/${product.id}`} className="flex-1">
-      <Button variant="default" className="w-full">
-        View Details
-      </Button>
-    </Link>
-    <Link to="/login" className="flex-1">
-      <Button variant="secondary" className="w-full">
-        Login to Buy
-      </Button>
-    </Link>
-  </>
-)}
+      
+      {/* Buy Now Button */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          Buy Now
+        </Button>
+      </Link>
+      
+      {/* View Details Button */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="secondary" className="w-full">
+          View Details
+        </Button>
+      </Link>
+    </>
+  ) : isAuthenticated && user?.role === 'PRODUCER' ? (
+    <>
+      {/* Producer sees only View Details */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          View Details
+        </Button>
+      </Link>
+    </>
+  ) : (
+    <>
+      {/* Guest/Non-authenticated users */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          View Details
+        </Button>
+      </Link>
+      <Link to="/login" className="flex-1">
+        <Button variant="secondary" className="w-full">
+          Login to Buy
+        </Button>
+      </Link>
+    </>
+  )}
 </CardFooter>
                     </Card>
                   );

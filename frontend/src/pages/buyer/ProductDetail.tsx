@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { useCart } from '@/contexts/CartContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ShieldCheck, 
@@ -14,7 +15,8 @@ import {
   Phone, 
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShoppingCart
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -90,7 +92,7 @@ const ProductDetail = () => {
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  
+  const { addToCart } = useCart(); 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('description');
@@ -370,53 +372,69 @@ const ProductDetail = () => {
               </Card>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 mb-4">
-              {isAuthenticated && user?.role === 'BUYER' ? (
-                <>
-                  <Button
-                    variant="hero"
-                    size="lg"
-                    className="flex-1"
-                    onClick={() => navigate(`/checkout/${product.id}`)}
-                  >
-                    Buy Now
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="lg"
-                    onClick={() => {
-                      toast({
-                        title: "Added to cart!",
-                        description: `${product.name} added to shopping cart`,
-                      });
-                    }}
-                  >
-                    Add to Cart
-                  </Button>
-                </>
-              ) : !isAuthenticated ? (
-                <Link to="/login" className="flex-1">
-                  <Button variant="hero" size="lg" className="w-full">
-                    Login to Purchase
-                  </Button>
-                </Link>
-              ) : null}
-              
-              {/* Contact buttons - show for all users */}
-              <Link to={`/contact/${product.producer?.id}`}>
-                <Button variant="outline" size="lg">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Contact
-                </Button>
-              </Link>
-              {isAuthenticated && (
-                <Button variant="outline" size="lg">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Chat
-                </Button>
-              )}
-            </div>
+// In ProductDetail.tsx - Replace the Action Buttons section
+{/* Action Buttons */}
+<div className="flex gap-3 mb-4 flex-wrap">
+  {isAuthenticated && user?.role === 'BUYER' ? (
+    <>
+      <Button
+        variant="hero"
+        size="lg"
+        className="flex-1 min-w-[140px]"
+        onClick={() => navigate(`/checkout/${product.id}`)}
+        disabled={!product.stock || product.stock === 0}
+      >
+        {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Buy Now'}
+      </Button>
+      
+      <Button 
+        variant="outline" 
+        size="lg"
+        onClick={() => {
+          addToCart({
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: 1,
+            image: getDisplayImage(product),
+            category: product.category,
+            region: product.region,
+            unit: product.unit,
+            stock: product.stock,
+            producerId: product.producer?.id || '',
+            producerName: getProducerName(product),
+          });
+        }}
+        disabled={!product.stock || product.stock === 0}
+        className="min-w-[140px]"
+      >
+        <ShoppingCart className="h-4 w-4 mr-2" />
+        Add to Cart
+      </Button>
+    </>
+  ) : !isAuthenticated ? (
+    <Link to="/login" className="flex-1">
+      <Button variant="hero" size="lg" className="w-full">
+        Login to Purchase
+      </Button>
+    </Link>
+  ) : null}
+  
+  {/* Contact buttons - show for all users */}
+  <Link to={`/contact/${product.producer?.id}`}>
+    <Button variant="outline" size="lg" className="min-w-[140px]">
+      <Phone className="h-4 w-4 mr-2" />
+      Contact
+    </Button>
+  </Link>
+  
+  {isAuthenticated && (
+    <Button variant="outline" size="lg" className="min-w-[140px]">
+      <MessageSquare className="h-4 w-4 mr-2" />
+      Chat
+    </Button>
+  )}
+</div>
 
             <div className="text-sm text-muted-foreground">
               {product.stock} {product.unit} available in stock
