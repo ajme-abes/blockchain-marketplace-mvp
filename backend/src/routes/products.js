@@ -67,14 +67,13 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single product (Public)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    console.log('🔧 Fetching product:', id);
+    console.log('🔧 Fetching product details:', id);
 
-    const product = await productService.getProductById(id);
+    const product = await productService.getProductDetail(id);
     
     if (!product) {
       return res.status(404).json({
@@ -89,10 +88,10 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get product error:', error);
+    console.error('Get product detail error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to fetch product',
+      message: 'Failed to fetch product details',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

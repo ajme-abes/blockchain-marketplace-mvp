@@ -253,6 +253,100 @@ async updateProductStatus(id, status) {
 
   return this.formatProductResponse(product);
 }
+async getProductDetail(id) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      producer: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true
+            }
+          }
+        }
+      },
+      reviews: {
+        include: {
+          buyer: {
+            include: {
+              user: {
+                select: {
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { reviewDate: 'desc' }
+      },
+      ipfsFiles: true,
+      // Add order items count for popularity
+      _count: {
+        select: {
+          orderItems: true
+        }
+      }
+    }
+  });
+
+  if (!product) return null;
+
+  return this.formatProductDetailResponse(product);
+}
+
+formatProductDetailResponse(product) {
+  const baseProduct = this.formatProductResponse(product);
+  
+  // Calculate detailed rating stats
+  const reviews = product.reviews || [];
+  const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  reviews.forEach(review => {
+    if (review.rating >= 1 && review.rating <= 5) {
+      ratingCounts[review.rating]++;
+    }
+  });
+
+  return {
+    ...baseProduct,
+    // Add fields needed for ProductDetail page
+    unit: 'unit', // You might want to add this to your Product model
+    region: product.producer?.location || 'Local',
+    verified: product.producer?.verificationStatus === 'VERIFIED',
+    reviews: reviews.length,
+    blockchainTxHash: null, // You can populate this from order data
+    nameAmh: '', // Add if you have Amharic names
+    stock: product.quantityAvailable,
+    popularity: product._count?.orderItems || 0,
+    
+    // Detailed review data
+    reviewDetails: {
+      total: reviews.length,
+      average: baseProduct.averageRating,
+      distribution: ratingCounts,
+      reviews: reviews.map(review => ({
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        date: review.reviewDate,
+        buyer: {
+          name: review.buyer?.user?.name || 'Anonymous',
+          email: review.buyer?.user?.email
+        }
+      }))
+    },
+    
+    // Producer contact info
+    producerContact: {
+      phone: product.producer?.user?.phone,
+      email: product.producer?.user?.email
+    }
+  };
+}
 
 async getProducerProducts(userId, pagination = {}) {
   const { page = 1, limit = 10 } = pagination;
