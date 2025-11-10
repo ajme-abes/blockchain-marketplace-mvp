@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,8 @@ const slides = [
   {
     image: heroImage1,
     caption: { en: 'Connecting with Ethiopian Coffee Farmers', amh: 'ከኢትዮጵያ የቡና አምራቾች ጋር መገናኘት' },
-    cta: { en: 'Explore Coffee', amh: 'ቡናን ያስሱ' }
+    cta: { en: 'Explore Coffee', amh: 'ቡናን ያስሱ' },
+    priority: true
   },
   {
     image: heroImage2,
@@ -27,21 +28,79 @@ const slides = [
 
 export const HeroCarousel = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [touchStart, setTouchStart] = useState(null);
+  const [imagesLoaded, setImagesLoaded] = useState({});
   const { language, t } = useLanguage();
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
-    return () => clearInterval(timer);
+  const memoizedSlides = useMemo(() => slides, []);
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % memoizedSlides.length);
+  }, [memoizedSlides.length]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + memoizedSlides.length) % memoizedSlides.length);
+  }, [memoizedSlides.length]);
+
+  const goToSlide = useCallback((index) => {
+    setCurrentSlide(index);
   }, []);
 
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % slides.length);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  // Auto-advance slides
+  useEffect(() => {
+    if (isPaused) return;
+
+    const timer = setInterval(() => {
+      nextSlide();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isPaused, nextSlide]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'ArrowRight') nextSlide();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [prevSlide, nextSlide]);
+
+  // Touch/swipe handling
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStart) return;
+    
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+    
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) nextSlide();
+      else prevSlide();
+    }
+    
+    setTouchStart(null);
+  };
+
+  const handleImageLoad = (index) => {
+    setImagesLoaded(prev => ({ ...prev, [index]: true }));
+  };
 
   return (
-    <section className="relative min-h-[600px] flex items-center overflow-hidden">
-      {slides.map((slide, index) => (
+    <section 
+      className="relative min-h-[600px] flex items-center overflow-hidden"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {memoizedSlides.map((slide, index) => (
         <div
           key={index}
           className={`absolute inset-0 transition-opacity duration-1000 ${
@@ -51,28 +110,32 @@ export const HeroCarousel = () => {
           <img
             src={slide.image}
             alt={slide.caption[language]}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-500 ${
+              imagesLoaded[index] ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => handleImageLoad(index)}
             loading={index === 0 ? 'eager' : 'lazy'}
+            fetchPriority={index === 0 ? 'high' : 'auto'}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/60" />
         </div>
       ))}
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-2xl">
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+        <div className="max-w-2xl animate-in fade-in duration-1000">
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight animate-in slide-in-from-bottom-8">
             {t('hero.title')}
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-4">
-            {slides[currentSlide].caption[language]}
+          <p className="text-lg md:text-xl text-muted-foreground mb-4 animate-in slide-in-from-bottom-8 delay-150">
+            {memoizedSlides[currentSlide].caption[language]}
           </p>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8">
+          <p className="text-lg md:text-xl text-muted-foreground mb-8 animate-in slide-in-from-bottom-8 delay-300">
             {t('hero.subtitle')}
           </p>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 animate-in slide-in-from-bottom-8 delay-500">
             <Link to="/marketplace">
               <Button size="lg" variant="hero" className="text-lg">
-                {slides[currentSlide].cta[language]}
+                {memoizedSlides[currentSlide].cta[language]}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -101,14 +164,15 @@ export const HeroCarousel = () => {
       </button>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-        {slides.map((_, index) => (
+        {memoizedSlides.map((_, index) => (
           <button
             key={index}
-            onClick={() => setCurrentSlide(index)}
+            onClick={() => goToSlide(index)}
             className={`h-2 rounded-full transition-all ${
               index === currentSlide ? 'w-8 bg-primary' : 'w-2 bg-background/60'
             }`}
             aria-label={`Go to slide ${index + 1}`}
+            aria-current={index === currentSlide}
           />
         ))}
       </div>
