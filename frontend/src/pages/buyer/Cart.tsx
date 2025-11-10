@@ -299,14 +299,15 @@ const Cart: React.FC = () => {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <Button 
-                    className="w-full h-12 text-base font-semibold" 
-                    size="lg"
-                    onClick={handleCheckout}
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Proceed to Checkout
-                  </Button>
+<Link to="/checkout" className="block">
+  <Button 
+    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-amber-200 dark:hover:shadow-amber-800 transition-all duration-300"
+    size="lg"
+  >
+    <CreditCard className="h-4 w-4 mr-2" />
+    Proceed to Checkout
+  </Button>
+</Link>
                   
                   <Link to="/marketplace" className="block">
                     <Button variant="outline" className="w-full" size="lg">

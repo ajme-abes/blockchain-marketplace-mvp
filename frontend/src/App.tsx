@@ -134,7 +134,7 @@ const App = () => (
       <Cart />
     </RoleRoute>
   } />
-  <Route path="/checkout/:id" element={
+  <Route path="/checkout" element={
     <RoleRoute allowedRoles={['buyer']}>
       <Checkout />
     </RoleRoute>
