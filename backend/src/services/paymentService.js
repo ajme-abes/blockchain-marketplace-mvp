@@ -68,7 +68,7 @@ class PaymentService {
         phone_number: customerInfo.phone || order.buyer.user.phone || '+251911223344',
         tx_ref: txRef, // Fixed: max 50 characters
         callback_url: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payments/webhook/chapa`,
-        return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/order/${orderId}`,
+        return_url: `${process.env.FRONTEND_URL || 'http://localhost:8080'}/order/${orderId}/success`,
         customization: {
           title: 'Marketplace',
           description: `Order ${shortOrderId}`

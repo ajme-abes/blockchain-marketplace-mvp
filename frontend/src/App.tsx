@@ -38,6 +38,7 @@ import ProducerOrders from "./pages/producer/ProducerOrders";
 import ProducerReviews from "./pages/producer/ProducerReviews";
 import ProducerAnalytics from "./pages/producer/ProducerAnalytics";
 import StoreSettings from "./pages/producer/StoreSettings";
+import PaymentSuccess from "./pages/buyer/PaymentSuccess";
 import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -144,6 +145,7 @@ const App = () => (
       <Orders />
     </RoleRoute>
   } />
+  <Route path="/order/:orderId/success" element={<PaymentSuccess />} />
 
   {/* Producer-only Routes */}
   <Route path="/my-products" element={
