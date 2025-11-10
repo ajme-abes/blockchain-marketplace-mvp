@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// ...existing code...
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -9,76 +10,238 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ShieldCheck, Star, Filter, Search, X } from 'lucide-react';
-import { mockProducts, categories, regions } from '@/lib/mockData';
+import { ShieldCheck, Star, Filter, Search, X, Loader2 } from 'lucide-react';
+import { categories, regions } from '@/lib/mockData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { productService, Product } from '@/services/productService';
+import { useCart } from '@/contexts/CartContext';
+
 
 const Marketplace = () => {
   const { t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
+  const { addToCart } = useCart(); 
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const filteredProducts = mockProducts.filter(product => {
-    // Search filter - search in name, producer name, category, and description
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = 
-        product.name.toLowerCase().includes(query) ||
-        product.producerName.toLowerCase().includes(query) ||
-        product.category.toLowerCase().includes(query) ||
-        (product.description && product.description.toLowerCase().includes(query));
-      if (!matchesSearch) return false;
+  // Load real products from backend
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading marketplace products...');
+
+      const response: any = await productService.getProducts();
+      console.log('✅ Marketplace products response:', response);
+
+      // Handle different response structures
+      let productsArray: any[] = [];
+
+      if (Array.isArray(response)) {
+        productsArray = response;
+      } else if (response.data && Array.isArray(response.data)) {
+        productsArray = response.data;
+      } else if (
+        response.data &&
+        response.data.products &&
+        Array.isArray(response.data.products)
+      ) {
+        productsArray = response.data.products;
+      } else if (response.products && Array.isArray(response.products)) {
+        productsArray = response.products;
+      } else {
+        console.warn('⚠️ Unexpected response structure:', response);
+        productsArray = [];
+      }
+
+      console.log('🔄 Extracted products array:', productsArray);
+      setProducts(productsArray);
+    } catch (error: any) {
+      console.error('❌ Failed to load marketplace products:', error);
+      toast({
+        title: 'Error loading products',
+        description: error.message || 'Failed to load products',
+        variant: 'destructive',
+      });
+      setProducts([]); // Ensure products is always an array
+    } finally {
+      setLoading(false);
     }
-    
-    // Category filter
-    if (selectedCategory && product.category !== selectedCategory) return false;
-    
-    // Region filter
-    if (selectedRegion && product.region !== selectedRegion) return false;
-    
-    // Price range filter
-    if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
-    
-    return true;
+  };
+
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(
+    (product) => {
+      if (!product) return false;
+
+      const isActive =
+        product.status === 'active' ||
+        product.status === 'ACTIVE' ||
+        product.status === 'Active' ||
+        !product.status; // If no status, assume active
+
+      if (!isActive) return false;
+
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          (product.name && product.name.toLowerCase().includes(query)) ||
+          (product.producerName && product.producerName.toLowerCase().includes(query)) ||
+          (product.category && product.category.toLowerCase().includes(query)) ||
+          (product.description && product.description.toLowerCase().includes(query));
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedCategory && product.category !== selectedCategory) return false;
+      if (selectedRegion && product.region !== selectedRegion) return false;
+      if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
+
+      return true;
+    }
+  );
+
+  // Debug logs
+  console.log('🔍 Debug - Product status analysis:', {
+    totalProducts: products.length,
+    filteredProducts: filteredProducts.length,
+    productStatuses: products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      isActive:
+        p.status === 'active' || p.status === 'ACTIVE' || p.status === 'Active' || !p.status,
+    })),
   });
+
+  console.log('🔍 Debug - Products data:', {
+    productsType: typeof products,
+    isArray: Array.isArray(products),
+    productsLength: Array.isArray(products) ? products.length : 'N/A',
+    productsSample: Array.isArray(products) && products.length > 0 ? products[0] : 'No products',
+    filteredCount: filteredProducts.length,
+  });
+
+  // Get display image URL with better fallbacks
+  const getDisplayImage = (product: Product) => {
+    if (product.imageUrl) return product.imageUrl;
+    if (product.images?.url) return product.images.url;
+    if (product.images?.ipfsCid) return `https://gateway.pinata.cloud/ipfs/${product.images.ipfsCid}`;
+    if (product.images && Array.isArray(product.images) && product.images.length > 0)
+      return product.images[0];
+    return 'https://via.placeholder.com/300x300?text=Product+Image';
+  };
+
+  // Get producer name with better logic
+  const getProducerName = (product: Product) => {
+    console.log('🔍 Producer data for product:', {
+      id: product.id,
+      name: product.name,
+      producerName: product.producerName,
+      producer: product.producer,
+    });
+
+    if (product.producerName && product.producerName !== 'Unknown Producer') {
+      return product.producerName;
+    }
+    if (product.producer?.businessName) return product.producer.businessName;
+    if (product.producer?.user?.name) return product.producer.user.name;
+    if (product.producer?.name) return product.producer.name;
+    return 'Local Farmer';
+  };
+
+  // Helper function for unit display
+  const getDisplayUnit = (unit: string | undefined) => {
+    if (!unit) return 'unit';
+
+    const unitMap: { [key: string]: string } = {
+      kg: 'kg',
+      g: 'g',
+      piece: 'piece',
+      pieces: 'pieces',
+      bundle: 'bundle',
+      liter: 'liter',
+      l: 'liter',
+      dozen: 'dozen',
+      unit: 'unit',
+      units: 'units',
+    };
+
+    return unitMap[unit.toLowerCase()] || unit;
+  };
+
+  // Helper function for rating display
+  const getRatingDisplay = (rating: number | null | undefined) => {
+    const actualRating = rating || 0;
+    if (actualRating === 0) {
+      return { display: 'No ratings', hasRating: false };
+    }
+    return { display: actualRating.toFixed(1), hasRating: true };
+  };
+
+  useEffect(() => {
+    if (filteredProducts.length > 0) {
+      console.log(
+        '🔍 Producer data analysis:',
+        filteredProducts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          producerName: p.producerName,
+          producer: p.producer,
+          hasProducer: !!p.producer,
+          hasProducerName: !!p.producerName,
+          producerBusinessName: p.producer?.businessName,
+          producerUserName: p.producer?.user?.name,
+        }))
+      );
+    }
+  }, [filteredProducts]);
 
   const content = (
     <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Marketplace</h1>
-          <p className="text-muted-foreground mb-6">
-            Browse verified Ethiopian products from local producers
-          </p>
-          
-          {/* Search Bar - Only show for authenticated users */}
-          {isAuthenticated && (
-            <div className="relative max-w-2xl">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search products by name, producer, category..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10 h-12 text-base"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Marketplace</h1>
+        <p className="text-muted-foreground mb-6">
+          Browse verified Ethiopian products from local producers
+        </p>
+
+        {/* Search Bar - Available to all users */}
+        <div className="relative max-w-2xl">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search products by name, producer, category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10 h-12 text-base"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8"
+              onClick={() => setSearchQuery('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
         </div>
+      </div>
 
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p className="text-muted-foreground">Loading products...</p>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <aside className="lg:col-span-1">
             <Card className="sticky top-20">
@@ -94,11 +257,13 @@ const Marketplace = () => {
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={selectedCategory || ''}
-                      onChange={e => setSelectedCategory(e.target.value || null)}
+                      onChange={(e) => setSelectedCategory(e.target.value || null)}
                     >
                       <option value="">All Categories</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -108,11 +273,13 @@ const Marketplace = () => {
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={selectedRegion || ''}
-                      onChange={e => setSelectedRegion(e.target.value || null)}
+                      onChange={(e) => setSelectedRegion(e.target.value || null)}
                     >
                       <option value="">All Regions</option>
-                      {regions.map(reg => (
-                        <option key={reg} value={reg}>{reg}</option>
+                      {regions.map((reg) => (
+                        <option key={reg} value={reg}>
+                          {reg}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -126,7 +293,7 @@ const Marketplace = () => {
                       min="0"
                       max="1000"
                       value={priceRange[1]}
-                      onChange={e => setPriceRange([0, parseInt(e.target.value)])}
+                      onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
                       className="w-full"
                     />
                   </div>
@@ -176,60 +343,185 @@ const Marketplace = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredProducts.map(product => (
-                <Card key={product.id} className="overflow-hidden shadow-card hover:shadow-glow transition-smooth">
-                  <Link to={`/products/${product.id}`}>
-                    <div className="aspect-square overflow-hidden">
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover hover:scale-105 transition-smooth"
-                        loading="lazy"
-                      />
-                    </div>
-                  </Link>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                        <p className="text-sm text-muted-foreground">by {product.producerName}</p>
-                      </div>
-                      {product.verified && (
-                        <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="secondary">{product.category}</Badge>
-                      <Badge variant="outline">{product.region}</Badge>
-                      <div className="flex items-center gap-1 text-sm ml-auto">
-                        <Star className="h-4 w-4 fill-accent text-accent" />
-                        <span>{product.rating}</span>
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-primary">
-                      {product.price} {t('currency')}/{product.unit}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {product.stock} {product.unit} in stock
-                    </div>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0 flex gap-2">
-                    <Link to={`/products/${product.id}`} className="flex-1">
-                      <Button variant="default" className="w-full">
-                        {t('common.buyNow')}
-                      </Button>
-                    </Link>
-                    <Link to={`/products/${product.id}`}>
-                      <Button variant="outline">Details</Button>
-                    </Link>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground text-lg mb-4">
+                  {products.length === 0 ? 'No products available yet' : 'No products match your filters'}
+                </p>
+                {(searchQuery || selectedCategory || selectedRegion) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory(null);
+                      setSelectedRegion(null);
+                      setPriceRange([0, 1000]);
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredProducts.map((product) => {
+                  const ratingInfo = getRatingDisplay(product.rating);
+                  const displayUnit = getDisplayUnit(product.unit);
+                  // Prefer common property names for quantity/stock/quantityAvailable
+                  const stock =
+                    product.quantityAvailable ??
+                    product.quantity ??
+                    product.stock ??
+                    product.qty ??
+                    0;
+
+                  return (
+                    <Card
+                      key={product.id}
+                      className="overflow-hidden shadow-card hover:shadow-glow transition-smooth"
+                    >
+                      <Link to={`/products/${product.id}`}>
+                        <div className="aspect-square overflow-hidden">
+                          <img
+                            src={getDisplayImage(product)}
+                            alt={product.name}
+                            className="w-full h-full object-cover hover:scale-105 transition-smooth"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://via.placeholder.com/300x300?text=Image+Not+Found';
+                            }}
+                          />
+                        </div>
+                      </Link>
+
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h3 className="font-semibold text-lg mb-1 line-clamp-1">{product.name}</h3>
+                            <p className="text-sm text-muted-foreground">by {getProducerName(product)}</p>
+                          </div>
+
+                          {product.verified && (
+                            <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0" />
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="secondary" className="capitalize">
+                            {product.category}
+                          </Badge>
+                          <Badge variant="outline">{product.region || 'Local'}</Badge>
+
+                          <div className="flex items-center gap-1 text-sm ml-auto">
+                            <Star
+                              className={`h-4 w-4 ${
+                                ratingInfo.hasRating ? 'fill-accent text-accent' : 'text-muted-foreground'
+                              }`}
+                            />
+                            <span className={ratingInfo.hasRating ? 'text-foreground' : 'text-muted-foreground'}>
+                              {ratingInfo.display}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-2xl font-bold text-primary">
+                              {product.price} ETB/{displayUnit}
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              In stock: <span className="font-medium text-foreground">{stock}</span> {displayUnit}
+                            </div>
+                          </div>
+
+                          {/* optional small CTA or stock indicator */}
+                          <div className="text-sm text-right">
+                            {stock === 0 ? (
+                              <span className="text-destructive font-semibold">Out of stock</span>
+                            ) : stock < 5 ? (
+                              <span className="text-warning font-medium">{stock} left</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </CardContent>
+
+<CardFooter className="p-4 pt-0 flex gap-2">
+  {isAuthenticated && user?.role === 'BUYER' ? (
+    <>
+      {/* Add to Cart Button */}
+      <Button 
+        variant="outline" 
+        className="flex-1"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          addToCart({
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: 1,
+            image: getDisplayImage(product),
+            category: product.category,
+            region: product.region || 'Local',
+            unit: product.unit || 'unit',
+            stock: product.stock || product.quantityAvailable || 0,
+            producerId: product.producer?.id || '',
+            producerName: getProducerName(product),
+          });
+        }}
+        disabled={!product.stock || product.stock === 0}
+      >
+        {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+      </Button>
+      
+      {/* Buy Now Button */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          Buy Now
+        </Button>
+      </Link>
+      
+      {/* View Details Button */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="secondary" className="w-full">
+          View Details
+        </Button>
+      </Link>
+    </>
+  ) : isAuthenticated && user?.role === 'PRODUCER' ? (
+    <>
+      {/* Producer sees only View Details */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          View Details
+        </Button>
+      </Link>
+    </>
+  ) : (
+    <>
+      {/* Guest/Non-authenticated users */}
+      <Link to={`/products/${product.id}`} className="flex-1">
+        <Button variant="default" className="w-full">
+          View Details
+        </Button>
+      </Link>
+      <Link to="/login" className="flex-1">
+        <Button variant="secondary" className="w-full">
+          Login to Buy
+        </Button>
+      </Link>
+    </>
+  )}
+</CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-      </main>
+      )}
+    </main>
   );
 
   if (isAuthenticated) {

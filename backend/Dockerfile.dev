@@ -1,20 +1,15 @@
-FROM node:18-alpine
+FROM node:18-bullseye
 
 WORKDIR /app
 
-# Install required system dependencies for Prisma
-RUN apk add --no-cache openssl openssl-dev libc6-compat
+RUN apt-get update && apt-get install -y openssl libc6-dev curl
 
-# Copy package files
 COPY package*.json ./
+RUN npm install --legacy-peer-deps
+
 COPY prisma ./prisma/
+COPY . .
 
-# Install dependencies with network retry settings
-RUN npm config set fetch-retry-maxtimeout 300000
-RUN npm config set fetch-retry-mintimeout 10000
-RUN npm install --no-optional
-
-# Generate Prisma client
 RUN npx prisma generate
 
 EXPOSE 5000

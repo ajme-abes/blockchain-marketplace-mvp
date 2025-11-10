@@ -20,7 +20,7 @@ interface ProductFormData {
   price: number;
   category: string;
   region: string;
-  stock: number;
+  quantity: number;
   unit: string;
 }
 
@@ -33,6 +33,7 @@ const AddProduct: React.FC = () => {
   
   const { register, handleSubmit, formState: { errors } } = useForm<ProductFormData>();
 
+  // In AddProduct.tsx - Update the onSubmit function
   const onSubmit = async (data: ProductFormData) => {
     if (images.length === 0) {
       toast({
@@ -42,17 +43,24 @@ const AddProduct: React.FC = () => {
       });
       return;
     }
-
+  
     setIsSubmitting(true);
     try {
       const productData: CreateProductData = {
         ...data,
         price: Number(data.price),
-        stock: Number(data.stock),
+        quantity: Number(data.quantity),
         images: images,
       };
-
-      await productService.createProduct(productData);
+  
+      console.log('🔄 Creating product with data:', {
+        ...productData,
+        imagesCount: productData.images.length
+      });
+      
+      const result = await productService.createProduct(productData);
+      
+      console.log('✅ Product created successfully:', result);
       
       toast({
         title: "Product created!",
@@ -61,7 +69,7 @@ const AddProduct: React.FC = () => {
       
       navigate('/my-products');
     } catch (error: any) {
-      console.error('Failed to create product:', error);
+      console.error('❌ Failed to create product:', error);
       toast({
         title: "Error creating product",
         description: error.message || "Please try again",
@@ -137,7 +145,7 @@ const AddProduct: React.FC = () => {
                   <select
                     id="category"
                     {...register('category', { required: 'Category is required' })}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <option value="">Select Category</option>
                     <option value="vegetables">Vegetables</option>
@@ -173,21 +181,21 @@ const AddProduct: React.FC = () => {
                   )}
                 </div>
 
-                {/* Stock */}
+                {/* quantity */}
                 <div>
-                  <Label htmlFor="stock">Stock Quantity *</Label>
+                  <Label htmlFor="quantity">quantity Quantity *</Label>
                   <Input
-                    id="stock"
+                    id="quantity"
                     type="number"
                     min="1"
                     placeholder="0"
-                    {...register('stock', { 
-                      required: 'Stock is required',
-                      min: { value: 1, message: 'Stock must be at least 1' }
+                    {...register('quantity', { 
+                      required: 'quantity is required',
+                      min: { value: 1, message: 'quantity must be at least 1' }
                     })}
                   />
-                  {errors.stock && (
-                    <p className="text-red-500 text-sm mt-1">{errors.stock.message}</p>
+                  {errors.quantity && (
+                    <p className="text-red-500 text-sm mt-1">{errors.quantity.message}</p>
                   )}
                 </div>
 
@@ -197,7 +205,7 @@ const AddProduct: React.FC = () => {
                   <select
                     id="unit"
                     {...register('unit', { required: 'Unit is required' })}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <option value="">Select Unit</option>
                     <option value="kg">Kilogram (kg)</option>
@@ -218,7 +226,7 @@ const AddProduct: React.FC = () => {
                   <select
                     id="region"
                     {...register('region', { required: 'Region is required' })}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <option value="">Select Region</option>
                     <option value="addis-ababa">Addis Ababa</option>
@@ -340,6 +348,7 @@ const AddProduct: React.FC = () => {
                   type="button" 
                   variant="outline" 
                   onClick={() => navigate('/my-products')}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
