@@ -1,48 +1,107 @@
 // src/pages/buyer/Cart.tsx
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, Minus, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { 
+  Trash2, 
+  Plus, 
+  Minus, 
+  ShoppingCart, 
+  ArrowLeft, 
+  Truck,
+  Shield,
+  CreditCard,
+  Sparkles
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const Cart: React.FC = () => {
-  const { state, dispatch } = useCart();
+  const { state, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity === 0) {
-      dispatch({ type: 'REMOVE_ITEM', payload: id });
+  const handleQuantityChange = (id: string, newQuantity: number) => {
+    if (newQuantity === 0) {
+      removeFromCart(id);
     } else {
-      dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
+      updateQuantity(id, newQuantity);
     }
   };
 
-  const removeItem = (id: string) => {
-    dispatch({ type: 'REMOVE_ITEM', payload: id });
+  const handleRemoveItem = (id: string, name: string) => {
+    removeFromCart(id);
+    toast({
+      title: "Item removed",
+      description: `${name} has been removed from your cart`,
+    });
   };
 
-  const shippingCost = state.total > 0 ? 50 : 0;
-  const finalTotal = state.total + shippingCost;
+  const handleClearCart = () => {
+    if (state.items.length > 0) {
+      clearCart();
+    }
+  };
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please login to proceed with checkout",
+        variant: "destructive",
+      });
+      navigate('/login');
+      return;
+    }
+    navigate('/checkout');
+  };
+
+  // Calculate totals
+  const subtotal = state.total;
+  const shippingCost = subtotal > 0 ? 50 : 0; // Fixed shipping for demo
+  const tax = subtotal * 0.15; // 15% tax for demo
+  const finalTotal = subtotal + shippingCost + tax;
 
   if (state.items.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto px-4 py-16 flex flex-col items-center justify-center text-center">
-          <ShoppingCart className="h-24 w-24 text-muted-foreground mb-6" />
-          <h1 className="text-4xl font-bold mb-4">Your Cart is Empty</h1>
+          <div className="relative mb-8">
+            <ShoppingCart className="h-24 w-24 text-muted-foreground" />
+            <div className="absolute -top-2 -right-2">
+              <Badge variant="secondary" className="px-2 py-1 text-xs">
+                0
+              </Badge>
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Your Cart is Empty
+          </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-md">
-            Browse our marketplace and add some amazing products to your cart!
+            Discover amazing local products from Ethiopian producers and fill your cart with quality goods!
           </p>
-          <Link to="/marketplace">
-            <Button size="lg">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Continue Shopping
-            </Button>
-          </Link>
+          <div className="flex gap-4">
+            <Link to="/marketplace">
+              <Button size="lg" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Explore Marketplace
+              </Button>
+            </Link>
+            <Link to="/products">
+              <Button variant="outline" size="lg" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Continue Shopping
+              </Button>
+            </Link>
+          </div>
         </main>
         <Footer />
       </div>
@@ -53,118 +112,218 @@ const Cart: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Shopping Cart</h1>
-          <p className="text-muted-foreground">
-            Review your items before checkout
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <Badge variant="secondary" className="mb-4">
+            {state.itemCount} {state.itemCount === 1 ? 'item' : 'items'}
+          </Badge>
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Shopping Cart
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Review your items and proceed to secure checkout
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cart Items ({state.itemCount})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {state.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 p-6">
+          {/* Cart Items */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Cart Header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold">Your Items</h2>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleClearCart}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Cart
+              </Button>
+            </div>
+
+            {/* Cart Items List */}
+            <Card className="shadow-lg border-0">
+              <CardContent className="p-0 divide-y divide-border">
+                {state.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-6 p-6 hover:bg-muted/50 transition-colors">
+                    {/* Product Image */}
+                    <div className="flex-shrink-0">
                       <img 
                         src={item.image || '/placeholder-product.jpg'} 
                         alt={item.name}
-                        className="w-20 h-20 object-cover rounded-lg"
+                        className="w-24 h-24 object-cover rounded-lg shadow-md"
                       />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg truncate">{item.name}</h3>
-                        <p className="text-muted-foreground text-sm">
-                          {item.category} • {item.region}
-                        </p>
-                        <div className="text-xl font-bold text-primary mt-1">
-                          {item.price} ETB / {item.unit}
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div>
+                        <h3 className="font-semibold text-lg leading-tight">{item.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {item.category}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">•</span>
+                          <span className="text-sm text-muted-foreground">{item.region}</span>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            className="w-16 text-center"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const newQuantity = parseInt(e.target.value) || 1;
-                              updateQuantity(item.id, newQuantity);
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            disabled={item.quantity >= item.stock}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                      <div className="flex items-center gap-4">
+                        <div className="text-2xl font-bold text-primary">
+                          {item.price} ETB
                         </div>
-                        
-                        <div className="text-lg font-semibold min-w-20 text-right">
-                          {item.price * item.quantity} ETB
+                        <div className="text-sm text-muted-foreground">
+                          per {item.unit}
                         </div>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                      </div>
+
+                      {/* Stock Info */}
+                      <div className="text-sm">
+                        {item.quantity >= item.stock ? (
+                          <span className="text-destructive font-medium">
+                            Only {item.stock} left in stock
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {item.stock} available
+                          </span>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Quantity Controls */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                          className="h-8 w-8"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <Input
+                          className="w-16 text-center h-8"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value) || 1;
+                            handleQuantityChange(item.id, newQuantity);
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                          disabled={item.quantity >= item.stock}
+                          className="h-8 w-8"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      
+                      {/* Item Total */}
+                      <div className="text-right min-w-24">
+                        <div className="text-lg font-semibold">
+                          {item.price * item.quantity} ETB
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {item.quantity} × {item.price}
+                        </div>
+                      </div>
+
+                      {/* Remove Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveItem(item.id, item.name)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>
 
+          {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+            <Card className="sticky top-24 shadow-xl border-0 bg-gradient-to-br from-background to-muted/30">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Order Summary
+                </CardTitle>
+                <CardDescription>
+                  Review your order details
+                </CardDescription>
               </CardHeader>
+              
               <CardContent className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal ({state.itemCount} items)</span>
-                  <span>{state.total} ETB</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Shipping</span>
-                  <span>{shippingCost} ETB</span>
-                </div>
-                <div className="border-t pt-4">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
-                    <span>{finalTotal} ETB</span>
+                {/* Price Breakdown */}
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal ({state.itemCount} items)</span>
+                    <span className="font-medium">{subtotal.toFixed(2)} ETB</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <Truck className="h-3 w-3" />
+                      Shipping
+                    </span>
+                    <span>{shippingCost.toFixed(2)} ETB</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span>Tax (15%)</span>
+                    <span>{tax.toFixed(2)} ETB</span>
+                  </div>
+                  
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <span className="text-primary">{finalTotal.toFixed(2)} ETB</span>
+                    </div>
                   </div>
                 </div>
-                
-                <Link to="/checkout">
-                  <Button className="w-full" size="lg">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
+
+                {/* Security Badge */}
+                <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-primary font-medium">Secure checkout</span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <Button 
+                    className="w-full h-12 text-base font-semibold" 
+                    size="lg"
+                    onClick={handleCheckout}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
                     Proceed to Checkout
                   </Button>
-                </Link>
-                
-                <Link to="/marketplace">
-                  <Button variant="outline" className="w-full">
-                    Continue Shopping
-                  </Button>
-                </Link>
+                  
+                  <Link to="/marketplace" className="block">
+                    <Button variant="outline" className="w-full" size="lg">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Continue Shopping
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* Trust Indicators */}
+                <div className="pt-4 border-t text-center">
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>🔒 Secure payment processing</p>
+                    <p>🚚 Fast delivery across Ethiopia</p>
+                    <p>⭐ Blockchain-verified transactions</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
