@@ -116,7 +116,11 @@ model Order {
   paymentStatus    PaymentStatus  @default(PENDING)
   deliveryStatus   DeliveryStatus @default(PENDING)
   orderDate        DateTime       @default(now())
-  blockchainTxHash String?
+  blockchainTxHash String?       @unique
+  blockchainOrderId    String?   @unique  
+  blockchainRecorded   Boolean?  @default(false)
+  blockchainError      String?   
+  
   shippingAddress  Json?
   updatedAt        DateTime       @updatedAt
 
