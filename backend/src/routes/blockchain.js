@@ -1,3 +1,4 @@
+const { prisma } = require('../config/database');
 const express = require('express');
 const blockchainService = require('../services/blockchainService');
 const router = express.Router();
@@ -19,35 +20,48 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// Record transaction on blockchain
+// Record transaction on blockchain - UPDATED
 router.post('/record-transaction', async (req, res) => {
   try {
     const {
       orderId,
-      productId,
-      buyerAddress,
-      sellerAddress,
-      amount,
-      paymentMethod = 'CHAPA',
-      status = 'confirmed'
+      paymentReference,
+      amountETB,
+      buyer,
+      producer,
+      txHash
     } = req.body;
 
-    // Validate required fields
-    if (!orderId || !productId || !buyerAddress || !sellerAddress || !amount) {
+    // Validate required fields for NEW contract
+    if (!orderId || !paymentReference || !amountETB || !buyer || !producer || !txHash) {
       return res.status(400).json({
         status: 'error',
-        message: 'Missing required fields: orderId, productId, buyerAddress, sellerAddress, amount'
+        message: 'Missing required fields: orderId, paymentReference, amountETB, buyer, producer, txHash'
+      });
+    }
+
+    // Validate Ethereum addresses
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!ethAddressRegex.test(buyer)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid buyer address format'
+      });
+    }
+    if (!ethAddressRegex.test(producer)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid producer address format'
       });
     }
 
     const result = await blockchainService.recordTransaction({
       orderId,
-      productId,
-      buyerAddress,
-      sellerAddress,
-      amount,
-      paymentMethod,
-      status
+      paymentReference,
+      amountETB,
+      buyer,
+      producer,
+      txHash
     });
 
     if (result.success) {
@@ -85,9 +99,9 @@ router.get('/transaction/:orderId', async (req, res) => {
         data: result
       });
     } else {
-      res.status(400).json({
+      res.status(404).json({
         status: 'error',
-        message: 'Failed to get transaction',
+        message: 'Transaction not found',
         error: result.error
       });
     }
@@ -125,15 +139,141 @@ router.get('/verify/:orderId', async (req, res) => {
     });
   }
 });
-// TEST ROUTES - Remove these after testing
+
+// Get user transactions - NEW
+router.get('/user/:address/transactions', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    // Validate Ethereum address
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!ethAddressRegex.test(address)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid Ethereum address format'
+      });
+    }
+    
+    const result = await blockchainService.getUserTransactions(address);
+    
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: 'Failed to get user transactions',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get producer transactions - NEW
+router.get('/producer/:address/transactions', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    // Validate Ethereum address
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!ethAddressRegex.test(address)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid Ethereum address format'
+      });
+    }
+    
+    const result = await blockchainService.getProducerTransactions(address);
+    
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: 'Failed to get producer transactions',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get transaction count - NEW
+router.get('/stats/count', async (req, res) => {
+  try {
+    const result = await blockchainService.getTransactionCount();
+    
+    res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get transaction count',
+      error: error.message
+    });
+  }
+});
+
+// Get contract owner info - NEW
+router.get('/contract/owner', async (req, res) => {
+  try {
+    const isOwner = await blockchainService.isContractOwner();
+    const status = await blockchainService.getBlockchainStatus();
+    
+    res.json({
+      status: 'success',
+      data: {
+        isOwner: isOwner,
+        contractOwner: status.contractOwner,
+        connectedWallet: status.wallet?.address
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get contract owner info',
+      error: error.message
+    });
+  }
+});
+
+// TEST ROUTES - Updated for new contract
 router.post('/test/record-mock', async (req, res) => {
   try {
-    const { orderId, paymentReference, txHash } = req.body;
+    const { 
+      orderId, 
+      paymentReference, 
+      amountETB, 
+      buyer, 
+      producer, 
+      txHash 
+    } = req.body;
     
     const result = await blockchainService.recordTransaction({
       orderId: orderId || 'test-order-' + Date.now(),
-      paymentReference: paymentReference || 'test-ref-' + Math.random(),
-      txHash: txHash || 'test-tx-' + Math.random()
+      paymentReference: paymentReference || 'test-ref-' + Math.random().toString(36).substring(7),
+      amountETB: amountETB || '100.50 ETB',
+      buyer: buyer || '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // Hardhat account 1
+      producer: producer || '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // Hardhat account 2
+      txHash: txHash || '0x' + Math.random().toString(16).substr(2, 64)
     });
 
     res.json({
@@ -165,4 +305,117 @@ router.get('/test/verify/:orderId', async (req, res) => {
     });
   }
 });
+
+// Test get user transactions - NEW
+router.get('/test/user/:address/transactions', async (req, res) => {
+  try {
+    const { address } = req.params;
+    const result = await blockchainService.getUserTransactions(address);
+    
+    res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
+// Test get producer transactions - NEW
+router.get('/test/producer/:address/transactions', async (req, res) => {
+  try {
+    const { address } = req.params;
+    const result = await blockchainService.getProducerTransactions(address);
+    
+    res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+// Add this new endpoint
+router.post('/order/:orderId/record', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { paymentReference, txHash } = req.body;
+
+    const result = await blockchainService.recordOrderTransaction(orderId, {
+      reference: paymentReference,
+      txHash: txHash
+    });
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: 'Order recorded on blockchain',
+        data: {
+          blockchainTxHash: result.blockchainTxHash,
+          blockchainOrderId: result.blockchainOrderId
+        }
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: 'Failed to record order on blockchain',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add endpoint to check blockchain status
+router.get('/order/:orderId/blockchain-status', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        blockchainRecorded: true,
+        blockchainTxHash: true,
+        blockchainOrderId: true,
+        blockchainError: true
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Order not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        blockchainRecorded: order.blockchainRecorded,
+        blockchainTxHash: order.blockchainTxHash,
+        blockchainOrderId: order.blockchainOrderId,
+        hasError: !!order.blockchainError,
+        error: order.blockchainError
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
