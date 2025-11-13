@@ -1,7 +1,9 @@
 {
-  "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "network": "unknown",
-  "chainId": 31337,
-  "deploymentTime": "2025-10-27T17:17:08.015Z"
+  "address": "0x433325BAd35537A923CB5a5876eFEE1d6727fbFe",
+  "deployer": "0x0BACfe253c447A406A5d834b9e266939ebEc0b00",
+  "network": "polygon-amoy",
+  "chainId": 80002,
+  "deploymentTime": "2025-11-13T11:06:00.982Z",
+  "transactionHash": "0xc50c097084f544c5c03730c4cfcad071f745b75aa7a3d6816233feec6e1532b5",
+  "blockNumber": null
 }

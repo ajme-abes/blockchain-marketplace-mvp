@@ -15,8 +15,7 @@ export default {
       url: process.env.POLYGON_RPC_URL || "https://rpc-amoy.polygon.technology",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 80002,
-      gas: 1000000,
-      gasPrice: 5000000000, 
+      gas: 30_000_000_000,
     },
   },
   etherscan: {
