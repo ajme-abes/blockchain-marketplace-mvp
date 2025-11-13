@@ -149,29 +149,112 @@ class PaymentService {
     }
   }
 
-async handlePaymentWebhook(webhookData) {
-  try {
-    console.log('🔄 Processing payment webhook:', JSON.stringify(webhookData, null, 2));
-
-    const { tx_ref, status, transaction_id, currency, amount } = webhookData;
-
-    // Log all received data
-    console.log('📨 Webhook data received:');
-    console.log('- Transaction Reference:', tx_ref);
-    console.log('- Status:', status);
-    console.log('- Transaction ID:', transaction_id);
-    console.log('- Currency:', currency);
-    console.log('- Amount:', amount);
-
-    // Find order by payment reference
-    console.log('🔍 Looking up order by payment reference:', tx_ref);
-
-    const paymentReference = await prisma.paymentReference.findUnique({
-      where: { 
-        paymentCode: tx_ref 
-      },
-      include: {
-        order: {
+  async handlePaymentWebhook(webhookData) {
+    try {
+      console.log('🔄 Processing payment webhook:', JSON.stringify(webhookData, null, 2));
+  
+      const { tx_ref, status, transaction_id, currency, amount } = webhookData;
+  
+      // Log all received data
+      console.log('📨 Webhook data received:');
+      console.log('- Transaction Reference:', tx_ref);
+      console.log('- Status:', status);
+      console.log('- Transaction ID:', transaction_id);
+      console.log('- Currency:', currency);
+      console.log('- Amount:', amount);
+  
+      // Find order by payment reference
+      console.log('🔍 Looking up order by payment reference:', tx_ref);
+  
+      const paymentReference = await prisma.paymentReference.findUnique({
+        where: { 
+          paymentCode: tx_ref 
+        },
+        include: {
+          order: {
+            include: {
+              buyer: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true
+                    }
+                  }
+                }
+              },
+              paymentConfirmations: {
+                orderBy: { confirmedAt: 'desc' },
+                take: 1
+              },
+              orderItems: {
+                include: {
+                  product: {
+                    include: {
+                      producer: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+  
+      if (!paymentReference) {
+        throw new Error(`Payment reference not found: ${tx_ref}. Please check if the payment intent was created successfully.`);
+      }
+  
+      const orderId = paymentReference.order.id;
+      const order = paymentReference.order;
+  
+      console.log('✅ Found order:', orderId);
+      console.log('💰 Order amount:', order.totalAmount);
+      console.log('💳 Current payment status:', order.paymentStatus);
+  
+      // Update order and payment status in transaction (without blockchain)
+      const result = await prisma.$transaction(async (tx) => {
+        console.log('💾 Starting database transaction...');
+  
+        const paymentConfirmation = await tx.paymentConfirmation.updateMany({
+          where: { 
+            orderId: orderId,
+            isConfirmed: false
+          },
+          data: {
+            confirmedAt: new Date(),
+            blockchainTxHash: status === 'success' ? transaction_id : null,
+            isConfirmed: true
+          }
+        });
+  
+        console.log('✅ Updated payment confirmations:', paymentConfirmation.count);
+  
+        // If no payment confirmation was updated, create a new one
+        if (paymentConfirmation.count === 0) {
+          console.log('⚠️ No existing payment confirmation found, creating new one...');
+          await tx.paymentConfirmation.create({
+            data: {
+              orderId: orderId,
+              confirmedById: order.buyer.userId,
+              confirmationMethod: 'CHAPA',
+              confirmedAt: new Date(),
+              blockchainTxHash: status === 'success' ? transaction_id : null,
+              proofImageUrl: null,
+              isConfirmed: true
+            }
+          });
+          console.log('✅ Created new payment confirmation');
+        }
+  
+        // Update order payment status
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED',
+            deliveryStatus: status === 'success' ? 'CONFIRMED' : 'PENDING'
+          },
           include: {
             buyer: {
               include: {
@@ -183,203 +266,119 @@ async handlePaymentWebhook(webhookData) {
                   }
                 }
               }
-            },
-            paymentConfirmations: {
-              orderBy: { confirmedAt: 'desc' },
-              take: 1
-            },
-            // ADD: Include order items for producer notification
-            orderItems: {
-              include: {
-                product: {
-                  include: {
-                    producer: true
-                  }
-                }
-              }
             }
-          }
-        }
-      }
-    });
-
-    if (!paymentReference) {
-      throw new Error(`Payment reference not found: ${tx_ref}. Please check if the payment intent was created successfully.`);
-    }
-
-    const orderId = paymentReference.order.id;
-    const order = paymentReference.order;
-
-    console.log('✅ Found order:', orderId);
-    console.log('💰 Order amount:', order.totalAmount);
-    console.log('💳 Current payment status:', order.paymentStatus);
-
-    // Update order and payment status in transaction
-    const result = await prisma.$transaction(async (tx) => {
-      console.log('💾 Starting database transaction...');
-
-      const paymentConfirmation = await tx.paymentConfirmation.updateMany({
-        where: { 
-          orderId: orderId,
-          isConfirmed: false
-        },
-        data: {
-          confirmedAt: new Date(),
-          blockchainTxHash: status === 'success' ? transaction_id : null,
-          isConfirmed: true
-        }
-      });
-
-      console.log('✅ Updated payment confirmations:', paymentConfirmation.count);
-
-      // If no payment confirmation was updated, create a new one
-      if (paymentConfirmation.count === 0) {
-        console.log('⚠️ No existing payment confirmation found, creating new one...');
-        await tx.paymentConfirmation.create({
-          data: {
-            orderId: orderId,
-            confirmedById: order.buyer.userId,
-            confirmationMethod: 'CHAPA',
-            confirmedAt: new Date(),
-            blockchainTxHash: status === 'success' ? transaction_id : null,
-            proofImageUrl: null,
-            isConfirmed: true
           }
         });
-        console.log('✅ Created new payment confirmation');
-      }
-
-      // Update order payment status
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: {
-          paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED',
-          // Also update delivery status if payment successful
-          deliveryStatus: status === 'success' ? 'CONFIRMED' : 'PENDING'
-        },
-        include: {
-          buyer: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+  
+        console.log('✅ Updated order payment status to:', updatedOrder.paymentStatus);
+  
+        // Mark payment reference as used
+        await tx.paymentReference.update({
+          where: { id: paymentReference.id },
+          data: { usedAt: new Date() }
+        });
+  
+        console.log('✅ Marked payment reference as used');
+  
+        return { order: updatedOrder };
       });
-
-      console.log('✅ Updated order payment status to:', updatedOrder.paymentStatus);
-
-      // Mark payment reference as used
-      await tx.paymentReference.update({
-        where: { id: paymentReference.id },
-        data: { usedAt: new Date() }
-      });
-
-      console.log('✅ Marked payment reference as used');
-
-      // ==================== NOTIFICATION INTEGRATION ====================
-      
+  
+      // ✅ BLOCKCHAIN RECORDING - AFTER DATABASE TRANSACTION
       if (status === 'success') {
         try {
           const blockchainService = require('./blockchainService');
           const notificationService = require('./notificationService');
           
-          // Get payment reference for blockchain recording
-          const paymentRef = await prisma.paymentReference.findFirst({
-            where: { orderId: orderId }
+          console.log('🔗 Starting blockchain recording for order:', orderId);
+          
+          // Record on blockchain with proper data
+          const blockchainResult = await blockchainService.recordOrderTransaction(orderId, {
+            paymentReference: tx_ref
           });
-
-          if (paymentRef) {
-            // Record on blockchain with correct parameters
-            const blockchainResult = await blockchainService.recordTransaction({
-              orderId: orderId,
-              paymentReference: paymentRef.paymentCode, // Use payment code from reference
-              txHash: transaction_id // Chapa transaction ID
+      
+          console.log('🔗 Blockchain recording result:', {
+            success: blockchainResult.success,
+            transactionHash: blockchainResult.blockchainTxHash,
+            message: blockchainResult.message
+          });
+      
+          // Update order with blockchain hash if successful
+          if (blockchainResult.success) {
+            await prisma.order.update({
+              where: { id: orderId },
+              data: { 
+                blockchainTxHash: blockchainResult.blockchainTxHash,
+                blockchainRecorded: true 
+              }
             });
-
-            console.log('🔗 Blockchain recording result:', {
-              success: blockchainResult.success,
-              isMock: blockchainResult.isMock,
-              message: blockchainResult.message
+            console.log('✅ Updated order with blockchain transaction');
+          } else {
+            console.log('⚠️ Blockchain recording failed:', blockchainResult.error);
+          }
+  
+          // ========== SEND NOTIFICATIONS ==========
+          
+          // 1. Send payment confirmation to buyer
+          console.log('📢 Sending payment confirmation notification to buyer...');
+          await notificationService.sendPaymentConfirmedNotification(orderId)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ Payment confirmation notification sent to buyer');
+              } else {
+                console.log('⚠️ Payment confirmation notification failed:', result.error);
+              }
+            })
+            .catch(error => {
+              console.error('❌ Payment notification error:', error);
             });
-
-            // Update order with blockchain hash if real transaction
-            if (blockchainResult.success && !blockchainResult.isMock) {
-              await tx.order.update({
-                where: { id: orderId },
-                data: { blockchainTxHash: blockchainResult.transactionHash }
-              });
-              console.log('✅ Updated order with blockchain hash');
-            }
-
-            // ========== SEND NOTIFICATIONS ==========
-            
-            // 1. Send payment confirmation to buyer
-            console.log('📢 Sending payment confirmation notification to buyer...');
-            await notificationService.sendPaymentConfirmedNotification(orderId)
+  
+          // 2. Send blockchain verification notification to buyer
+          if (blockchainResult.success && !blockchainResult.isMock) {
+            console.log('📢 Sending blockchain verification notification...');
+            await notificationService.sendBlockchainVerificationNotification(
+              orderId, 
+              blockchainResult.blockchainTxHash
+            )
               .then(result => {
                 if (result.success) {
-                  console.log('✅ Payment confirmation notification sent to buyer');
+                  console.log('✅ Blockchain verification notification sent');
                 } else {
-                  console.log('⚠️ Payment confirmation notification failed:', result.error);
+                  console.log('⚠️ Blockchain notification failed:', result.error);
                 }
               })
               .catch(error => {
-                console.error('❌ Payment notification error:', error);
-              });
-
-            // 2. Send blockchain verification notification to buyer
-            if (blockchainResult.success && !blockchainResult.isMock) {
-              console.log('📢 Sending blockchain verification notification...');
-              await notificationService.sendBlockchainVerificationNotification(
-                orderId, 
-                blockchainResult.transactionHash
-              )
-                .then(result => {
-                  if (result.success) {
-                    console.log('✅ Blockchain verification notification sent');
-                  } else {
-                    console.log('⚠️ Blockchain notification failed:', result.error);
-                  }
-                })
-                .catch(error => {
-                  console.error('❌ Blockchain notification error:', error);
-                });
-            }
-
-            // 3. Send new order notification to producer(s)
-            console.log('📢 Sending new order notification to producer...');
-            await notificationService.sendNewOrderNotificationToProducer(orderId)
-              .then(result => {
-                if (result.success) {
-                  console.log('✅ New order notification sent to producer');
-                } else {
-                  console.log('⚠️ Producer notification failed:', result.error);
-                }
-              })
-              .catch(error => {
-                console.error('❌ Producer notification error:', error);
-              });
-
-            // 4. Send order status update notification
-            console.log('📢 Sending order status notification...');
-            await notificationService.sendOrderStatusNotification(orderId, 'CONFIRMED')
-              .then(result => {
-                if (result.success) {
-                  console.log('✅ Order status notification sent');
-                } else {
-                  console.log('⚠️ Order status notification failed:', result.error);
-                }
-              })
-              .catch(error => {
-                console.error('❌ Order status notification error:', error);
+                console.error('❌ Blockchain notification error:', error);
               });
           }
+  
+          // 3. Send new order notification to producer(s)
+          console.log('📢 Sending new order notification to producer...');
+          await notificationService.sendNewOrderNotificationToProducer(orderId)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ New order notification sent to producer');
+              } else {
+                console.log('⚠️ Producer notification failed:', result.error);
+              }
+            })
+            .catch(error => {
+              console.error('❌ Producer notification error:', error);
+            });
+  
+          // 4. Send order status update notification
+          console.log('📢 Sending order status notification...');
+          await notificationService.sendOrderStatusNotification(orderId, 'CONFIRMED')
+            .then(result => {
+              if (result.success) {
+                console.log('✅ Order status notification sent');
+              } else {
+                console.log('⚠️ Order status notification failed:', result.error);
+              }
+            })
+            .catch(error => {
+              console.error('❌ Order status notification error:', error);
+            });
+      
         } catch (blockchainError) {
           console.error('⚠️ Blockchain recording failed, but payment succeeded:', blockchainError);
           // Don't fail the payment process if blockchain fails
@@ -408,36 +407,32 @@ async handlePaymentWebhook(webhookData) {
           console.error('❌ Payment failure notification error:', notifError);
         }
       }
-
-      return { order: updatedOrder };
-    });
-
-    console.log(`✅ Payment webhook processed successfully - Status: ${status}`);
-
-    return {
-      success: status === 'success',
-      orderId: orderId,
-      transactionId: transaction_id,
-      paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED'
-    };
-
-  } catch (error) {
-    console.error('❌ Payment webhook processing FAILED:');
-    console.error('Error message:', error.message);
-    console.error('Stack trace:', error.stack);
-    
-    // Log additional context for debugging
-    if (error.code) {
-      console.error('Error code:', error.code);
+  
+      console.log(`✅ Payment webhook processed successfully - Status: ${status}`);
+  
+      return {
+        success: status === 'success',
+        orderId: orderId,
+        transactionId: transaction_id,
+        paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED'
+      };
+  
+    } catch (error) {
+      console.error('❌ Payment webhook processing FAILED:');
+      console.error('Error message:', error.message);
+      console.error('Stack trace:', error.stack);
+      
+      // Log additional context for debugging
+      if (error.code) {
+        console.error('Error code:', error.code);
+      }
+      if (error.meta) {
+        console.error('Error meta:', error.meta);
+      }
+      
+      throw new Error(`Webhook processing failed: ${error.message}`);
     }
-    if (error.meta) {
-      console.error('Error meta:', error.meta);
-    }
-    
-    throw new Error(`Webhook processing failed: ${error.message}`);
   }
-}
-
   async getPaymentStatus(orderId) {
     try {
       const payment = await prisma.paymentConfirmation.findFirst({

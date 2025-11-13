@@ -2,6 +2,7 @@
 const express = require('express');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const paymentService = require('../services/paymentService');
+const blockchainService = require('../services/blockchainService');
 const router = express.Router();
 
 // Create payment intent (BUYER only)
@@ -73,8 +74,48 @@ router.post('/webhook/chapa', express.json(), async (req, res) => {
   try {
     console.log('🔄 Received Chapa webhook:', req.body);
 
+    const { 
+      tx_ref,           // Your order ID
+      transaction_id,   // Chapa transaction ID
+      status,           // "success", "failed", etc.
+      amount,
+      currency
+    } = req.body;
+
     // Process the webhook
     const result = await paymentService.handlePaymentWebhook(req.body);
+
+    // ✅ ADD BLOCKCHAIN RECORDING FOR SUCCESSFUL PAYMENTS
+    if (status === 'success' || status === 'completed') {
+      try {
+        console.log('🔗 Recording successful payment on blockchain...');
+        
+        const blockchainResult = await blockchainService.recordOrderTransaction(tx_ref, {
+          reference: tx_ref,
+          txHash: transaction_id
+        });
+
+        console.log('📝 Blockchain recording result:', {
+          success: blockchainResult.success,
+          txHash: blockchainResult.blockchainTxHash,
+          orderId: blockchainResult.blockchainOrderId
+        });
+
+        // Add blockchain info to the result
+        result.blockchain = {
+          recorded: blockchainResult.success,
+          transactionHash: blockchainResult.blockchainTxHash,
+          blockchainOrderId: blockchainResult.blockchainOrderId
+        };
+
+      } catch (blockchainError) {
+        console.error('❌ Blockchain recording failed:', blockchainError);
+        result.blockchain = {
+          recorded: false,
+          error: blockchainError.message
+        };
+      }
+    }
 
     // Always return 200 to Chapa to acknowledge receipt
     res.status(200).json({ 
@@ -92,7 +133,7 @@ router.post('/webhook/chapa', express.json(), async (req, res) => {
       message: 'Webhook processing failed internally'
     });
   }
-});
+ });
 
 // Get payment status
 router.get('/:orderId/status', authenticateToken, async (req, res) => {
