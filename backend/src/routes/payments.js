@@ -117,6 +117,37 @@ router.get('/test-blockchain', async (req, res) => {
   }
 });
 
+// Debug contract with unique order
+router.post('/debug-contract', async (req, res) => {
+  try {
+    const blockchainService = require('../services/blockchainService');
+    
+    // Test with completely unique order ID
+    const testOrderId = 'debug-test-' + Date.now();
+    const testPaymentRef = 'debug-pay-' + Date.now();
+    
+    console.log('🧪 DEBUG: Testing contract with unique order:', testOrderId);
+    
+    const result = await blockchainService.recordTransaction({
+      orderId: testOrderId,
+      paymentReference: testPaymentRef,
+      amountETB: '100',
+      buyer: '0x0BACfe253c447A406A5d834b9e266939ebEc0b00',
+      producer: '0x0BACfe253c447A406A5d834b9e266939ebEc0b00'
+    });
+    
+    res.json({
+      success: result.success,
+      message: result.success ? '✅ Contract test successful!' : '❌ Contract test failed',
+      transactionHash: result.transactionHash,
+      error: result.error
+    });
+    
+  } catch (error) {
+    console.error('❌ Contract debug failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 // Get payment status
 router.get('/:orderId/status', authenticateToken, async (req, res) => {
   try {

