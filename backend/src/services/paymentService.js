@@ -67,7 +67,7 @@ class PaymentService {
         last_name: lastName,
         phone_number: customerInfo.phone || order.buyer.user.phone || '+251911223344',
         tx_ref: txRef, // Fixed: max 50 characters
-        callback_url: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payments/webhook/chapa`,
+        callback_url: `https://anton-armoured-lustfully.ngrok-free.dev/api/payments/webhook/chapa`,
         return_url: `${process.env.FRONTEND_URL || 'http://localhost:8080'}/order/${orderId}/success`,
         customization: {
           title: 'Marketplace',
@@ -284,6 +284,8 @@ class PaymentService {
       });
   
       // ✅ BLOCKCHAIN RECORDING - AFTER DATABASE TRANSACTION
+      let blockchainResult = null;
+      
       if (status === 'success') {
         try {
           const blockchainService = require('./blockchainService');
@@ -291,17 +293,27 @@ class PaymentService {
           
           console.log('🔗 Starting blockchain recording for order:', orderId);
           
-          // Record on blockchain with proper data
-          const blockchainResult = await blockchainService.recordOrderTransaction(orderId, {
-            paymentReference: tx_ref
-          });
-      
+          const canRecord = await blockchainService.verifyContractOwnership();
+          if (!canRecord) {
+            console.log('⚠️ Skipping blockchain recording - wallet not contract owner');
+            blockchainResult = {
+              success: false,
+              error: 'Wallet not contract owner',
+              isMock: false
+            };
+          } else {
+            // Proceed with blockchain recording
+            blockchainResult = await blockchainService.recordOrderTransaction(orderId, {
+              paymentReference: tx_ref
+            });
+          }
+          
           console.log('🔗 Blockchain recording result:', {
             success: blockchainResult.success,
             transactionHash: blockchainResult.blockchainTxHash,
             message: blockchainResult.message
           });
-      
+  
           // Update order with blockchain hash if successful
           if (blockchainResult.success) {
             await prisma.order.update({
@@ -378,7 +390,7 @@ class PaymentService {
             .catch(error => {
               console.error('❌ Order status notification error:', error);
             });
-      
+  
         } catch (blockchainError) {
           console.error('⚠️ Blockchain recording failed, but payment succeeded:', blockchainError);
           // Don't fail the payment process if blockchain fails
@@ -410,12 +422,26 @@ class PaymentService {
   
       console.log(`✅ Payment webhook processed successfully - Status: ${status}`);
   
-      return {
+      // Create the final response
+      const response = {
         success: status === 'success',
         orderId: orderId,
         transactionId: transaction_id,
         paymentStatus: status === 'success' ? 'CONFIRMED' : 'FAILED'
       };
+  
+      // Add blockchain data to response if available
+      if (blockchainResult) {
+        response.blockchain = {
+          recorded: blockchainResult.success,
+          transactionHash: blockchainResult.blockchainTxHash,
+          blockchainOrderId: blockchainResult.blockchainOrderId,
+          isMock: blockchainResult.isMock || false
+        };
+      }
+  
+      console.log(`✅ Payment webhook processed successfully - Status: ${status}`);
+      return response;
   
     } catch (error) {
       console.error('❌ Payment webhook processing FAILED:');
