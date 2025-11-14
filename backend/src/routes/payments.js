@@ -74,48 +74,8 @@ router.post('/webhook/chapa', express.json(), async (req, res) => {
   try {
     console.log('🔄 Received Chapa webhook:', req.body);
 
-    const { 
-      tx_ref,           // Your order ID
-      transaction_id,   // Chapa transaction ID
-      status,           // "success", "failed", etc.
-      amount,
-      currency
-    } = req.body;
-
-    // Process the webhook
+    // Process the webhook (blockchain recording happens INSIDE paymentService)
     const result = await paymentService.handlePaymentWebhook(req.body);
-
-    // ✅ ADD BLOCKCHAIN RECORDING FOR SUCCESSFUL PAYMENTS
-    if (status === 'success' || status === 'completed') {
-      try {
-        console.log('🔗 Recording successful payment on blockchain...');
-        
-        const blockchainResult = await blockchainService.recordOrderTransaction(tx_ref, {
-          reference: tx_ref,
-          txHash: transaction_id
-        });
-
-        console.log('📝 Blockchain recording result:', {
-          success: blockchainResult.success,
-          txHash: blockchainResult.blockchainTxHash,
-          orderId: blockchainResult.blockchainOrderId
-        });
-
-        // Add blockchain info to the result
-        result.blockchain = {
-          recorded: blockchainResult.success,
-          transactionHash: blockchainResult.blockchainTxHash,
-          blockchainOrderId: blockchainResult.blockchainOrderId
-        };
-
-      } catch (blockchainError) {
-        console.error('❌ Blockchain recording failed:', blockchainError);
-        result.blockchain = {
-          recorded: false,
-          error: blockchainError.message
-        };
-      }
-    }
 
     // Always return 200 to Chapa to acknowledge receipt
     res.status(200).json({ 
@@ -133,7 +93,29 @@ router.post('/webhook/chapa', express.json(), async (req, res) => {
       message: 'Webhook processing failed internally'
     });
   }
- });
+});
+
+// Test blockchain connection
+router.get('/test-blockchain', async (req, res) => {
+  try {
+    const blockchainService = require('../services/blockchainService');
+    
+    // Test ownership
+    const isOwner = await blockchainService.verifyContractOwnership();
+    
+    // Test connection
+    const status = await blockchainService.getBlockchainStatus();
+    
+    res.json({
+      blockchainStatus: status,
+      contractOwnership: isOwner,
+      message: isOwner ? '✅ Ready for blockchain recording' : '❌ Cannot record - check contract ownership'
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Get payment status
 router.get('/:orderId/status', authenticateToken, async (req, res) => {

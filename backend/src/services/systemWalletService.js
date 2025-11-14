@@ -10,16 +10,17 @@ class SystemWalletService {
   }
 
   initializeSystemWallets() {
-    // These are EXAMPLE addresses - replace with real ones
     const defaultWallets = {
-      'SYSTEM_BUYER': '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-      'SYSTEM_PRODUCER': '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
-      'SYSTEM_ADMIN': '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      'SYSTEM_BUYER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', // Your actual wallet
+      'SYSTEM_PRODUCER': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00', // Same for now
+      'SYSTEM_ADMIN': '0x0BACfe253c447A406A5d834b9e266939ebEc0b00'   // Your wallet
     };
-
+  
     for (const [key, address] of Object.entries(defaultWallets)) {
       this.systemWallets.set(key, address);
     }
+    
+    console.log('✅ System wallets initialized with REAL addresses');
   }
 
   // Get wallet address for any database user ID

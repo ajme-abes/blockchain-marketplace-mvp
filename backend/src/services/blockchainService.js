@@ -20,7 +20,7 @@ class BlockchainService {
         this.isConnected = false;
         return;
       }
-
+  
       const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
       const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'https://rpc-amoy.polygon.technology';
       
@@ -29,9 +29,24 @@ class BlockchainService {
         this.isConnected = false;
         return;
       }
-
-      // Setup provider and wallet for Polygon Amoy
+  
+      console.log('🔗 Initializing blockchain connection...');
+      
+      // ✅ FIX: Setup provider FIRST
       this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+      
+      // Test provider connection
+      try {
+        const network = await this.provider.getNetwork();
+        const blockNumber = await this.provider.getBlockNumber();
+        console.log(`✅ Provider connected: ${network.name} (Block: ${blockNumber})`);
+      } catch (providerError) {
+        console.log('❌ Provider connection failed:', providerError.message);
+        this.isConnected = false;
+        return;
+      }
+  
+      // ✅ FIX: Setup wallet AFTER provider
       this.wallet = new ethers.Wallet(privateKey, this.provider);
       
       // Contract ABI matching your EXACT deployed contract
@@ -46,35 +61,44 @@ class BlockchainService {
         "function transactions(string) public view returns (string, string, string, address, address, uint256, string, bool)",
         "event TransactionRecorded(string indexed orderId, address indexed buyer, address indexed producer, string paymentReference, string amountETB, uint256 timestamp, string txHash)"
       ];
-
+  
       this.contract = new ethers.Contract(this.contractAddress, contractABI, this.wallet);
-
-      // Test connection
-      const network = await this.provider.getNetwork();
-      const blockNumber = await this.provider.getBlockNumber();
-      
+  
+      // ✅ FIX: Get gas prices safely
+      let feeData;
+      try {
+        feeData = await this.provider.getFeeData();
+        console.log('⛽ Current network gas prices:', {
+          maxFeePerGas: ethers.utils.formatUnits(feeData.maxFeePerGas, 'gwei'),
+          maxPriorityFeePerGas: ethers.utils.formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
+        });
+      } catch (gasError) {
+        console.log('⚠️ Could not get gas prices, using defaults:', gasError.message);
+        feeData = {
+          maxFeePerGas: ethers.utils.parseUnits('35', 'gwei'),
+          maxPriorityFeePerGas: ethers.utils.parseUnits('30', 'gwei')
+        };
+      }
+  
+      // Store fee data for later use
+      this.feeData = feeData;
+  
       console.log(`✅ Connected to Polygon Amoy:`);
       console.log(`   📄 Contract: ${this.contractAddress}`);
       console.log(`   👛 Wallet: ${this.wallet.address}`);
-      console.log(`   🌐 Network: ${network.name} (Chain ID: ${network.chainId})`);
-      console.log(`   📦 Block: ${blockNumber}`);
-      
-      // Verify we're the contract owner
-      const owner = await this.contract.owner();
-      const isOwner = owner.toLowerCase() === this.wallet.address.toLowerCase();
-      console.log(`   👑 Contract Owner: ${isOwner ? 'YES ✅' : 'NO ❌'}`);
       
       this.isConnected = true;
-
+  
     } catch (error) {
       console.log('❌ Blockchain connection failed:', error.message);
+      console.log('💡 Check your RPC URL and private key in .env file');
       this.isConnected = false;
     }
   }
 
   async recordTransaction(transactionData) {
     const { orderId, paymentReference, amountETB, buyer, producer } = transactionData;
-
+  
     // If not connected, return mock response
     if (!this.isConnected || !this.contract) {
       console.log('🔗 [MOCK] Recording transaction on blockchain');
@@ -85,48 +109,127 @@ class BlockchainService {
         message: 'Transaction recorded (mock mode)'
       };
     }
-
+  
     try {
       console.log('🔗 Recording transaction on Polygon Amoy...');
       
-      // Generate unique transaction hash for the contract
+      // ✅ FIXED: Use high gas prices to ensure transaction success
+      let txOptions = {};
+      
+      // Get current network gas prices
+      let feeData;
+      try {
+        feeData = await this.provider.getFeeData();
+        console.log('⛽ Current network gas prices:', {
+          maxFeePerGas: ethers.utils.formatUnits(feeData.maxFeePerGas, 'gwei'),
+          maxPriorityFeePerGas: ethers.utils.formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
+        });
+      } catch (gasError) {
+        console.log('⚠️ Could not get gas prices, using defaults:', gasError.message);
+        feeData = null;
+      }
+  
+      // Use much higher gas prices to ensure success
+      if (feeData && feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+        // Use network prices but add significant buffer
+        txOptions = {
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas.add(ethers.utils.parseUnits('25', 'gwei')), // +25 Gwei buffer
+          maxFeePerGas: feeData.maxFeePerGas.add(ethers.utils.parseUnits('35', 'gwei')), // +35 Gwei buffer
+          gasLimit: 3000000
+        };
+      } else {
+        // High fixed prices as fallback (should definitely work)
+        txOptions = {
+          maxPriorityFeePerGas: ethers.utils.parseUnits('30', 'gwei'),  // 30 Gwei tip
+          maxFeePerGas: ethers.utils.parseUnits('50', 'gwei'),          // 50 Gwei max fee
+          gasLimit: 3000000
+        };
+      }
+  
+      console.log('⛽ Using gas options:', {
+        maxPriorityFeePerGas: ethers.utils.formatUnits(txOptions.maxPriorityFeePerGas, 'gwei') + ' gwei',
+        maxFeePerGas: ethers.utils.formatUnits(txOptions.maxFeePerGas, 'gwei') + ' gwei',
+        gasLimit: txOptions.gasLimit
+      });
+  
+      // Generate unique transaction hash
       const uniqueTxHash = `0x${Buffer.from(`${orderId}-${Date.now()}`).toString('hex').substring(0, 64)}`;
       
-      // Call the smart contract - EXACT parameters matching your contract
+      console.log('📝 Calling smart contract with parameters:', {
+        orderId,
+        paymentReference,
+        amountETB: `${amountETB} ETB`,
+        buyer,
+        producer,
+        uniqueTxHash
+      });
+  
+      // Call the smart contract with proper gas options
       const tx = await this.contract.recordTransaction(
-        orderId,                    // string _orderId
-        paymentReference,           // string _paymentReference  
-        `${amountETB} ETB`,         // string _amountETB
-        buyer,                      // address _buyer
-        producer,                   // address _producer
-        uniqueTxHash                // string _txHash
+        orderId,
+        paymentReference,  
+        `${amountETB} ETB`,
+        buyer,
+        producer,
+        uniqueTxHash,               // ✅ Last parameter matching ABI
+        {                          // ✅ Transaction options as separate object
+          maxPriorityFeePerGas: txOptions.maxPriorityFeePerGas,
+          maxFeePerGas: txOptions.maxFeePerGas,
+          gasLimit: txOptions.gasLimit
+        }
       );
       
       console.log('📝 Transaction sent:', tx.hash);
       
       // Wait for confirmation
+      console.log('⏳ Waiting for transaction confirmation...');
       const receipt = await tx.wait();
+      
       console.log('✅ Transaction confirmed on Polygon Amoy!');
+      console.log('📊 Transaction details:', {
+        blockNumber: receipt.blockNumber,
+        transactionHash: receipt.transactionHash,
+        gasUsed: receipt.gasUsed.toString(),
+        status: receipt.status === 1 ? 'Success' : 'Failed'
+      });
       
       return {
         success: true,
         transactionHash: receipt.transactionHash,
         contractTxHash: uniqueTxHash,
         blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
         isMock: false,
         message: 'Recorded on Polygon Amoy'
       };
       
     } catch (error) {
       console.error('❌ Blockchain recording failed:', error);
+      
+      // Log specific gas-related errors
+      if (error.message && error.message.includes('gas price below minimum')) {
+        console.error('💡 GAS PRICE ISSUE: Transaction failed due to insufficient gas price');
+        console.error('💡 Solution: Increase maxPriorityFeePerGas and maxFeePerGas values');
+      }
+      
+      if (error.message && error.message.includes('insufficient funds')) {
+        console.error('💡 BALANCE ISSUE: Wallet has insufficient MATIC for gas');
+        console.error('💡 Solution: Add MATIC to wallet:', this.wallet.address);
+      }
+      
+      if (error.message && error.message.includes('nonce')) {
+        console.error('💡 NONCE ISSUE: Transaction nonce conflict');
+        console.error('💡 Solution: Wait for previous transactions to confirm');
+      }
+      
       return {
         success: false,
         error: error.message,
-        isMock: false
+        isMock: false,
+        transactionHash: error.transactionHash // Include failed transaction hash if available
       };
     }
   }
-
   async recordOrderTransaction(orderId, paymentData) {
     try {
       // Get order from database
@@ -307,6 +410,32 @@ class BlockchainService {
         message: `Connection error: ${error.message}`,
         contractAddress: this.contractAddress
       };
+    }
+  }
+  async verifyContractOwnership() {
+    if (!this.isConnected) {
+      console.log('❌ Blockchain not connected - cannot verify ownership');
+      return false;
+    }
+  
+    try {
+      const owner = await this.contract.owner();
+      const isOwner = owner.toLowerCase() === this.wallet.address.toLowerCase();
+      
+      console.log('🔑 Contract Ownership Check:');
+      console.log(`   Contract Owner: ${owner}`);
+      console.log(`   Our Wallet: ${this.wallet.address}`);
+      console.log(`   Is Owner: ${isOwner}`);
+      
+      if (!isOwner) {
+        console.log('❌ CRITICAL: Our wallet is NOT the contract owner!');
+        console.log('💡 Solution: Deploy contract with wallet: ' + this.wallet.address);
+      }
+      
+      return isOwner;
+    } catch (error) {
+      console.error('❌ Ownership verification failed:', error);
+      return false;
     }
   }
 
