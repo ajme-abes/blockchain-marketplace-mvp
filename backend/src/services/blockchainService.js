@@ -49,19 +49,17 @@ class BlockchainService {
       // ✅ FIX: Setup wallet AFTER provider
       this.wallet = new ethers.Wallet(privateKey, this.provider);
       
-      // Contract ABI matching your EXACT deployed contract
       const contractABI = [
-        "function recordTransaction(string, string, string, address, address, string) external",
-        "function getTransaction(string) external view returns (string, string, string, address, address, uint256, string, bool)",
+        "function recordTransaction(string, string, string, string, string, string) external",
+        "function getTransaction(string) external view returns (string, string, string, string, string, uint256, string, bool)",
         "function verifyTransaction(string) external view returns (bool)",
-        "function getUserTransactions(address) external view returns (string[])",
-        "function getProducerTransactions(address) external view returns (string[])",
+        "function getUserTransactions(string) external view returns (string[])",
+        "function getProducerTransactions(string) external view returns (string[])",
         "function getTransactionCount() external view returns (uint256)",
         "function owner() external view returns (address)",
-        "function transactions(string) public view returns (string, string, string, address, address, uint256, string, bool)",
-        "event TransactionRecorded(string indexed orderId, address indexed buyer, address indexed producer, string paymentReference, string amountETB, uint256 timestamp, string txHash)"
-      ];
-  
+        "function transactions(string) public view returns (string, string, string, string, string, uint256, string, bool)",
+        "event TransactionRecorded(string indexed orderId, string indexed buyerId, string indexed producerId, string paymentReference, string amountETB, uint256 timestamp, string txHash)"
+    ];
       this.contract = new ethers.Contract(this.contractAddress, contractABI, this.wallet);
   
       // ✅ FIX: Get gas prices safely
@@ -113,7 +111,15 @@ class BlockchainService {
     try {
       console.log('🔗 Recording transaction on Polygon Amoy...');
       
-      // ✅ FIXED: Use high gas prices to ensure transaction success
+      // ✅ UPDATED: Log user identifiers instead of addresses
+      console.log('👥 Using user identifiers:', {
+        buyer,
+        producer,
+        orderId,
+        paymentReference
+      });
+  
+      // ✅ UPDATED: Use high gas prices to ensure transaction success
       let txOptions = {};
       
       // Get current network gas prices
@@ -159,20 +165,20 @@ class BlockchainService {
         orderId,
         paymentReference,
         amountETB: `${amountETB} ETB`,
-        buyer,
-        producer,
+        buyer,          // ✅ Now shows user identifier string
+        producer,       // ✅ Now shows user identifier string
         uniqueTxHash
       });
   
-      // Call the smart contract with proper gas options
+      // ✅ UPDATED: Call contract with string parameters (no address validation)
       const tx = await this.contract.recordTransaction(
         orderId,
         paymentReference,  
         `${amountETB} ETB`,
-        buyer,
-        producer,
-        uniqueTxHash,               // ✅ Last parameter matching ABI
-        {                          // ✅ Transaction options as separate object
+        buyer,           // ✅ Now passes string identifier
+        producer,        // ✅ Now passes string identifier
+        uniqueTxHash,
+        {
           maxPriorityFeePerGas: txOptions.maxPriorityFeePerGas,
           maxFeePerGas: txOptions.maxFeePerGas,
           gasLimit: txOptions.gasLimit
@@ -234,7 +240,7 @@ class BlockchainService {
     try {
       console.log('🔗 Starting blockchain recording for order:', orderId);
   
-      // ✅ FIRST: Check if order already exists on blockchain
+      // ✅ UPDATED: Check if order already exists on blockchain
       const existingTx = await this.verifyTransaction(orderId);
       if (existingTx.exists) {
         console.log('✅ Order already recorded on blockchain:', orderId);
@@ -243,6 +249,8 @@ class BlockchainService {
           recordedAt: existingTx.timestamp,
           paymentReference: existingTx.paymentReference,
           amount: existingTx.amountETB,
+          buyerId: existingTx.buyerId,        // ✅ UPDATED field name
+          producerId: existingTx.producerId,  // ✅ UPDATED field name
           verified: existingTx.isVerified
         });
   
@@ -314,28 +322,28 @@ class BlockchainService {
         return { success: false, error: 'Order not found' };
       }
   
-      // ✅ USE YOUR SYSTEM WALLET SERVICE
-      const buyerAddress = systemWalletService.getUserWalletAddress(order.buyer.user.id, 'BUYER');
+      // ✅ UPDATED: USE USER IDENTIFIERS INSTEAD OF WALLET ADDRESSES
+      const buyerIdentifier = systemWalletService.getBuyerIdentifier(order.buyer.user.id);
       
-      // Get producer address from the first product (or use system default)
-      const producerAddress = order.orderItems.length > 0 
-        ? systemWalletService.getUserWalletAddress(order.orderItems[0].product.producer.user.id, 'PRODUCER')
-        : systemWalletService.getSystemProducerAddress();
+      // Get producer identifier from the first product
+      const producerIdentifier = order.orderItems.length > 0 
+        ? systemWalletService.getProducerIdentifier(order.orderItems[0].product.producer.user.id)
+        : 'producer_system_default';
   
-      console.log('👥 Wallet addresses for new recording:', {
-        buyer: buyerAddress,
-        producer: producerAddress,
+      console.log('👥 User identifiers for new recording:', {
+        buyer: buyerIdentifier,
+        producer: producerIdentifier,
         buyerUserId: order.buyer.user.id,
         producerUserId: order.orderItems[0]?.product.producer.user.id
       });
   
-      // Prepare transaction data matching your contract
+      // Prepare transaction data matching your NEW contract
       const transactionData = {
         orderId: orderId,
         paymentReference: paymentData.paymentReference || `payref-${orderId}`,
         amountETB: order.totalAmount.toString(),
-        buyer: buyerAddress,
-        producer: producerAddress
+        buyer: buyerIdentifier,        // ✅ Now uses user identifier string
+        producer: producerIdentifier   // ✅ Now uses user identifier string
       };
   
       console.log('🔗 Recording new order transaction:', transactionData);
@@ -420,7 +428,7 @@ class BlockchainService {
         isMock: true 
       };
     }
-
+  
     try {
       const transaction = await this.contract.getTransaction(orderId);
       return {
@@ -428,8 +436,8 @@ class BlockchainService {
         orderId: transaction[0],
         paymentReference: transaction[1],
         amountETB: transaction[2],
-        buyer: transaction[3],
-        producer: transaction[4],
+        buyerId: transaction[3],       
+        producerId: transaction[4],     
         timestamp: new Date(Number(transaction[5]) * 1000),
         txHash: transaction[6],
         isVerified: transaction[7],
