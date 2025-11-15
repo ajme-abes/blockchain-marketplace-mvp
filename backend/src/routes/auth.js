@@ -93,6 +93,9 @@ router.post('/login', async (req, res) => {
       role: user.role,
       phone: user.phone,
       address: user.address,
+      avatarUrl: user.avatarUrl, 
+      region: user.region,       
+      bio: user.bio,             
       languagePreference: user.languagePreference,
       hasProducerProfile: !!user.producerProfile,
       hasBuyerProfile: !!user.buyerProfile
@@ -114,7 +117,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current user
+// In backend/src/routes/auth.js - UPDATE THE /me ENDPOINT
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -126,6 +129,9 @@ router.get('/me', authenticateToken, async (req, res) => {
         role: true,
         phone: true,
         address: true,
+        avatarUrl: true, // ← ADD THIS
+        region: true,    // ← ADD THIS
+        bio: true,       // ← ADD THIS
         languagePreference: true,
         registrationDate: true,
         producerProfile: {
@@ -145,8 +151,22 @@ router.get('/me', authenticateToken, async (req, res) => {
       }
     });
 
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    console.log('🔧 /me endpoint - User data:', {
+      id: user.id,
+      hasAvatar: !!user.avatarUrl,
+      avatarUrl: user.avatarUrl
+    });
+
     res.json({ user });
   } catch (error) {
+    console.error('❌ /me endpoint error:', error);
     res.status(500).json({
       error: 'Failed to fetch user profile',
       code: 'PROFILE_FETCH_FAILED'

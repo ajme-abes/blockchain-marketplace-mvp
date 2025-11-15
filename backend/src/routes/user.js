@@ -1,6 +1,7 @@
 const express = require('express');
 const userService = require('../services/userService');
 const { authenticateToken } = require('../middleware/auth');
+const { prisma } = require('../config/database');
 const router = express.Router();
 
 // Try to import authService with error handling
@@ -167,6 +168,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
+    console.log('🔧 User profile fetched:', {
+      id: user.id,
+      hasAvatar: !!user.avatarUrl,
+      avatarUrl: user.avatarUrl
+    });
+
     res.json({
       status: 'success',
       data: user
@@ -233,16 +240,17 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// UPDATE USER PROFILE
+
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { name, phone, address, languagePreference } = req.body;
+    const { name, phone, address, languagePreference, region, bio } = req.body;
+    const userId = req.user.id;
 
-    console.log('🔧 Updating profile for user:', req.user.id);
-    console.log('🔧 Update data:', { name, phone, address, languagePreference });
+    console.log('🔧 Updating profile for user:', userId);
+    console.log('🔧 Update data:', { name, phone, address, languagePreference, region, bio });
 
     // Validate at least one field is provided
-    if (!name && !phone && !address && !languagePreference) {
+    if (!name && !phone && !address && !languagePreference && !region && !bio) {
       return res.status(400).json({
         status: 'error',
         message: 'At least one field must be provided for update'
@@ -254,11 +262,13 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (phone) updateData.phone = phone;
     if (address) updateData.address = address;
     if (languagePreference) updateData.languagePreference = languagePreference;
+    if (region) updateData.region = region;
+    if (bio) updateData.bio = bio;
 
     const { prisma } = require('../config/database');
     
     const updatedUser = await prisma.user.update({
-      where: { id: req.user.id },
+      where: { id: userId },
       data: updateData,
       select: {
         id: true,
@@ -267,6 +277,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
         phone: true,
         role: true,
         address: true,
+        avatarUrl: true,
+        region: true,
+        bio: true,
         languagePreference: true,
         registrationDate: true,
         producerProfile: {
@@ -298,6 +311,47 @@ router.put('/profile', authenticateToken, async (req, res) => {
       status: 'error',
       message: 'Failed to update profile',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+router.put('/avatar', authenticateToken, async (req, res) => {
+  try {
+    const { prisma } = require('../config/database');
+    const { avatarUrl } = req.body;
+    const userId = req.user.id;
+
+    if (!avatarUrl) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'avatarUrl is required'
+      });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,  // ← MAKE SURE THIS IS INCLUDED
+        email: true,
+      },
+    });
+
+    console.log('✅ Avatar updated successfully');
+
+    res.json({
+      status: 'success',
+      message: 'Avatar updated successfully',
+      data: updatedUser,
+    });
+
+  } catch (error) {
+    console.error('Update avatar error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update avatar',
+      error: error.message,
     });
   }
 });

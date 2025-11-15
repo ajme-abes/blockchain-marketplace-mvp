@@ -238,9 +238,10 @@ class UserService {
     }
   }
   
+  // In your backend userService - UPDATE getUserById
   async getUserById(id) {
     try {
-      return await prisma.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { id },
         select: {
           id: true,
@@ -249,8 +250,12 @@ class UserService {
           phone: true,
           role: true,
           address: true,
+          avatarUrl: true, // ← ADD THIS
+          region: true,    // ← ADD THIS
+          bio: true,       // ← ADD THIS
+          languagePreference: true,
           registrationDate: true,
-          emailVerified: true, // ADD THIS
+          emailVerified: true,
           producerProfile: {
             select: {
               businessName: true,
@@ -265,8 +270,16 @@ class UserService {
           }
         }
       });
+  
+      console.log('🔧 getUserById result:', {
+        id: user?.id,
+        hasAvatar: !!user?.avatarUrl,
+        avatarUrl: user?.avatarUrl
+      });
+  
+      return user;
     } catch (error) {
-      console.error('❌ getUserById error:', error);
+      console.error('Error in getUserById:', error);
       throw error;
     }
   }
