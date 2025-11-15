@@ -287,4 +287,8 @@ export const productService = {
       method: 'DELETE',
     });
   },
+  async getProducerProducts() {
+    const response = await api.request('/products/producer');
+    return response.data;
+  },
 };
