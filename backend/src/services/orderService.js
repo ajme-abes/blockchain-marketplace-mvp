@@ -4,7 +4,17 @@ const { DeliveryStatus } = require('@prisma/client');
 
 class OrderService {
 async createOrder(orderData, userId) { // Add userId parameter
-  const { buyerId, items, shippingAddress, totalAmount } = orderData;
+  const { items, shippingAddress, totalAmount } = orderData;
+  // Get buyer ID from user ID
+  const buyer = await prisma.buyer.findUnique({
+    where: { userId: userId }
+  });
+  
+  if (!buyer) {
+    throw new Error('Buyer profile not found');
+  }
+  
+  const buyerId = buyer.id;
 
   console.log('🔧 Creating order for buyer:', buyerId);
   console.log('🔧 Order items:', items);

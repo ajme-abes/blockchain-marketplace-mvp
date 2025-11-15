@@ -1,4 +1,4 @@
-// src/pages/buyer/Checkout.tsx - FIXED VERSION
+// src/pages/buyer/Checkout.tsx - UPDATED IMPORTS
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
@@ -23,6 +23,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
+import { orderService } from '@/services/orderService'; // ← ADD THIS
 import { paymentService } from '@/services/paymentService';
 
 interface ShippingAddress {
@@ -155,51 +156,49 @@ const Checkout = () => {
 
   const handleCheckout = async () => {
     if (!validateForm()) return;
-
     setIsProcessing(true);
-
+  
     try {
-      console.log('🔍 DEBUG: Starting checkout process...');
-
-      // 1. Prepare order data
-      const orderData = {
+      console.log('🔧 DEBUG: Cart items:', cartState.items);
+      
+      // 1. FIRST create the order - FIXED: Use item.productId instead of item.id
+      const orderPayload = {
         items: cartState.items.map(item => ({
-          productId: item.productId,
+          productId: item.productId, // ← FIX: Use productId, not id
           quantity: item.quantity,
           price: item.price
         })),
         shippingAddress,
         totalAmount: finalTotal
       };
-
-      console.log('🔍 DEBUG: Order data prepared:', orderData);
-
-      // 2. Create order using your paymentService (which will call the backend)
-      console.log('🔍 DEBUG: Creating payment intent with order data...');
+  
+      console.log('🔧 DEBUG: Order payload:', JSON.stringify(orderPayload, null, 2));
       
-      // FIXED: Use the correct service method with proper parameters
-      const paymentResult = await paymentService.createPayment({
-        orderData, // Send the full order data
-        paymentMethod, // Include payment method
+      const orderResult = await orderService.createOrder(orderPayload);
+  
+      console.log('✅ Order created:', orderResult);
+  
+      if (!orderResult.data || !orderResult.data.id) {
+        throw new Error('Failed to create order: No order ID returned');
+      }
+  
+      // 2. THEN create payment intent with the order ID
+      const paymentResult = await paymentService.createPaymentIntent({
+        orderId: orderResult.data.id,
         customerInfo: {
           name: shippingAddress.fullName,
           email: shippingAddress.email,
           phone: shippingAddress.phone
         }
       });
-
-      console.log('🔍 DEBUG: Payment result:', paymentResult);
-
-      if (paymentResult?.paymentUrl) {
-        // Clear cart before redirecting to payment
-        clearCart();
-        window.location.href = paymentResult.paymentUrl;
-      } else {
-        throw new Error('No payment URL received');
-      }
-
+  
+      // 3. Clear cart and redirect to payment
+      clearCart();
+      console.log('🔄 Redirecting to payment URL');
+      window.location.href = paymentResult.paymentUrl;
+  
     } catch (error: any) {
-      console.error('❌ DEBUG: Checkout failed:', error);
+      console.error('❌ Checkout failed:', error);
       toast({
         title: "Checkout failed",
         description: error.message || "Something went wrong. Please try again.",
@@ -306,12 +305,14 @@ const Checkout = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="region">Region *</Label>
+    
                     <Input
                       id="region"
                       value={shippingAddress.region}
                       onChange={(e) => handleInputChange('region', e.target.value)}
                       placeholder="e.g., Oromia"
                     />
+
                   </div>
                 </div>
 
@@ -452,6 +453,12 @@ const Checkout = () => {
                       <span>Total</span>
                       <span className="text-primary">{finalTotal.toFixed(2)} ETB</span>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                         <ShieldCheck className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                          Transaction will be verified on Polygon blockchain
+                      </span>
                   </div>
                 </div>
 
