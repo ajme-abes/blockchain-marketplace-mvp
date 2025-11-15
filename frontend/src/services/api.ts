@@ -27,11 +27,12 @@ class ApiService {
     localStorage.removeItem('authToken');
   }
 
+  // src/services/api.ts - UPDATE THE REQUEST METHOD
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
     console.log('🔧 API Request:', url, options);
-
+  
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -39,14 +40,19 @@ class ApiService {
       },
       ...options,
     };
-
+  
+    // FIX: Properly stringify the body if it's an object
+    if (options.body && typeof options.body === 'object') {
+      config.body = JSON.stringify(options.body);
+    }
+  
     if (this.token) {
       config.headers = {
         ...config.headers,
         'Authorization': `Bearer ${this.token}`,
       };
     }
-
+  
     try {
       const response = await fetch(url, config);
       
@@ -57,7 +63,7 @@ class ApiService {
         console.error('🔧 API Error:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
+  
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
       

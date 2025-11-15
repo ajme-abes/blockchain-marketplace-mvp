@@ -342,6 +342,16 @@ async handlePaymentWebhook(webhookData) {
           }
         }
       });
+      // After updating order status, record the change
+                    tx.orderStatusHistory.create({
+                    data: {
+                    orderId: orderId,
+                    fromStatus: order.paymentStatus, // previous status
+                    toStatus: status === 'success' ? 'CONFIRMED' : 'FAILED',
+                    changedById: 'system', // or admin user ID
+                    reason: `Payment ${status === 'success' ? 'confirmed' : 'failed'} via Chapa`
+                  }
+                  });
 
       console.log('✅ Updated order payment status to:', updatedOrder.paymentStatus);
 
@@ -550,6 +560,17 @@ async handlePaymentWebhook(webhookData) {
     
     throw new Error(`Webhook processing failed: ${error.message}`);
   }
+}
+
+async verifyWebhookSignature(signature, payload) {
+  const crypto = require('crypto');
+  const hmac = crypto.createHmac('sha256', this.webhookSecret);
+  hmac.update(JSON.stringify(payload));
+  const calculatedSignature = hmac.digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature), 
+    Buffer.from(calculatedSignature)
+  );
 }
   async getPaymentStatus(orderId) {
     try {

@@ -39,6 +39,7 @@ import ProducerReviews from "./pages/producer/ProducerReviews";
 import ProducerAnalytics from "./pages/producer/ProducerAnalytics";
 import StoreSettings from "./pages/producer/StoreSettings";
 import PaymentSuccess from "./pages/buyer/PaymentSuccess";
+import OrderDetail from "./pages/buyer/OrderDetail";
 import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -153,6 +154,7 @@ const App = () => (
       <Products />
     </RoleRoute>
   } />
+  <Route path="/orders/:orderId" element={<OrderDetail />} />
   <Route path="/sellers/:id/contact" element={
     <RoleRoute allowedRoles={['producer']}>
       <SellerContact />
