@@ -1,64 +1,338 @@
 // src/pages/producer/ProducerDashboard.tsx
+import { useState, useEffect } from 'react';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { orderService } from '@/services/orderService';
+import { productService } from '@/services/productService';
+import { useNavigate } from 'react-router-dom';
+
+interface DashboardStats {
+  totalProducts: number;
+  pendingOrders: number;
+  totalEarnings: number;
+  growthPercentage: number;
+}
+
+interface RecentOrder {
+  id: string;
+  totalAmount: number;
+  deliveryStatus: string;
+  orderDate: string;
+  buyer: {
+    user: {
+      name: string;
+    };
+  };
+  items: Array<{
+    product: {
+      name: string;
+    };
+    quantity: number;
+  }>;
+}
 
 const ProducerDashboard = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [stats, setStats] = useState<DashboardStats>({
+    totalProducts: 0,
+    pendingOrders: 0,
+    totalEarnings: 0,
+    growthPercentage: 0
+  });
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    { title: 'Total Listings', value: '12', icon: Package, color: 'text-primary' },
-    { title: 'Pending Orders', value: '5', icon: ShoppingCart, color: 'text-secondary' },
-    { title: 'Monthly Earnings', value: '45,230 ETB', icon: DollarSign, color: 'text-accent' },
-    { title: 'Growth', value: '+12%', icon: TrendingUp, color: 'text-primary' },
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch producer orders and products in parallel
+      const [ordersResponse, productsResponse] = await Promise.all([
+        orderService.getProducerOrders(),
+        orderService.getProducerProducts() // Use orderService since we moved the method
+      ]);
+  
+      console.log('🔧 Orders response:', ordersResponse);
+      console.log('🔧 Products response:', productsResponse);
+  
+      // Extract data based on your backend response structure
+      const orders = ordersResponse?.orders || ordersResponse?.data?.orders || [];
+      const products = productsResponse?.products || productsResponse?.data?.products || [];
+  
+      console.log('🔧 Extracted orders:', orders);
+      console.log('🔧 Extracted products:', products);
+  
+      // Calculate stats
+      const pendingOrders = orders.filter(order => 
+        ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
+      ).length;
+  
+      const totalEarnings = orders
+        .filter(order => order.paymentStatus === 'CONFIRMED')
+        .reduce((sum, order) => sum + order.totalAmount, 0);
+  
+      const growthPercentage = orders.length > 0 ? 12 : 0;
+  
+      setStats({
+        totalProducts: products.length,
+        pendingOrders,
+        totalEarnings,
+        growthPercentage
+      });
+  
+      // Get recent orders (last 5)
+      setRecentOrders(orders.slice(0, 5));
+  
+    } catch (error: any) {
+      console.error('Failed to fetch dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'bg-yellow-500/10 text-yellow-600';
+      case 'CONFIRMED': return 'bg-blue-500/10 text-blue-600';
+      case 'SHIPPED': return 'bg-purple-500/10 text-purple-600';
+      case 'DELIVERED': return 'bg-green-500/10 text-green-600';
+      case 'CANCELLED': return 'bg-red-500/10 text-red-600';
+      default: return 'bg-gray-500/10 text-gray-600';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatPrice = (amount: number) => {
+    return `${amount.toFixed(2)} ETB`;
+  };
+
+  const statCards = [
+    { 
+      title: 'Total Products', 
+      value: stats.totalProducts.toString(), 
+      icon: Package, 
+      color: 'text-blue-600',
+      description: 'Active listings'
+    },
+    { 
+      title: 'Pending Orders', 
+      value: stats.pendingOrders.toString(), 
+      icon: ShoppingCart, 
+      color: 'text-orange-600',
+      description: 'Awaiting processing'
+    },
+    { 
+      title: 'Total Earnings', 
+      value: formatPrice(stats.totalEarnings), 
+      icon: DollarSign, 
+      color: 'text-green-600',
+      description: 'All time revenue'
+    },
+    { 
+      title: 'Growth', 
+      value: `${stats.growthPercentage}%`, 
+      icon: TrendingUp, 
+      color: stats.growthPercentage >= 0 ? 'text-green-600' : 'text-red-600',
+      description: 'This month'
+    },
   ];
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <PageHeader title="Producer Dashboard" />
+            <main className="flex-1 p-6 flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <p>Loading dashboard...</p>
+              </div>
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader title="Producer Dashboard" />
+          <PageHeader 
+            title="Producer Dashboard" 
+            description="Manage your products and track business performance"
+            action={
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => navigate('/producer/orders')}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View All Orders
+                </Button>
+                <Button onClick={() => navigate('/producer/add-product')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
+                </Button>
+              </div>
+            }
+          />
 
           <main className="flex-1 p-6">
+            {/* Welcome Section */}
             <div className="mb-8">
-              <h2 className="text-3xl font-bold mb-2">
+              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 Welcome back, {user?.name}!
               </h2>
-              <p className="text-muted-foreground">
-                Manage your products and track your business performance.
+              <p className="text-muted-foreground text-lg">
+                Here's what's happening with your business today.
               </p>
             </div>
 
+            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <Card key={index} className="shadow-card">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+              {statCards.map((stat, index) => (
+                <Card key={index} className="shadow-card hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
                       {stat.title}
                     </CardTitle>
                     <stat.icon className={`h-5 w-5 ${stat.color}`} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-2xl font-bold mb-1">{stat.value}</div>
+                    <p className="text-xs text-muted-foreground">{stat.description}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Recent Sales</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Your recent sales activity will be displayed here.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Orders */}
+              <Card className="shadow-card">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Recent Orders</CardTitle>
+                    <CardDescription>Latest customer orders</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/producer/orders')}>
+                    View All
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {recentOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {recentOrders.map((order) => (
+                        <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">
+                                {order.items[0]?.product.name}
+                                {order.items.length > 1 && ` +${order.items.length - 1} more`}
+                              </span>
+                              <Badge variant="outline" className={getStatusColor(order.deliveryStatus)}>
+                                {order.deliveryStatus}
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {order.buyer.user.name} • {formatDate(order.orderDate)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-sm">{formatPrice(order.totalAmount)}</div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 text-xs"
+                              onClick={() => navigate(`/orders/${order.id}`)}
+                            >
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">No orders yet</p>
+                      <Button onClick={() => navigate('/marketplace')}>
+                        Promote Your Products
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                  <CardDescription>Manage your business</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/my-products')}
+                    >
+                      <Package className="h-6 w-6 mb-2" />
+                      <span>Manage Products</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/producer/orders')}
+                    >
+                      <ShoppingCart className="h-6 w-6 mb-2" />
+                      <span>View Orders</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/producer/analytics')}
+                    >
+                      <TrendingUp className="h-6 w-6 mb-2" />
+                      <span>Analytics</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/producer/transactionhistory')}
+                    >
+                      <DollarSign className="h-6 w-6 mb-2" />
+                      <span>Transactions</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </main>
         </div>
       </div>

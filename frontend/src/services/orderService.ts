@@ -54,5 +54,28 @@ export const orderService = {
       console.error('❌ Status update failed:', error);
       throw new Error(error.message || 'Failed to update order status');
     }
+  },
+  async getProducerOrders() {
+    try {
+      console.log('🔧 Fetching producer orders');
+      const response = await api.request('/orders/producer/orders');
+      console.log('✅ Producer orders response:', response);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Producer orders fetch failed:', error);
+      throw new Error(error.message || 'Failed to fetch producer orders');
+    }
+  },
+
+  async getProducerProducts() {
+    try {
+      console.log('🔧 Fetching producer products');
+      const response = await api.request('/products/my/products'); 
+      console.log('✅ Producer products response:', response);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Producer products fetch failed:', error);
+      throw new Error(error.message || 'Failed to fetch producer products');
+    }
   }
 };
