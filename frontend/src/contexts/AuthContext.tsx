@@ -1,8 +1,8 @@
-// src/contexts/AuthContext.tsx
+// src/contexts/AuthContext.tsx - UPDATED
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import apiService from '@/services/api'; // Your API service
+import apiService from '@/services/api';
 
-type UserRole = 'BUYER' | 'PRODUCER' | 'ADMIN'; // Updated to match backend
+type UserRole = 'BUYER' | 'PRODUCER' | 'ADMIN';
 
 interface User {
   id: string;
@@ -11,6 +11,9 @@ interface User {
   role: UserRole;
   phone?: string;
   address?: string;
+  avatarUrl?: string; // ← ADD THIS FIELD
+  region?: string;    // ← ADD THIS FIELD  
+  bio?: string;       // ← ADD THIS FIELD
   emailVerified?: boolean;
   registrationDate?: string;
   hasProducerProfile?: boolean;
@@ -26,6 +29,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   clearError: () => void;
+  updateUser: (updates: Partial<User>) => void; // ← ADD THIS METHOD
 }
 
 interface RegisterData {
@@ -35,6 +39,8 @@ interface RegisterData {
   role: UserRole;
   phone?: string;
   address?: string;
+  region?: string;    // ← ADD THIS FIELD
+  bio?: string;       // ← ADD THIS FIELD
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,7 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is logged in on app start
   useEffect(() => {
     checkAuthStatus();
   }, []);
@@ -55,11 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         apiService.setToken(token);
         const response = await apiService.getCurrentUser();
+        
+        // Make sure the user data includes avatarUrl
+        console.log('🔧 AuthContext - User data from /me:', response.user);
+        
         setUser(response.user);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      // Token might be expired, remove it
       localStorage.removeItem('authToken');
     } finally {
       setLoading(false);
@@ -67,59 +75,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    console.log('🔧 Frontend: Starting login for:', email);
-    
-    const response = await apiService.login(email, password);
-    
-    console.log('🔧 Frontend: Full login response:', response);
-    
-    // Handle case where response might be empty or different structure
-    if (!response) {
-      throw new Error('Empty response from server');
-    }
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔧 Frontend: Starting login for:', email);
+      
+      const response = await apiService.login(email, password);
+      
+      console.log('🔧 Frontend: Full login response:', response);
 
-    // Try different response structures
-    const token = response.token || response.data?.token;
-    const userData = response.user || response.data?.user;
+      if (!response) {
+        throw new Error('Empty response from server');
+      }
 
-    if (token && userData) {
-      apiService.setToken(token);
-      
-      const frontendUser: User = {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: (userData.role as UserRole) || 'BUYER',
-        phone: userData.phone,
-        address: userData.address,
-        emailVerified: userData.emailVerified,
-        registrationDate: userData.registrationDate,
-        hasProducerProfile: userData.hasProducerProfile,
-        hasBuyerProfile: userData.hasBuyerProfile
-      };
-      
-      setUser(frontendUser);
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('ethiotrust-user', JSON.stringify(frontendUser));
-      
-      console.log('🔧 Frontend: Login successful, user:', frontendUser);
-    } else {
-      console.error('🔧 Frontend: Missing token or user data in response:', response);
-      throw new Error('Invalid response from server - missing token or user data');
+      const token = response.token || response.data?.token;
+      const userData = response.user || response.data?.user;
+
+      if (token && userData) {
+        apiService.setToken(token);
+        
+        const frontendUser: User = {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          role: (userData.role as UserRole) || 'BUYER',
+          phone: userData.phone,
+          address: userData.address,
+          avatarUrl: userData.avatarUrl, // ← ADD THIS
+          region: userData.region,       // ← ADD THIS
+          bio: userData.bio,             // ← ADD THIS
+          emailVerified: userData.emailVerified,
+          registrationDate: userData.registrationDate,
+          hasProducerProfile: userData.hasProducerProfile,
+          hasBuyerProfile: userData.hasBuyerProfile
+        };
+        
+        setUser(frontendUser);
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('ethiotrust-user', JSON.stringify(frontendUser));
+        
+        console.log('🔧 Frontend: Login successful, user:', frontendUser);
+      } else {
+        console.error('🔧 Frontend: Missing token or user data in response:', response);
+        throw new Error('Invalid response from server - missing token or user data');
+      }
+    } catch (error: any) {
+      console.error('🔧 Frontend: Login failed:', error);
+      const errorMessage = error.message || 'Login failed. Please try again.';
+      setError(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error('🔧 Frontend: Login failed:', error);
-    const errorMessage = error.message || 'Login failed. Please try again.';
-    setError(errorMessage);
-    throw error;
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const register = async (userData: RegisterData) => {
     try {
@@ -145,6 +154,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ADD THIS METHOD TO UPDATE USER
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      localStorage.setItem('ethiotrust-user', JSON.stringify(updatedUser));
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setError(null);
@@ -166,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     error,
     clearError,
+    updateUser, // ← ADD THIS TO THE CONTEXT VALUE
   };
 
   return (

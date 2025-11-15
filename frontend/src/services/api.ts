@@ -1,4 +1,4 @@
-// src/services/api.ts
+// src/services/api.ts - FIXED VERSION
 const API_BASE_URL = 'http://localhost:5000/api';
 
 export interface ApiResponse<T = any> {
@@ -27,8 +27,8 @@ class ApiService {
     localStorage.removeItem('authToken');
   }
 
-  // src/services/api.ts - UPDATE THE REQUEST METHOD
-  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // FIXED: Properly handle both 'data' and 'body' properties
+  async request<T>(endpoint: string, options: any = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
     console.log('🔧 API Request:', url, options);
@@ -38,12 +38,19 @@ class ApiService {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
+      method: options.method || 'GET',
     };
   
-    // FIX: Properly stringify the body if it's an object
-    if (options.body && typeof options.body === 'object') {
-      config.body = JSON.stringify(options.body);
+    // FIX: Handle 'data' property (used by userService) OR 'body' property
+    let requestBody = options.data || options.body;
+    
+    if (requestBody) {
+      if (typeof requestBody === 'object') {
+        config.body = JSON.stringify(requestBody);
+        console.log('🔧 Request body stringified:', config.body.substring(0, 200) + '...');
+      } else {
+        config.body = requestBody;
+      }
     }
   
     if (this.token) {
@@ -60,8 +67,17 @@ class ApiService {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('🔧 API Error:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.error('🔧 API Error Response:', errorText);
+        
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // If not JSON, use the text as is
+        }
+        
+        throw new Error(errorMessage);
       }
   
       const text = await response.text();
@@ -80,7 +96,7 @@ class ApiService {
   async login(email: string, password: string): Promise<{ token: string; user: any }> {
     const response = await this.request<{ token: string; user: any }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      data: { email, password }, // Changed from body to data
     });
     
     if (response.token) {
@@ -92,18 +108,21 @@ class ApiService {
   async register(userData: any): Promise<any> {
     return this.request('/users/register', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      data: userData, // Changed from body to data
     });
   }
 
+  // In your api.ts - Add logging to getCurrentUser
   async getCurrentUser(): Promise<any> {
-    return this.request('/auth/me');
+    console.log('🔧 Fetching current user from /me endpoint...');
+    const response = await this.request('/auth/me');
+    console.log('✅ Current user response:', response);
+    return response;
   }
-
   async verifyEmail(token: string): Promise<any> {
     return this.request('/email-verification/verify', {
       method: 'POST',
-      body: JSON.stringify({ token }),
+      data: { token }, // Changed from body to data
     });
   }
 
