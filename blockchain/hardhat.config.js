@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-/** @type import('hardhat/config').HardhatUserConfig */
 export default {
   solidity: "0.8.19",
   networks: {
@@ -15,14 +14,24 @@ export default {
       url: process.env.POLYGON_RPC_URL || "https://rpc-amoy.polygon.technology",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 80002,
-      gas: 30_000_000_000,
     },
   },
+
+  // ✅ CORRECT SETTINGS — using Etherscan API V2
   etherscan: {
-    apiKey: {
-      polygonAmoy: process.env.POLYGONSCAN_API_KEY || "",
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY,  // <-- IMPORTANT
+    customChains: [
+      {
+        network: "amoy",
+        chainId: 80002,
+        urls: {
+          apiURL: "https://api-amoy.polygonscan.com/api",
+          browserURL: "https://amoy.polygonscan.com"
+        }
+      }
+    ]
   },
+
   paths: {
     artifacts: "./artifacts",
     cache: "./cache",
