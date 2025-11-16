@@ -12,7 +12,7 @@ model User {
   email                    String    @unique
   passwordHash             String
   name                     String
-  phone                    String?
+  phone                    String?   @unique
   role                     UserRole  @default(BUYER)
   address                  String?
   avatarUrl                String?
@@ -47,6 +47,7 @@ model User {
   @@index([role])
   @@index([registrationDate])
   @@index([email, role])
+  @@index([phone])
   @@map("users")
 }
 

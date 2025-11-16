@@ -47,16 +47,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    const existingUser = await userService.findUserByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({
-        status: 'error',
-        message: 'User already exists with this email'
-      });
-    }
+    // ✅ ENHANCED: Let userService handle duplicate checks
+    console.log('🔧 Creating user with enhanced validation...');
 
-    // Create user using the UPDATED createUser method (with email verification)
+    // Create user using the UPDATED createUser method
     const user = await userService.createUser({
       email,
       password,
@@ -78,8 +72,8 @@ router.post('/register', async (req, res) => {
         phone: user.phone,
         address: user.address,
         registrationDate: user.registrationDate,
-        emailVerified: user.emailVerified || false, // ADD THIS
-        verificationEmailSent: user.verificationEmailSent || false // ADD THIS
+        emailVerified: user.emailVerified || false,
+        verificationEmailSent: user.verificationEmailSent || false
       };
 
       return res.status(201).json({
@@ -91,8 +85,8 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // If authService is available, generate token (skip session creation for now)
-    console.log('🔧 Generating JWT token (session creation disabled)...');
+    // If authService is available, generate token
+    console.log('🔧 Generating JWT token...');
     const token = authService.generateAccessToken(user);
     
     console.log('✅ Token generated successfully');
@@ -105,12 +99,12 @@ router.post('/register', async (req, res) => {
       phone: user.phone,
       address: user.address,
       registrationDate: user.registrationDate,
-      emailVerified: user.emailVerified || false, // ADD THIS
-      verificationEmailSent: user.verificationEmailSent || false // ADD THIS
+      emailVerified: user.emailVerified || false,
+      verificationEmailSent: user.verificationEmailSent || false
     };
 
     // Customize success message based on email verification status
-    let successMessage = 'User registered successfully with JWT token (session creation disabled)';
+    let successMessage = 'User registered successfully';
     if (user.verificationEmailSent) {
       successMessage = 'User registered successfully. Please check your email for verification.';
     } else if (user.note) {
@@ -122,20 +116,47 @@ router.post('/register', async (req, res) => {
       message: successMessage,
       data: {
         user: userResponse,
-        token: token,
-        note: user.note || "Session creation temporarily disabled - database migration needed"
+        token: token
       }
     });
 
   } catch (error) {
     console.error('User registration error:', error);
     
-    // Handle specific errors
-    if (error.code === 'P2002') {
+    // ✅ ENHANCED ERROR HANDLING
+    if (error.message === 'User already exists with this email address') {
       return res.status(409).json({
         status: 'error',
-        message: 'User already exists with this email'
+        message: 'User already exists with this email address',
+        code: 'EMAIL_EXISTS'
       });
+    }
+    
+    if (error.message === 'User already exists with this phone number') {
+      return res.status(409).json({
+        status: 'error',
+        message: 'User already exists with this phone number',
+        code: 'PHONE_EXISTS'
+      });
+    }
+    
+    // Handle Prisma unique constraint errors (backup)
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'email') {
+        return res.status(409).json({
+          status: 'error',
+          message: 'User already exists with this email address',
+          code: 'EMAIL_EXISTS'
+        });
+      }
+      if (field === 'phone') {
+        return res.status(409).json({
+          status: 'error',
+          message: 'User already exists with this phone number',
+          code: 'PHONE_EXISTS'
+        });
+      }
     }
     
     res.status(500).json({

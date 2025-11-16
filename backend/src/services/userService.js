@@ -3,11 +3,38 @@ const { prisma } = require('../config/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
 
 class UserService {
+  // In backend/src/services/userService.js - UPDATE createUser method
+
   async createUser(userData) {
     try {
       console.log('🔧 createUser called with:', { ...userData, password: '[HIDDEN]' });
       
       const { email, password, name, phone, role, address } = userData;
+      
+      // ✅ ENHANCED VALIDATION: Check for duplicate email AND phone
+      console.log('🔧 Checking for existing users...');
+      
+      // Check if email already exists
+      const existingEmailUser = await prisma.user.findUnique({
+        where: { email }
+      });
+      
+      if (existingEmailUser) {
+        console.log('❌ Email already exists:', email);
+        throw new Error('EMAIL_EXISTS');
+      }
+      
+      // Check if phone already exists (if phone provided)
+      if (phone) {
+        const existingPhoneUser = await prisma.user.findUnique({
+          where: { phone }
+        });
+        
+        if (existingPhoneUser) {
+          console.log('❌ Phone number already exists:', phone);
+          throw new Error('PHONE_EXISTS');
+        }
+      }
       
       // Use the new password utility
       const passwordHash = await hashPassword(password);
@@ -29,9 +56,9 @@ class UserService {
             address
           }
         });
-
+  
         console.log('🔧 User created:', newUser.id);
-
+  
         // Create role-specific profile
         if (role === 'PRODUCER') {
           console.log('🔧 Creating producer profile...');
@@ -52,7 +79,7 @@ class UserService {
             }
           });
         }
-
+  
         return newUser;
       });
       
@@ -89,16 +116,25 @@ class UserService {
         emailVerified: false,
         verificationEmailSent: emailResult ? emailResult.success : false
       };
-
+  
       // Add note if email failed
       if (emailResult && !emailResult.success) {
         response.note = emailResult.error || 'Verification email not sent';
       }
-
+  
       return response;
-
+  
     } catch (error) {
       console.error('❌ createUser error:', error);
+      
+      // Handle specific errors
+      if (error.message === 'EMAIL_EXISTS') {
+        throw new Error('User already exists with this email address');
+      }
+      if (error.message === 'PHONE_EXISTS') {
+        throw new Error('User already exists with this phone number');
+      }
+      
       throw error;
     }
   }

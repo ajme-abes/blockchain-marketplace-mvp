@@ -28,17 +28,17 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-
+  
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-
+  
     if (formData.password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
-
+  
     try {
       const { confirmPassword, ...registerData } = formData;
       const response = await register(registerData);
@@ -60,7 +60,14 @@ const Register = () => {
         }
       }
     } catch (error: any) {
-      toast.error(error?.message || 'Registration failed. Please try again.');
+      // ✅ ENHANCED ERROR HANDLING
+      if (error?.code === 'EMAIL_EXISTS') {
+        toast.error('This email is already registered. Please use a different email or login.');
+      } else if (error?.code === 'PHONE_EXISTS') {
+        toast.error('This phone number is already registered. Please use a different phone number.');
+      } else {
+        toast.error(error?.message || 'Registration failed. Please try again.');
+      }
     }
   };
 

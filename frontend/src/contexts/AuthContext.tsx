@@ -29,7 +29,9 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   clearError: () => void;
-  updateUser: (updates: Partial<User>) => void; // ← ADD THIS METHOD
+  updateUser: (updates: Partial<User>) => void; 
+  resendVerificationEmail: () => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
 }
 
 interface RegisterData {
@@ -74,62 +76,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('🔧 Frontend: Starting login for:', email);
-      
-      const response = await apiService.login(email, password);
-      
-      console.log('🔧 Frontend: Full login response:', response);
+  // In AuthContext.tsx - REPLACE the entire login method:
 
-      if (!response) {
-        throw new Error('Empty response from server');
-      }
+const login = async (email: string, password: string) => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log('🔧 Frontend: Starting login for:', email);
+    
+    const response = await apiService.login(email, password);
+    
+    // ✅ NEW: Check if login was blocked due to unverified email
+    if (response.code === 'EMAIL_NOT_VERIFIED') {
+      console.log('🔧 Frontend: Email not verified, redirecting to verification');
+      
+      // Store user info for verification flow
+      const unverifiedUser = {
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.name,
+        requiresVerification: true,
+        canResend: response.canResend
+      };
+      
+      // Navigate to verification notice with user info
+      navigate('/verify-email-notice', { 
+        state: { 
+          email: response.user.email,
+          user: unverifiedUser,
+          fromLogin: true,
+          canResend: response.canResend
+        } 
+      });
+      
+      // Throw error to stop the login flow
+      throw new Error('Please verify your email before logging in');
+    }
 
-      const token = response.token || response.data?.token;
-      const userData = response.user || response.data?.user;
+    // ✅ Normal login flow for verified users
+    if (!response) {
+      throw new Error('Empty response from server');
+    }
 
-      if (token && userData) {
-        apiService.setToken(token);
-        
-        const frontendUser: User = {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          role: (userData.role as UserRole) || 'BUYER',
-          phone: userData.phone,
-          address: userData.address,
-          avatarUrl: userData.avatarUrl, // ← ADD THIS
-          region: userData.region,       // ← ADD THIS
-          bio: userData.bio,             // ← ADD THIS
-          emailVerified: userData.emailVerified,
-          registrationDate: userData.registrationDate,
-          hasProducerProfile: userData.hasProducerProfile,
-          hasBuyerProfile: userData.hasBuyerProfile
-        };
-        
-        setUser(frontendUser);
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('ethiotrust-user', JSON.stringify(frontendUser));
-        
-        console.log('🔧 Frontend: Login successful, user:', frontendUser);
-      } else {
-        console.error('🔧 Frontend: Missing token or user data in response:', response);
-        throw new Error('Invalid response from server - missing token or user data');
-      }
-    } catch (error: any) {
-      console.error('🔧 Frontend: Login failed:', error);
+    const token = response.token || response.data?.token;
+    const userData = response.user || response.data?.user;
+
+    if (token && userData) {
+      apiService.setToken(token);
+      
+      const frontendUser: User = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: (userData.role as UserRole) || 'BUYER',
+        phone: userData.phone,
+        address: userData.address,
+        avatarUrl: userData.avatarUrl,
+        region: userData.region,
+        bio: userData.bio,
+        emailVerified: userData.emailVerified, // ✅ Include verification status
+        registrationDate: userData.registrationDate,
+        hasProducerProfile: userData.hasProducerProfile,
+        hasBuyerProfile: userData.hasBuyerProfile
+      };
+      
+      setUser(frontendUser);
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('ethiotrust-user', JSON.stringify(frontendUser));
+      
+      console.log('🔧 Frontend: Login successful, user:', frontendUser);
+    } else {
+      console.error('🔧 Frontend: Missing token or user data in response:', response);
+      throw new Error('Invalid response from server - missing token or user data');
+    }
+  } catch (error: any) {
+    console.error('🔧 Frontend: Login failed:', error);
+    
+    // Don't show error for unverified email (we handled it above)
+    if (error.message !== 'Please verify your email before logging in') {
       const errorMessage = error.message || 'Login failed. Please try again.';
       setError(errorMessage);
-      throw error;
-    } finally {
-      setLoading(false);
     }
-  };
-
+    
+    throw error;
+  } finally {
+    setLoading(false);
+  }
+};
   const register = async (userData: RegisterData) => {
     try {
       setLoading(true);
@@ -153,6 +187,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   };
+  const resendVerificationEmail = async () => {
+    try {
+      const response = await apiService.resendVerificationEmail();
+      return response;
+    } catch (error: any) {
+      const errorMessage = error.message || 'Failed to resend verification email';
+      setError(errorMessage);
+      throw error;
+    }
+  };
+  const verifyEmail = async (token: string) => {
+    try {
+      await apiService.verifyEmail(token);
+    } catch (error: any) {
+      const errorMessage = error.message || 'Email verification failed';
+      setError(errorMessage);
+      throw error;
+    }
+  };
+  
 
   // ADD THIS METHOD TO UPDATE USER
   const updateUser = (updates: Partial<User>) => {
@@ -184,7 +238,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     error,
     clearError,
-    updateUser, // ← ADD THIS TO THE CONTEXT VALUE
+    updateUser, 
+    resendVerificationEmail,
+    verifyEmail,
   };
 
   return (

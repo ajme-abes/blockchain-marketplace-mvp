@@ -3,6 +3,7 @@ const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const authService = require('../services/authService');
 const userService = require('../services/userService');
+const emailVerificationService = require('../services/emailVerificationService');
 
 // FIX: Check the correct path to database config
 let prisma;
@@ -79,8 +80,32 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // ✅ NEW: CHECK EMAIL VERIFICATION STATUS
+    if (!user.emailVerified) {
+      console.log('❌ Login blocked - email not verified:', user.email);
+      
+      // Check if verification token is expired
+      const isTokenExpired = user.verificationTokenExpires && 
+                            new Date() > user.verificationTokenExpires;
+      
+      return res.status(403).json({
+        error: 'Please verify your email before logging in',
+        code: 'EMAIL_NOT_VERIFIED',
+        requiresVerification: true,
+        canResend: isTokenExpired || !user.verificationToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
+    }
+
+    // ✅ User is verified, proceed with login
+    console.log('✅ Login successful for verified user:', user.email);
+
     // Generate token
-    console.log('🔧 Login successful, generating token...');
+    console.log('🔧 Generating token for verified user...');
     const token = authService.generateAccessToken(user);
     
     console.log('✅ Login successful for user:', user.id);
@@ -97,6 +122,7 @@ router.post('/login', async (req, res) => {
       region: user.region,       
       bio: user.bio,             
       languagePreference: user.languagePreference,
+      emailVerified: user.emailVerified, // ✅ Include verification status
       hasProducerProfile: !!user.producerProfile,
       hasBuyerProfile: !!user.buyerProfile
     };
@@ -192,6 +218,119 @@ router.post('/logout', authenticateToken, async (req, res) => {
       error: 'Logout failed',
       code: 'LOGOUT_FAILED',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        error: 'Verification token is required',
+        code: 'MISSING_TOKEN'
+      });
+    }
+
+    const result = await emailVerificationService.verifyEmail(token);
+
+    if (result.success) {
+      res.json({
+        message: result.message,
+        user: result.user
+      });
+    } else {
+      res.status(400).json({
+        error: result.error,
+        code: 'VERIFICATION_FAILED'
+      });
+    }
+
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({
+      error: 'Email verification failed',
+      code: 'VERIFICATION_ERROR'
+    });
+  }
+});
+
+// Resend Verification Email Endpoint
+router.post('/resend-verification', authenticateToken, async (req, res) => {
+  try {
+    const result = await emailVerificationService.resendVerificationEmail(req.user.id);
+
+    if (result.success) {
+      res.json({
+        message: result.message,
+        verificationUrl: result.verificationUrl // For manual testing
+      });
+    } else {
+      res.status(400).json({
+        error: result.error,
+        code: 'RESEND_FAILED'
+      });
+    }
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({
+      error: 'Failed to resend verification email',
+      code: 'RESEND_ERROR'
+    });
+  }
+});
+
+// Forgot Password Endpoint (Basic Implementation)
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email is required',
+        code: 'MISSING_EMAIL'
+      });
+    }
+
+    // TODO: Implement password reset logic
+    res.json({
+      message: 'Password reset functionality coming soon',
+      note: 'Check server logs for implementation status'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      error: 'Password reset request failed',
+      code: 'RESET_REQUEST_FAILED'
+    });
+  }
+});
+
+// Reset Password Endpoint (Basic Implementation)
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        error: 'Token and password are required',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    // TODO: Implement password reset logic
+    res.json({
+      message: 'Password reset functionality coming soon',
+      note: 'Check server logs for implementation status'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      error: 'Password reset failed',
+      code: 'RESET_FAILED'
     });
   }
 });
