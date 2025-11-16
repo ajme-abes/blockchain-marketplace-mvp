@@ -2,124 +2,143 @@ const { prisma } = require('../config/database');
 
 class ReviewService {
   // ==================== CREATE REVIEW ====================
-async createReview(buyerId, productId, rating, comment = null) {
-  try {
-    // Validate rating
-    if (rating < 1 || rating > 5) {
-      return {
-        success: false,
-        error: 'Rating must be between 1 and 5 stars'
-      };
-    }
-
-    // Check if buyer purchased this product
-    const hasPurchased = await this.hasPurchasedProduct(buyerId, productId);
-    if (!hasPurchased) {
-      return {
-        success: false,
-        error: 'You can only review products you have purchased'
-      };
-    }
-
-    // Check if already reviewed
-    const existingReview = await prisma.review.findUnique({
-      where: {
-        buyerId_productId: {
-          buyerId,
-          productId
-        }
+  async createReview(buyerId, productId, rating, comment = null) {
+    try {
+      console.log('🔄 createReview called:', { buyerId, productId, rating, comment });
+  
+      // Validate rating
+      if (rating < 1 || rating > 5) {
+        console.log('❌ Rating validation failed');
+        return {
+          success: false,
+          error: 'Rating must be between 1 and 5 stars'
+        };
       }
-    });
-
-    if (existingReview) {
-      return {
-        success: false,
-        error: 'You have already reviewed this product'
-      };
-    }
-
-    // Create the review
-    const review = await prisma.review.create({
-      data: {
-        buyerId,
-        productId,
-        rating,
-        comment,
-        reviewDate: new Date()
-      },
-      include: {
-        buyer: {
-          include: {
-            user: {
-              select: {
-                name: true
+  
+      // Check if buyer purchased this product
+      const hasPurchased = await this.hasPurchasedProduct(buyerId, productId);
+      
+      if (!hasPurchased) {
+        console.log('❌ Purchase validation failed - buyer has not purchased this product');
+        return {
+          success: false,
+          error: 'You can only review products you have purchased and received'
+        };
+      }
+  
+      // Check if already reviewed
+      const existingReview = await prisma.review.findUnique({
+        where: {
+          buyerId_productId: {
+            buyerId,
+            productId
+          }
+        }
+      });
+  
+      if (existingReview) {
+        console.log('❌ Already reviewed this product');
+        return {
+          success: false,
+          error: 'You have already reviewed this product'
+        };
+      }
+  
+      console.log('✅ All validations passed, creating review...');
+  
+      // Create the review
+      const review = await prisma.review.create({
+        data: {
+          buyerId,
+          productId,
+          rating,
+          comment,
+          reviewDate: new Date()
+        },
+        include: {
+          buyer: {
+            include: {
+              user: {
+                select: {
+                  name: true
+                }
               }
             }
-          }
-        },
-        product: {
-          select: {
-            name: true,
-            producer: {
-              include: {
-                user: {
-                  select: {
-                    name: true
+          },
+          product: {
+            select: {
+              name: true,
+              producer: {
+                include: {
+                  user: {
+                    select: {
+                      name: true
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
-    });
-
-    // Update product average rating
-    await this.updateProductRating(productId);
-
-    console.log(`⭐ Review created: ${rating} stars for product ${productId} by buyer ${buyerId}`);
-
-    return {
-      success: true,
-      review
-    };
-
-  } catch (error) {
-    console.error('❌ Create review error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+      });
+  
+      // Update product average rating
+      await this.updateProductRating(productId);
+  
+      console.log(`⭐ Review created successfully: ${rating} stars for product ${productId}`);
+  
+      return {
+        success: true,
+        review
+      };
+  
+    } catch (error) {
+      console.error('❌ Create review error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
-}
 
   // ==================== CHECK PURCHASE HISTORY ====================
-async hasPurchasedProduct(buyerId, productId) {
-  try {
-    const orderItem = await prisma.orderItem.findFirst({
-      where: {
-        productId: productId,
-        order: {
-          buyerId: buyerId, // Make sure this uses buyerId, not userId
-          paymentStatus: 'CONFIRMED'
-        }
-      },
-      include: {
-        order: {
-          select: {
-            paymentStatus: true
+  async hasPurchasedProduct(buyerId, productId) {
+    try {
+      console.log('🔍 Checking purchase for:', { buyerId, productId });
+      
+      const orderItem = await prisma.orderItem.findFirst({
+        where: {
+          productId: productId,
+          order: {
+            buyerId: buyerId,
+            paymentStatus: 'CONFIRMED',  // ✅ UPPERCASE
+            deliveryStatus: 'DELIVERED'  // ✅ UPPERCASE - only allow reviews for delivered orders
+          }
+        },
+        include: {
+          order: {
+            select: {
+              paymentStatus: true,
+              deliveryStatus: true,
+              id: true
+            }
           }
         }
-      }
-    });
-
-    return !!orderItem;
-  } catch (error) {
-    console.error('Check purchase history error:', error);
-    return false;
+      });
+  
+      console.log('📦 Purchase validation result:', { 
+        foundOrderItem: !!orderItem,
+        orderId: orderItem?.order?.id,
+        paymentStatus: orderItem?.order?.paymentStatus,
+        deliveryStatus: orderItem?.order?.deliveryStatus
+      });
+  
+      return !!orderItem;
+    } catch (error) {
+      console.error('❌ Check purchase history error:', error);
+      return false;
+    }
   }
-}
-
   // ==================== UPDATE PRODUCT RATING ====================
   async updateProductRating(productId) {
     try {

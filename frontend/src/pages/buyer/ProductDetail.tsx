@@ -467,74 +467,74 @@ const ProductDetail = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="reviews" className="mt-4">
-            <Card>
-              <CardContent className="p-6">
-                {product.reviewDetails && product.reviewDetails.reviews.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Rating Summary */}
-                    <div className="flex items-center gap-6 mb-6">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold">{product.reviewDetails.average.toFixed(1)}</div>
-                        <div className="flex items-center justify-center">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= Math.round(product.reviewDetails.average)
-                                  ? 'fill-accent text-accent'
-                                  : 'text-muted-foreground'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {product.reviewDetails.total} reviews
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Reviews List */}
-                    <div className="space-y-4">
-                      {product.reviewDetails.reviews.map((review) => (
-                        <div key={review.id} className="border-b pb-4 last:border-b-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="flex items-center gap-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`h-3 w-3 ${
-                                    star <= review.rating
-                                      ? 'fill-accent text-accent'
-                                      : 'text-muted-foreground'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <span className="font-medium">{review.buyer.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {new Date(review.date).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {review.comment && (
-                            <p className="text-sm text-muted-foreground">{review.comment}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No reviews yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Be the first to review this product!
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+<TabsContent value="reviews" className="mt-4">
+<Card>
+  <CardContent className="p-6">
+    {product.reviewDetails && product.reviewDetails.reviews.length > 0 ? (
+      <div className="space-y-4">
+        {/* Rating Summary */}
+        <div className="flex items-center gap-6 mb-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold">{product.reviewDetails.average.toFixed(1)}</div>
+            <div className="flex items-center justify-center">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`h-4 w-4 ${
+                    star <= Math.round(product.reviewDetails.average)
+                      ? 'fill-accent text-accent'
+                      : 'text-muted-foreground'
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {product.reviewDetails.total} reviews
+            </div>
+          </div>
+        </div>
+        
+        {/* Reviews List */}
+        <div className="space-y-4">
+          {product.reviewDetails.reviews.map((review) => (
+            <div key={review.id} className="border-b pb-4 last:border-b-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`h-3 w-3 ${
+                        star <= review.rating
+                          ? 'fill-accent text-accent'
+                          : 'text-muted-foreground'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="font-medium">{review.buyer.name}</span>
+                <span className="text-sm text-muted-foreground">
+                  {new Date(review.date).toLocaleDateString()}
+                </span>
+              </div>
+              {review.comment && (
+                <p className="text-sm text-muted-foreground">{review.comment}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="text-center py-8">
+        <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground">No reviews yet</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Be the first to review this product!
+        </p>
+      </div>
+    )}
+  </CardContent>
+</Card>
+</TabsContent>
           
           <TabsContent value="delivery" className="mt-4">
             <Card>
