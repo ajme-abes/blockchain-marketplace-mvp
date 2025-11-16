@@ -3,11 +3,15 @@ const { prisma } = require('../config/database');
 
 class ProductService {
 
+
+  // In backend/src/services/productService.js - UPDATE createProduct method
+
   async createProduct(productData) {
-    const { name, description, price, category, quantity, producerId, imageCids = [] } = productData;
+    const { name, description, price, category, quantityAvailable, producerId, imageCids = [] } = productData;
   
     console.log('🔧 Creating product with producerId:', producerId);
     console.log('🔧 Image CIDs received:', imageCids);
+    console.log('🔧 Product data:', { name, description, price, category, quantityAvailable });
   
     // First, find the producer profile for this user
     const producer = await prisma.producer.findUnique({
@@ -20,28 +24,42 @@ class ProductService {
   
     console.log('🔧 Found producer profile:', producer.id);
   
-    // ✅ DIRECT FIX: Use the first CID in imageUrl field
-    const primaryImageUrl = imageCids.length > 0 ? `https://gateway.pinata.cloud/ipfs/${imageCids[0]}` : null;
-    
-    console.log('🖼️ Setting product imageUrl:', primaryImageUrl);
+    // ✅ FIXED: Use the first CID to create proper imageUrl
+    let primaryImageUrl = null;
+    if (imageCids.length > 0) {
+      primaryImageUrl = `https://gateway.pinata.cloud/ipfs/${imageCids[0]}`;
+      console.log('🖼️ Setting product imageUrl from IPFS:', primaryImageUrl);
+    } else {
+      console.log('🖼️ No image CIDs provided, imageUrl will be null');
+    }
   
-    // Create product with direct imageUrl
+    // ✅ FIXED: Include ALL required fields including quantityAvailable
+    const createData = {
+      name,
+      description: description || '',
+      price: parseFloat(price),
+      category,
+      quantityAvailable: parseInt(quantityAvailable),
+      producerId: producer.id,
+      imageUrl: primaryImageUrl, // ✅ This will be the actual image URL
+    };
+  
+    // Only add ipfsFiles connection if there are CIDs
+    if (imageCids.length > 0) {
+      const ipfsFileIds = await this.getIpfsFileIds(imageCids);
+      if (ipfsFileIds.length > 0) {
+        createData.ipfsFiles = {
+          connect: ipfsFileIds
+        };
+        console.log('🔗 Connecting IPFS files to product:', ipfsFileIds);
+      }
+    }
+  
+    console.log('🔧 Final create data:', createData);
+  
+    // Create product with all required fields
     const product = await prisma.product.create({
-      data: {
-        name,
-        description,
-        price,
-        category,
-        quantityAvailable: quantity,
-        producerId: producer.id,
-        imageUrl: primaryImageUrl, // ✅ DIRECTLY SET THE IMAGE URL
-        // Also link IPFS files if they exist
-        ...(imageCids.length > 0 && {
-          ipfsFiles: {
-            connect: await this.getIpfsFileIds(imageCids)
-          }
-        })
-      },
+      data: createData,
       include: {
         producer: {
           include: {
@@ -58,8 +76,11 @@ class ProductService {
       }
     });
   
-    console.log('✅ Product created with imageUrl:', product.imageUrl);
-    console.log('✅ Product IPFS files:', product.ipfsFiles?.length || 0);
+    console.log('✅ Product created successfully:', {
+      id: product.id,
+      imageUrl: product.imageUrl,
+      ipfsFilesCount: product.ipfsFiles?.length || 0
+    });
   
     return this.formatProductResponse(product);
   }
@@ -197,13 +218,30 @@ async getProducts(filters = {}) {
     return this.formatProductResponse(product);
   }
 
+
   async updateProduct(id, updateData) {
+    console.log('🔄 Updating product in service:', { id, updateData });
+    
+    // ✅ FIX: Map 'quantity' to 'quantityAvailable' for Prisma
+    const prismaUpdateData = { ...updateData };
+    
+    // If 'quantity' is provided, map it to 'quantityAvailable'
+    if (prismaUpdateData.quantity !== undefined) {
+      prismaUpdateData.quantityAvailable = prismaUpdateData.quantity;
+      delete prismaUpdateData.quantity; // Remove the invalid field
+    }
+    
+    // If 'imageCid' is provided, create proper imageUrl
+    if (prismaUpdateData.imageCid) {
+      prismaUpdateData.imageUrl = `https://gateway.pinata.cloud/ipfs/${prismaUpdateData.imageCid}`;
+      delete prismaUpdateData.imageCid; // Remove if not needed
+    }
+  
+    console.log('🔧 Mapped update data for Prisma:', prismaUpdateData);
+  
     const product = await prisma.product.update({
       where: { id },
-      data: {
-        ...updateData,
-        ...(updateData.imageCid && { imageUrl: `ipfs://${updateData.imageCid}` })
-      },
+      data: prismaUpdateData, // ✅ Now uses correct field names
       include: {
         producer: {
           include: {
@@ -218,10 +256,9 @@ async getProducts(filters = {}) {
         }
       }
     });
-
+  
     return this.formatProductResponse(product);
   }
-
   async deleteProduct(id) {
     // Soft delete by setting status to INACTIVE
     await prisma.product.delete({
