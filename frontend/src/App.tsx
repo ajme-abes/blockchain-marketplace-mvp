@@ -40,6 +40,8 @@ import ProducerAnalytics from "./pages/producer/ProducerAnalytics";
 import StoreSettings from "./pages/producer/StoreSettings";
 import PaymentSuccess from "./pages/buyer/PaymentSuccess";
 import OrderDetail from "./pages/buyer/OrderDetail";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import VerifyEmailNotice from "./pages/auth/VerifyEmailNotice";
 import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -165,6 +167,9 @@ const App = () => (
       <TransactionHistory />
     </RoleRoute>
   } />
+  <Route path="/verify-email" element={<VerifyEmail />} />
+  <Route path="/verify-email-notice" element={<VerifyEmailNotice />} />
+
   <Route path="/forgot-password" element={<ForgotPassword />} />
 <Route path="/reset-password" element={<ResetPassword />} />
 <Route path="/products/add" element={
