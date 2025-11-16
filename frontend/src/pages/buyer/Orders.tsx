@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { Star } from 'lucide-react';
+import { ReviewModal } from '@/components/reviews/ReviewModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,7 +52,15 @@ const Orders = () => {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    product: { id: string; name: string } | null;
+    orderId: string | null;
+  }>({
+    isOpen: false,
+    product: null,
+    orderId: null
+  });
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -95,6 +105,24 @@ const Orders = () => {
       default:
         return 'bg-muted text-muted-foreground';
     }
+  };
+  const handleOpenReview = (product: { id: string; name: string }, orderId: string) => {
+    setReviewModal({
+      isOpen: true,
+      product,
+      orderId
+    });
+  };
+  
+  // Add this function to refresh orders after review
+  const handleReviewSubmitted = () => {
+    fetchOrders(); // Refresh orders to show updated state
+  };
+  
+  // Add this helper function to check if order can be reviewed
+  const canReviewOrder = (order: Order) => {
+    return order.deliveryStatus === 'DELIVERED' && 
+           order.paymentStatus === 'CONFIRMED';
   };
 
   const formatDate = (dateString: string) => {
@@ -199,17 +227,27 @@ const Orders = () => {
                         <p className="text-sm text-muted-foreground">Total Amount</p>
                         <p className="font-medium text-primary">{formatPrice(order.totalAmount)}</p>
                       </div>
-                      <div className="flex items-end">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full"
-                          onClick={() => navigate(`/orders/${order.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                      </div>
+<div className="flex items-end gap-2">
+{!isProducer && canReviewOrder(order) && (
+  <Button 
+    variant="default" 
+    size="sm"
+    onClick={() => handleOpenReview(order.items[0].product, order.id)}
+  >
+    <Star className="h-4 w-4 mr-2" />
+    Review
+  </Button>
+)}
+<Button 
+  variant="outline" 
+  size="sm" 
+  className={!isProducer && canReviewOrder(order) ? "flex-1" : "w-full"}
+  onClick={() => navigate(`/orders/${order.id}`)}
+>
+  <Eye className="h-4 w-4 mr-2" />
+  View Details
+</Button>
+</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -237,6 +275,15 @@ const Orders = () => {
           </main>
         </div>
       </div>
+      {reviewModal.isOpen && reviewModal.product && (
+  <ReviewModal
+    isOpen={reviewModal.isOpen}
+    onClose={() => setReviewModal({ isOpen: false, product: null, orderId: null })}
+    product={reviewModal.product}
+    orderId={reviewModal.orderId}
+    onReviewSubmitted={handleReviewSubmitted}
+  />
+)}
     </SidebarProvider>
   );
 };
