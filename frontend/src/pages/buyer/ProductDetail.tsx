@@ -372,7 +372,6 @@ const ProductDetail = () => {
               </Card>
             )}
 
-// In ProductDetail.tsx - Replace the Action Buttons section
 {/* Action Buttons */}
 <div className="flex gap-3 mb-4 flex-wrap">
   {isAuthenticated && user?.role === 'BUYER' ? (

@@ -98,18 +98,23 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product (PRODUCER only)
+
 router.post(
   '/',
   authenticateToken,
   requireRole(['PRODUCER']),
   upload.array('images', 5),
   async (req, res) => {
+    // ✅ Define variables at the top
+    let ipfsRecords = [];
+    let imageCids = [];
+
     try {
       console.log('🔧 Creating product for user:', req.user.id);
       console.log('🔧 Product data:', req.body);
       console.log(`🔧 Files received: ${req.files?.length || 0}`);
 
-      const { name, description, price, category, quantity, region, unit } = req.body;
+      const { name, description, price, category, quantity } = req.body;
 
       // Validate required fields
       if (!name || !price || !category || !quantity) {
@@ -119,10 +124,7 @@ router.post(
         });
       }
 
-      let imageCids = [];
-      let ipfsRecords = [];
-
-      // ✅ Upload multiple images to IPFS if provided
+      // ✅ UPLOAD IMAGES TO IPFS
       if (req.files && req.files.length > 0) {
         console.log('🔧 Uploading images to IPFS...');
         for (const file of req.files) {
@@ -131,6 +133,7 @@ router.post(
             file.originalname,
             'PRODUCT_IMAGE',
             req.user.id
+            // Don't pass productId yet - product doesn't exist
           );
 
           if (uploadResult.success) {
@@ -143,32 +146,26 @@ router.post(
         }
       }
 
-      // ✅ DEBUG: Check current state before product creation
       console.log('🔍 DEBUG - Before product creation:');
       console.log('🔍 imageCids:', imageCids);
-      console.log('🔍 ipfsRecords:', ipfsRecords.map(r => ({ id: r.id, cid: r.cid, productId: r.productId })));
+      console.log('🔍 ipfsRecords:', ipfsRecords.map(r => ({ id: r.id, cid: r.cid })));
 
-      // Check current state of IPFS files in database
-      const dbFiles = await prisma.iPFSMetadata.findMany({
-        where: { cid: { in: imageCids } },
-        select: { id: true, cid: true, productId: true }
-      });
-      console.log('🔍 Files in database before product creation:', dbFiles);
-
-      // ✅ Create product
+      // ✅ CREATE PRODUCT WITH IMAGE URLS
       const productData = {
         name,
         description: description || '',
         price: parseFloat(price),
         category,
-        quantity: parseInt(quantity),
+        quantityAvailable: parseInt(quantity), // ✅ Maps to quantityAvailable in service
         producerId: req.user.id,
-        imageCids // Pass the CIDs to the service
+        imageCids // ✅ Pass the CIDs to create proper imageUrl
       };
+
+      console.log('🔧 Creating product with data:', productData);
 
       const product = await productService.createProduct(productData);
 
-      // ✅ CRITICAL: Update IPFS records with the product ID
+      // ✅ LINK IPFS RECORDS TO PRODUCT
       if (ipfsRecords.length > 0) {
         console.log('🔗 Linking IPFS files to product:', product.id);
         
@@ -177,7 +174,9 @@ router.post(
           ipfsRecords.map(record =>
             prisma.iPFSMetadata.update({
               where: { id: record.id },
-              data: { productId: product.id }
+              data: { 
+                product: { connect: { id: product.id } } // ✅ Use relation connection
+              }
             })
           )
         );
@@ -198,17 +197,23 @@ router.post(
         console.log('✅ Product IPFS files after linking:', productWithFiles.ipfsFiles.map(f => f.cid));
       }
 
-      console.log('✅ Product created successfully:', product.id);
+      console.log('✅ Product created successfully:', {
+        id: product.id,
+        name: product.name,
+        imageUrl: product.imageUrl,
+        hasImages: !!product.imageUrl
+      });
 
       res.status(201).json({
         status: 'success',
         message: 'Product created successfully',
         data: product
       });
+
     } catch (error) {
       console.error('Create product error:', error);
 
-      // Cleanup: If product creation fails, delete any IPFS records that were created
+      // ✅ CLEANUP: Delete IPFS records if product creation fails
       if (ipfsRecords && ipfsRecords.length > 0) {
         console.log('🧹 Cleaning up IPFS records due to error');
         try {
@@ -217,11 +222,13 @@ router.post(
               prisma.iPFSMetadata.delete({ where: { id: record.id } })
             )
           );
+          console.log('✅ Cleanup completed');
         } catch (cleanupError) {
           console.error('Cleanup error:', cleanupError);
         }
       }
 
+      // Handle specific errors
       if (error.code === 'P2002') {
         return res.status(400).json({
           status: 'error',
@@ -238,15 +245,16 @@ router.post(
   }
 );
 
-
 // Update product (Owner only)
-router.put('/:id', authenticateToken, upload.single('image'), async (req, res) => {
+
+router.put('/:id', authenticateToken, upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, price, category, quantity } = req.body;
 
     console.log('🔧 Updating product:', id);
     console.log('🔧 Update data:', { name, description, price, category, quantity });
+    console.log('🔧 Files received:', req.files?.length || 0);
 
     // Check if product exists
     const existingProduct = await productService.getProductById(id);
@@ -257,7 +265,7 @@ router.put('/:id', authenticateToken, upload.single('image'), async (req, res) =
       });
     }
 
-    // Check ownership - we need to compare the producer user ID
+    // Check ownership
     const { prisma } = require('../config/database');
     const producer = await prisma.producer.findUnique({
       where: { id: existingProduct.producer.id }
@@ -270,45 +278,53 @@ router.put('/:id', authenticateToken, upload.single('image'), async (req, res) =
       });
     }
 
-    let imageCid = existingProduct.imageCid;
-    let ipfsRecord = null;
+    let imageCid = null;
+    let ipfsRecords = [];
 
-    // Upload new image to IPFS if provided
-    if (req.file) {
-      console.log('🔧 Uploading new image to IPFS...');
-      const uploadResult = await ipfsService.uploadFile(
-        req.file.buffer,
-        req.file.originalname,
-        'PRODUCT_IMAGE',
-        req.user.id,
-        id
-      );
+    // ✅ UPLOAD NEW IMAGES TO IPFS IF PROVIDED
+    if (req.files && req.files.length > 0) {
+      console.log('🔧 Uploading new images to IPFS...');
+      
+      for (const file of req.files) {
+        const uploadResult = await ipfsService.uploadFile(
+          file.buffer,
+          file.originalname,
+          'PRODUCT_IMAGE',
+          req.user.id,
+          id // Now we have product ID
+        );
 
-      if (!uploadResult.success) {
-        return res.status(500).json({
-          status: 'error',
-          message: 'Failed to upload product image',
-          error: uploadResult.error
-        });
+        if (uploadResult.success) {
+          imageCid = uploadResult.cid; // Use the last uploaded image
+          ipfsRecords.push(uploadResult.ipfsRecord);
+          console.log('✅ New image uploaded to IPFS:', imageCid);
+        } else {
+          console.warn('⚠️ Failed to upload image:', uploadResult.error);
+        }
       }
-
-      imageCid = uploadResult.cid;
-      ipfsRecord = uploadResult.ipfsRecord;
-      console.log('✅ New image uploaded to IPFS:', imageCid);
     }
 
-    // Prepare update data
+    // ✅ PREPARE UPDATE DATA
     const updateData = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (price) updateData.price = parseFloat(price);
     if (category) updateData.category = category;
     if (quantity !== undefined) updateData.quantity = parseInt(quantity);
-    if (imageCid) updateData.imageCid = imageCid;
+    
+    // ✅ SET IMAGE CID FOR SERVICE TO CREATE PROPER IMAGE URL
+    if (imageCid) {
+      updateData.imageCid = imageCid;
+    }
+
+    console.log('🔧 Final update data for service:', updateData);
 
     const updatedProduct = await productService.updateProduct(id, updateData);
 
-    console.log('✅ Product updated successfully');
+    console.log('✅ Product updated successfully:', {
+      id: updatedProduct.id,
+      imageUrl: updatedProduct.imageUrl
+    });
 
     res.json({
       status: 'success',
@@ -325,7 +341,6 @@ router.put('/:id', authenticateToken, upload.single('image'), async (req, res) =
     });
   }
 });
-
 // Delete product (Owner only)
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
