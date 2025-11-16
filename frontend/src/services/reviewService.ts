@@ -77,7 +77,12 @@ class ReviewService {
     });
     return response;
   }
-
+  async getProducerReviews(page = 1, limit = 10) {
+    const response = await apiService.request('/reviews/producer/my-reviews', {
+      params: { page, limit }
+    });
+    return response.data;
+  }
   async getReviewStats(productId: string): Promise<ReviewStats> {
     const response = await apiService.request(`/reviews/product/${productId}/stats`);
     return response.data;

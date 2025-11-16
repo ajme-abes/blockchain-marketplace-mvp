@@ -238,5 +238,106 @@ router.get('/product/:productId/stats', async (req, res) => {
     });
   }
 });
+// ==================== GET PRODUCER REVIEWS ====================
+router.get('/producer/my-reviews', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Get producer profile
+    const producer = await prisma.producer.findUnique({
+      where: { userId: req.user.id },
+      include: {
+        products: {
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!producer) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Producer profile not found'
+      });
+    }
+
+    // Get product IDs for this producer
+    const productIds = producer.products.map(p => p.id);
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where: {
+          productId: { in: productIds }
+        },
+        include: {
+          buyer: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              category: true
+            }
+          }
+        },
+        orderBy: { reviewDate: 'desc' },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit)
+      }),
+      prisma.review.count({
+        where: {
+          productId: { in: productIds }
+        }
+      })
+    ]);
+
+    // Calculate statistics
+    const stats = {
+      total: total,
+      average: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    };
+
+    if (reviews.length > 0) {
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      stats.average = Math.round((totalRating / reviews.length) * 10) / 10;
+
+      // Calculate distribution
+      reviews.forEach(review => {
+        stats.distribution[review.rating]++;
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        reviews,
+        stats,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get producer reviews route error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get producer reviews'
+    });
+  }
+});
 
 module.exports = router;
