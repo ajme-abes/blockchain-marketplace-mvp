@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChat } from '@/contexts/ChatContext';
 import { useToast } from '@/hooks/use-toast';
 import { productService } from '@/services/productService';
 
@@ -92,6 +93,7 @@ const ProductDetail = () => {
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const { createProductChat, loading: chatLoading } = useChat();
   const { addToCart } = useCart(); 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +133,30 @@ const ProductDetail = () => {
       setLoading(false);
     }
   };
-
+  const handleProductChat = async () => {
+    if (!product?.id) return;
+  
+    try {
+      const chat = await createProductChat(product.id);
+      
+      toast({
+        title: "Chat opened!",
+        description: "You can now message the producer",
+      });
+  
+      setTimeout(() => {
+        navigate(`/chats?chat=${chat.id}`);
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('Failed to create product chat:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to open chat",
+        variant: "destructive",
+      });
+    }
+  };
   // Get all available images from the product
   const getAllImages = (product: ProductDetail): string[] => {
     const images: string[] = [];
@@ -427,12 +452,22 @@ const ProductDetail = () => {
     </Button>
   </Link>
   
-  {isAuthenticated && (
-    <Button variant="outline" size="lg" className="min-w-[140px]">
+{isAuthenticated && (
+  <Button 
+    variant="outline" 
+    size="lg" 
+    className="min-w-[140px]"
+    onClick={handleProductChat}
+    disabled={chatLoading}
+  >
+    {chatLoading ? (
+      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+    ) : (
       <MessageSquare className="h-4 w-4 mr-2" />
-      Chat
-    </Button>
-  )}
+    )}
+    Chat
+  </Button>
+)}
 </div>
 
             <div className="text-sm text-muted-foreground">

@@ -6,13 +6,14 @@ const hpp = require('hpp');
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute (shorter window)
+  max: 500, // Much higher limit for development
   message: {
     status: 'error',
     message: 'Too many requests from this IP, please try again later.'
   }
 });
+
 
 // Security headers middleware
 const securityHeaders = helmet({
