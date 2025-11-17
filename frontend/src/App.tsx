@@ -26,6 +26,7 @@ import Orders from "./pages/buyer/Orders";
 import Products from "./pages/producer/Products";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import ChangePassword from "./pages/auth/ChangePassword";
 import AddProduct from "./pages/producer/AddProduct";
 import EditProduct from "./pages/producer/EditProduct";
 import TransactionHistory from "./pages/producer/TransactionHistory";
@@ -187,6 +188,7 @@ const App = () => (
 
   <Route path="/forgot-password" element={<ForgotPassword />} />
 <Route path="/reset-password" element={<ResetPassword />} />
+<Route path="/change-password" element={<ChangePassword />} />
 <Route path="/products/add" element={
   <RoleRoute allowedRoles={['producer']}>
     <AddProduct />

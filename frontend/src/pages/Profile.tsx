@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, Save, ShieldCheck, Upload, MessageSquare, Loader2, MapPin, Mail, Phone } from 'lucide-react';
+import { Camera, Save, ShieldCheck, Upload, MessageSquare, Loader2, MapPin, Mail, Phone, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { userService } from '@/services/userService';
 
@@ -648,17 +648,18 @@ return (
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Change Password</p>
-                    <p className="text-sm text-muted-foreground">
-                      Update your password regularly for security
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={() => navigate("/change-password")}>
-                    Change
-                  </Button>
-                </div>
+<div className="flex items-center justify-between p-3 border rounded-lg">
+<div>
+  <p className="font-medium">Change Password</p>
+  <p className="text-sm text-muted-foreground">
+    Update your password regularly for security
+  </p>
+</div>
+<Button variant="outline" onClick={() => navigate("/change-password")} className="flex items-center gap-2">
+<Key className="h-4 w-4" />
+Change
+</Button>
+</div>
 
                 <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div>

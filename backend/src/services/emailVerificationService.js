@@ -11,7 +11,7 @@ class EmailVerificationService {
   }
 
   // Create and send verification email
-// In emailVerificationService.js - Enhanced version
+
 async sendVerificationEmail(user) {
   try {
     // Generate verification token
@@ -28,7 +28,7 @@ async sendVerificationEmail(user) {
     });
 
     // Create verification URL
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/verify-email?token=${verificationToken}`;
     
     const emailHtml = this.createVerificationEmailTemplate(user.name, verificationUrl);
     const emailText = `Verify your email for Blockchain Marketplace: ${verificationUrl}`;
@@ -45,7 +45,7 @@ async sendVerificationEmail(user) {
       if (typeof notificationService.sendEmail === 'function') {
         console.log('🔧 Using sendEmail method...');
         emailResult = await notificationService.sendEmail({
-          to: user.email,
+          to: user.email, // Use original stored email
           subject: 'Verify Your Email - Blockchain Marketplace',
           html: emailHtml,
           text: emailText
