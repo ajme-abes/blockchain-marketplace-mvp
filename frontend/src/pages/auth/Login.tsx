@@ -45,7 +45,7 @@ const Login = () => {
   };
 
   const handleForgotPassword = () => {
-    toast.info('Password reset feature coming soon!');
+    navigate('/forgot-password');
   };
 
   return (
@@ -151,13 +151,13 @@ const Login = () => {
               </label>
               
               <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium flex items-center space-x-1 transition-colors"
-              >
-                <Key className="h-3 w-3" />
-                <span>Forgot password?</span>
-              </button>
+  type="button"
+  onClick={handleForgotPassword}
+  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center space-x-1 transition-colors group"
+>
+  <Key className="h-3 w-3 transition-transform group-hover:scale-110" />
+  <span className="group-hover:underline">Forgot password?</span>
+</button>
             </div>
 
             {/* Login Button */}

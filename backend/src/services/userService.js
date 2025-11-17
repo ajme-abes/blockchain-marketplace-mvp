@@ -11,16 +11,25 @@ class UserService {
       
       const { email, password, name, phone, role, address } = userData;
       
-      // ✅ ENHANCED VALIDATION: Check for duplicate email AND phone
+      // ✅ FIX: Normalize email to lowercase for consistency
+      const normalizedEmail = email.toLowerCase().trim();
+      console.log('🔧 Normalized email:', { original: email, normalized: normalizedEmail });
+      
+      // ✅ ENHANCED VALIDATION: Check for duplicate email (case-insensitive)
       console.log('🔧 Checking for existing users...');
       
-      // Check if email already exists
-      const existingEmailUser = await prisma.user.findUnique({
-        where: { email }
+      // Check if email already exists (case-insensitive)
+      const existingEmailUser = await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: normalizedEmail,
+            mode: 'insensitive' // Case-insensitive search
+          }
+        }
       });
       
       if (existingEmailUser) {
-        console.log('❌ Email already exists:', email);
+        console.log('❌ Email already exists:', normalizedEmail);
         throw new Error('EMAIL_EXISTS');
       }
       
@@ -45,10 +54,10 @@ class UserService {
       const user = await prisma.$transaction(async (tx) => {
         console.log('🔧 Inside transaction - creating user...');
         
-        // Create main user
+        // ✅ FIX: Store normalized email in database
         const newUser = await tx.user.create({
           data: {
-            email,
+            email: normalizedEmail, // Store lowercase
             passwordHash,
             name,
             phone,
@@ -104,10 +113,10 @@ class UserService {
         };
       }
       
-      // Return user without password
+      // Return user without password (return original email for display)
       const response = {
         id: user.id,
-        email: user.email,
+        email: user.email, // This will be normalized (lowercase)
         name: user.name,
         phone: user.phone,
         role: user.role,
@@ -144,6 +153,23 @@ class UserService {
       console.log('🔧 createUserWithProfile called with:', { ...userData, password: '[HIDDEN]' });
       
       const { email, password, name, phone, role, address, businessName, location } = userData;
+      const normalizedEmail = email.toLowerCase().trim();
+    
+      // ✅ Check for existing user with normalized email
+      const existingEmailUser = await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: normalizedEmail,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      if (existingEmailUser) {
+        console.log('❌ Email already exists:', normalizedEmail);
+        throw new Error('EMAIL_EXISTS');
+      }
+      
       
       const passwordHash = await hashPassword(password);
       
@@ -152,10 +178,10 @@ class UserService {
       const user = await prisma.$transaction(async (tx) => {
         console.log('🔧 Inside profile transaction - creating user...');
         
-        // Create main user
+        // ✅ FIX: Store normalized email
         const newUser = await tx.user.create({
           data: {
-            email,
+            email: normalizedEmail,
             passwordHash,
             name,
             phone,
@@ -240,9 +266,12 @@ class UserService {
   
   async findUserByEmail(email) {
     try {
-      console.log('🔧 findUserByEmail called for:', email);
+      // ✅ FIX: Normalize email for querying
+      const normalizedEmail = email.toLowerCase().trim();
+      console.log('🔧 findUserByEmail called for:', { original: email, normalized: normalizedEmail });
+      
       return await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail }, // Query with normalized email
         select: {
           id: true,
           email: true,
@@ -252,7 +281,7 @@ class UserService {
           role: true,
           address: true,
           registrationDate: true,
-          emailVerified: true, // ADD THIS
+          emailVerified: true,
           producerProfile: {
             select: {
               id: true,
@@ -322,17 +351,20 @@ class UserService {
 
   async validatePassword(plainPassword, hashedPassword) {
     try {
-      return await verifyPassword(plainPassword, hashedPassword);
+      const bcrypt = require('bcryptjs');
+      return await bcrypt.compare(plainPassword, hashedPassword);
     } catch (error) {
-      console.error('❌ validatePassword error:', error);
+      console.error('❌ Password validation error:', error);
       throw error;
     }
   }
-
   async getUserForAuth(email) {
     try {
+      // ✅ FIX: Normalize email for authentication
+      const normalizedEmail = email.toLowerCase().trim();
+      
       return await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail }, // Query with normalized email
         include: {
           producerProfile: true,
           buyerProfile: true
@@ -343,6 +375,16 @@ class UserService {
       throw error;
     }
   }
+async hashPassword(password) {
+  try {
+    const bcrypt = require('bcryptjs');
+    const saltRounds = 12;
+    return await bcrypt.hash(password, saltRounds);
+  } catch (error) {
+    console.error('❌ Password hashing error:', error);
+    throw error;
+  }
+}
 
   async updateUserProfile(userId, updateData) {
     try {
