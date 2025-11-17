@@ -14,6 +14,7 @@ import {
   Info,
   Star,
   BarChart2,
+  History, // ADD THIS IMPORT
 } from 'lucide-react';
 import {
   Sidebar,
@@ -27,13 +28,13 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-// UPDATE THIS IMPORT - ADD AvatarImage
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Moon, Sun, Globe } from 'lucide-react';
+
 export const AppSidebar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -53,24 +54,20 @@ export const AppSidebar = () => {
     { title: 'My Products', url: '/my-products', icon: Package },
     { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
     { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
-    { title: 'Transaction History', url: '/producer/transactionhistory', icon: Package },
+    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, // Changed icon
     { title: 'Analytics', url: '/producer/analytics', icon: BarChart2 },
     { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
   ];
 
   const buyerLinks = [
     { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
+    { title: 'Purchase History', url: '/buyer/transactions', icon: History }, // ADDED THIS LINE
   ];
 
   const adminLinks = [
     { title: 'Manage Users', url: '/admin/users', icon: Users },
     { title: 'Manage Products', url: '/admin/products', icon: Wrench },
     { title: 'Disputes', url: '/admin/disputes', icon: Scale },
-  ];
-
-  // New: transaction links (visible to authenticated users)
-  const transactionLinks = [
-    { title: 'Transaction History', url: '/producer/transactionhistory', icon: Package },
   ];
 
   let roleLinks: typeof commonLinks = [];
@@ -82,25 +79,24 @@ export const AppSidebar = () => {
 
   return (
     <Sidebar className="border-r border-border">
-<SidebarHeader className="border-b border-border p-4">
-  <div className="flex items-center gap-3">
-    <Avatar>
-      {/* ADD AvatarImage WITH avatarUrl */}
-      <AvatarImage 
-        src={user?.avatarUrl} 
-        alt={user?.name}
-        className="object-cover"
-      />
-      <AvatarFallback className="bg-primary text-primary-foreground">
-        {user?.name[0]?.toUpperCase()}
-      </AvatarFallback>
-    </Avatar>
-    <div className="flex-1 min-w-0">
-      <div className="font-semibold truncate">{user?.name}</div>
-      <div className="text-xs text-muted-foreground capitalize">{user?.role}</div>
-    </div>
-  </div>
-</SidebarHeader>
+      <SidebarHeader className="border-b border-border p-4">
+        <div className="flex items-center gap-3">
+          <Avatar>
+            <AvatarImage 
+              src={user?.avatarUrl} 
+              alt={user?.name}
+              className="object-cover"
+            />
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {user?.name[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold truncate">{user?.name}</div>
+            <div className="text-xs text-muted-foreground capitalize">{user?.role}</div>
+          </div>
+        </div>
+      </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
@@ -124,31 +120,6 @@ export const AppSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Transactions group - Only for producers */}
-        {user && user.role === 'PRODUCER' && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Transactions</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {transactionLinks.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.url)}
-                      className="transition-smooth"
-                    >
-                      <Link to={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         {roleLinks.length > 0 && (
           <SidebarGroup>
