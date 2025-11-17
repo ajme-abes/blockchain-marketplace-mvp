@@ -73,7 +73,7 @@ const Products = () => {
   };
 
   const handleEditProduct = (productId: string) => {
-    navigate(`/producer/edit-product/${productId}`);
+    navigate(`/products/edit/${productId}`);
   };
 
   const handleViewProduct = (productId: string) => {

@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services/paymentService';
+import { useChat } from '@/contexts/ChatContext';
+import { MessageSquare, Loader2 } from 'lucide-react';
 import { 
   Package, 
   Truck, 
@@ -86,6 +88,7 @@ const OrderDetail = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { createOrderChat, loading: chatLoading } = useChat();
   const { toast } = useToast();
   
   const [order, setOrder] = useState<Order | null>(null);
@@ -174,6 +177,55 @@ const OrderDetail = () => {
         return <CheckCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
+    }
+  };
+  const handleContactSeller = async () => {
+    if (!orderId) return;
+  
+    try {
+      const chat = await createOrderChat(orderId);
+      
+      toast({
+        title: "Chat opened successfully!",
+        description: "Redirecting to messages...",
+      });
+  
+      // Small delay for better UX
+      setTimeout(() => {
+        navigate(`/chats?chat=${chat.id}`);
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('Failed to create order chat:', error);
+      toast({
+        title: "Error opening chat",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleSendMessage = async () => {
+    if (!orderId) return;
+  
+    try {
+      const chat = await createOrderChat(orderId);
+      
+      toast({
+        title: "Chat opened",
+        description: "You can now message the buyer",
+      });
+  
+      // Navigate to the chat
+      navigate(`/chats?chat=${chat.id}`);
+      
+    } catch (error: any) {
+      console.error('Failed to create order chat:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to open chat",
+        variant: "destructive",
+      });
     }
   };
 
@@ -521,40 +573,67 @@ const OrderDetail = () => {
                 </Card>
 
                 {/* Contact Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Contact Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {isProducer && order.buyer ? (
-                      <>
-                        <div>
-                          <p className="font-semibold">{order.buyer.user.name}</p>
-                          <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
-                          <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full">
-                          Send Message
-                        </Button>
-                      </>
-                    ) : order.items[0]?.product.producer && (
-                      <>
-                        <div>
-                          <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Contact: {order.items[0].product.producer.user.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {order.items[0].product.producer.user.email}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full">
-                          Contact Seller
-                        </Button>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+<Card>
+<CardHeader>
+  <CardTitle>Contact Information</CardTitle>
+</CardHeader>
+<CardContent className="space-y-3">
+  {isProducer && order.buyer ? (
+    <>
+      <div>
+        <p className="font-semibold">{order.buyer.user.name}</p>
+        <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
+        <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
+      </div>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="w-full"
+        onClick={handleSendMessage}
+        disabled={chatLoading}
+      >
+        {chatLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        ) : (
+          <MessageSquare className="h-4 w-4 mr-2" />
+        )}
+        Send Message
+      </Button>
+    </>
+  ) : order.items[0]?.product.producer && (
+    <>
+      <div>
+        <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
+        <p className="text-sm text-muted-foreground">
+          Contact: {order.items[0].product.producer.user.name}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {order.items[0].product.producer.user.email}
+        </p>
+      </div>
+<Button 
+  variant="outline" 
+  size="sm" 
+  className="w-full"
+  onClick={handleContactSeller}
+  disabled={chatLoading}
+>
+  {chatLoading ? (
+    <>
+      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+      Opening Chat...
+    </>
+  ) : (
+    <>
+      <MessageSquare className="h-4 w-4 mr-2" />
+      Contact Seller
+    </>
+  )}
+</Button>
+    </>
+  )}
+</CardContent>
+</Card>
               </div>
             </div>
           </main>

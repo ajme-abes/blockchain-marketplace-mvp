@@ -86,10 +86,7 @@ router.post('/register', async (req, res) => {
     }
 
     // If authService is available, generate token
-    console.log('🔧 Generating JWT token...');
-    const token = authService.generateAccessToken(user);
-    
-    console.log('✅ Token generated successfully');
+    console.log('✅ User registered successfully - NO TOKEN GENERATED (email verification required)');
 
     const userResponse = {
       id: user.id,
@@ -115,8 +112,7 @@ router.post('/register', async (req, res) => {
       status: 'success',
       message: successMessage,
       data: {
-        user: userResponse,
-        token: token
+        user: userResponse
       }
     });
 

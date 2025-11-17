@@ -17,10 +17,12 @@ const adminRoutes = require('./routes/admin');
 const ipfsRoutes = require('./routes/ipfs');
 const emailVerificationRoutes = require('./routes/emailVerification');
 const disputeRoutes = require('./routes/disputes');
+const chatRoutes = require('./routes/chat'); 
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
 
 // ==================== MIDDLEWARE (Order Matters!) ====================
 
@@ -33,7 +35,31 @@ app.use(securityMiddleware.auditMiddleware);
 app.use(helmet({
   crossOriginEmbedderPolicy: false // Allow external resources
 }));
-app.use(cors(securityMiddleware.corsOptions));
+app.use(cors({
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:8080', 
+      'http://localhost:8081',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:8081'
+    ];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -136,6 +162,8 @@ app.use('/api/ipfs', ipfsRoutes);
 app.use('/api/email-verification', emailVerificationRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/chat', chatRoutes); // Add this line
+
 // ==================== ERROR HANDLING ====================
 
 // 404 handler - Catch undefined routes

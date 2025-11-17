@@ -28,6 +28,9 @@ model User {
   resetTokenExpires        DateTime?
 
   // Relations
+  chatParticipants ChatParticipant[]
+  sentMessages     Message[]
+  messageReads     MessageRead[]
   producerProfile      Producer?
   buyerProfile         Buyer?
   orders               Order[]               @relation("UserOrders")
@@ -86,6 +89,7 @@ model Product {
   id                String        @id @default(uuid())
   name              String
   category          String
+  chats Chat[] @relation("ProductChats")
   price             Float
   quantityAvailable Int
   description       String?
@@ -120,6 +124,7 @@ model Order {
   paymentStatus    PaymentStatus  @default(PENDING)
   deliveryStatus   DeliveryStatus @default(PENDING)
   orderDate        DateTime       @default(now())
+  chat Chat? @relation("OrderChat")
   blockchainTxHash String?       @unique
   blockchainOrderId    String?   @unique  
   blockchainRecorded   Boolean?  @default(false)
@@ -481,7 +486,108 @@ model DisputeMessage {
   @@map("dispute_messages")
 }
 
-// Add these enums to your existing enums
+
+model Chat {
+  id           String         @id @default(uuid())
+  participants ChatParticipant[]
+  messages     Message[]
+  orderId      String?        @unique
+  order        Order?         @relation("OrderChat", fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product?       @relation("ProductChats", fields: [productId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lastMessageAt DateTime?
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([lastMessageAt])
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime @default(now())
+  lastReadAt DateTime?
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+  @@index([lastReadAt])
+  @@map("chat_participants")
+}
+
+model Message {
+  id           String         @id @default(uuid())
+  content      String
+  messageType  MessageType    @default(TEXT)
+  senderId     String
+  sender       User           @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  chatId       String
+  chat         Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  readBy       MessageRead[]
+  attachments  MessageAttachment[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@index([chatId, createdAt])
+  @@map("messages")
+}
+
+model MessageRead {
+  id         String   @id @default(uuid())
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt     DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@index([readAt])
+  @@map("message_reads")
+}
+
+model MessageAttachment {
+  id        String            @id @default(uuid())
+  messageId String
+  message   Message           @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName  String?
+  fileUrl   String
+  fileType  String
+  fileSize  Int?
+  ipfsCid   String?
+  createdAt DateTime          @default(now())
+
+  @@index([messageId])
+  @@index([fileType])
+  @@index([createdAt])
+  @@map("message_attachments")
+}
+
+// ENUMS
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum ChatType {
+  ORDER
+  PRODUCT_INQUIRY
+  GENERAL
+}
 enum DisputeStatus {
   OPEN
   UNDER_REVIEW
