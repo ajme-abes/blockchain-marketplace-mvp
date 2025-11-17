@@ -29,6 +29,8 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import AddProduct from "./pages/producer/AddProduct";
 import EditProduct from "./pages/producer/EditProduct";
 import TransactionHistory from "./pages/producer/TransactionHistory";
+import BuyerTransactionHistory from "./pages/buyer/BuyerTransactionHistory";
+import TransactionDetail from "./pages/common/TransactionDetail";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
@@ -168,6 +170,17 @@ const App = () => (
       <TransactionHistory />
     </RoleRoute>
   } />
+  <Route path="/buyer/transactions" element={
+  <RoleRoute allowedRoles={['buyer']}>
+    <BuyerTransactionHistory />
+  </RoleRoute>
+} />
+<Route path="/transaction/:transactionId" element={
+  <ProtectedRoute>
+    <TransactionDetail />
+  </ProtectedRoute>
+} />
+  
   <Route path="/producer/edit-product/:id" element={<EditProduct />} />
   <Route path="/verify-email" element={<VerifyEmail />} />
   <Route path="/verify-email-notice" element={<VerifyEmailNotice />} />

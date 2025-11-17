@@ -24,7 +24,7 @@ import { transactionService, Transaction, TransactionStats } from '@/services/tr
 import { useNavigate } from 'react-router-dom';
 import { exportToPDF } from '@/utils/exportUtils';
 
-const ProducerTransactionHistory = () => {
+const BuyerTransactionHistory = () => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -40,7 +40,7 @@ const ProducerTransactionHistory = () => {
   const loadTransactions = async () => {
     try {
       setLoading(true);
-      const response = await transactionService.getProducerTransactions();
+      const response = await transactionService.getBuyerTransactions();
       setTransactions(response.transactions);
       setStats(response.stats);
     } catch (error: any) {
@@ -58,24 +58,15 @@ const ProducerTransactionHistory = () => {
   const handleFilter = async () => {
     try {
       setLoading(true);
-  
       const filters: any = {};
-      if (dateRange.start) {
-        filters.startDate = new Date(dateRange.start + "T00:00:00Z").toISOString();
-      }
-      if (dateRange.end) {
-        filters.endDate = new Date(dateRange.end + "T23:59:59Z").toISOString();
-      }
-  
-      const response = await transactionService.getProducerTransactions(filters);
-  
-      // Correctly access nested data
-      const resData = response.data.data; // <-- notice the double 'data'
-      setTransactions(resData.transactions);
-      setStats(resData.stats);
-  
+      if (dateRange.start) filters.startDate = dateRange.start;
+      if (dateRange.end) filters.endDate = dateRange.end;
+      
+      const response = await transactionService.getBuyerTransactions(filters);
+      setTransactions(response.transactions);
+      setStats(response.stats);
     } catch (error: any) {
-      console.error("Filter transactions error:", error);
+      console.error('Filter transactions error:', error);
       toast({
         title: "Error",
         description: "Failed to filter transactions",
@@ -85,9 +76,6 @@ const ProducerTransactionHistory = () => {
       setLoading(false);
     }
   };
-  
-  
-  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -107,11 +95,11 @@ const ProducerTransactionHistory = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction =>
-    transaction.buyerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
     transaction.items.some(item => 
-      item.product.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+      item.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.producer?.toLowerCase().includes(searchQuery.toLowerCase())
+    ) ||
+    transaction.orderId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -120,11 +108,11 @@ const ProducerTransactionHistory = () => {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">
-            <PageHeader title="Transaction History" />
+            <PageHeader title="Purchase History" />
             <main className="flex-1 p-6 flex items-center justify-center">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                <p>Loading transactions...</p>
+                <p>Loading purchase history...</p>
               </div>
             </main>
           </div>
@@ -139,8 +127,8 @@ const ProducerTransactionHistory = () => {
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <PageHeader 
-            title="Transaction History" 
-            description="View your sales history and revenue analytics"
+            title="Purchase History" 
+            description="View your order history and transaction details"
           />
 
           <main className="flex-1 p-6">
@@ -150,8 +138,8 @@ const ProducerTransactionHistory = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                      <p className="text-2xl font-bold">{stats.totalRevenue || 0} ETB</p>
+                      <p className="text-sm font-medium text-muted-foreground">Total Spent</p>
+                      <p className="text-2xl font-bold">{stats.totalSpent || 0} ETB</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-green-500" />
                   </div>
@@ -161,8 +149,8 @@ const ProducerTransactionHistory = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Completed Sales</p>
-                      <p className="text-2xl font-bold">{stats.completedSales || 0}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Completed Orders</p>
+                      <p className="text-2xl font-bold">{stats.completedOrders || 0}</p>
                     </div>
                     <Calendar className="h-8 w-8 text-blue-500" />
                   </div>
@@ -172,8 +160,8 @@ const ProducerTransactionHistory = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Pending Payments</p>
-                      <p className="text-2xl font-bold">{stats.pendingSales || 0}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Pending Orders</p>
+                      <p className="text-2xl font-bold">{stats.pendingOrders || 0}</p>
                     </div>
                     <Filter className="h-8 w-8 text-orange-500" />
                   </div>
@@ -188,39 +176,27 @@ const ProducerTransactionHistory = () => {
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by buyer, order ID, or product..."
+                      placeholder="Search by product, producer, or order ID..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-10"
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      placeholder="Start Date"
-                      value={dateRange.start}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    />
-                    <Input
-                      type="date"
-                      placeholder="End Date"
-                      value={dateRange.end}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    />
-                    <Button variant="outline" onClick={handleFilter}>
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
-                    </Button>
-                    <Button variant="outline" onClick={loadTransactions}>
-                      Reset
-                    </Button>
-                    <Button 
-                         variant="outline"
-                         onClick={() => exportToPDF(transactions, 'Transaction History', stats, 'PRODUCER')}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Export PDF
-                    </Button>
-                  </div>
+  <Input type="date" placeholder="Start Date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} />
+  <Input type="date" placeholder="End Date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} />
+  <Button variant="outline" onClick={handleFilter}>
+    <Filter className="h-4 w-4 mr-2" /> Filter
+  </Button>
+  <Button variant="outline" onClick={loadTransactions}>Reset</Button>
+  <Button 
+    variant="outline" 
+    onClick={() => exportToPDF(transactions, 'Buyer Transaction History', stats)}
+  >
+    <Download className="h-4 w-4 mr-2" /> Export PDF
+  </Button>
+</div>
+
                 </div>
               </CardContent>
             </Card>
@@ -228,7 +204,7 @@ const ProducerTransactionHistory = () => {
             {/* Transactions Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Sales History</CardTitle>
+                <CardTitle>Purchase History</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -236,8 +212,8 @@ const ProducerTransactionHistory = () => {
                     <TableRow>
                       <TableHead>Transaction ID</TableHead>
                       <TableHead>Order ID</TableHead>
-                      <TableHead>Buyer</TableHead>
                       <TableHead>Products</TableHead>
+                      <TableHead>Producers</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
@@ -246,16 +222,24 @@ const ProducerTransactionHistory = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}   className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/transaction/${transaction.id}`)} >
+                      <TableRow key={transaction.id} className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/transaction/${transaction.id}`)}>
                         <TableCell className="font-medium">{transaction.id}</TableCell>
                         <TableCell>{transaction.orderId}</TableCell>
-                        <TableCell>{transaction.buyerName || 'Unknown Buyer'}</TableCell>
                         <TableCell>
                           <div className="max-w-[200px]">
                             {transaction.items.map((item, index) => (
                               <div key={index} className="text-sm">
                                 {item.product} (x{item.quantity})
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[150px]">
+                            {transaction.items.map((item, index) => (
+                              <div key={index} className="text-sm text-muted-foreground">
+                                {item.producer}
                               </div>
                             ))}
                           </div>
@@ -293,7 +277,7 @@ const ProducerTransactionHistory = () => {
                 {filteredTransactions.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     {transactions.length === 0 
-                      ? "No sales transactions yet" 
+                      ? "No purchase history yet" 
                       : "No transactions found for your search"
                     }
                   </div>
@@ -307,4 +291,4 @@ const ProducerTransactionHistory = () => {
   );
 };
 
-export default ProducerTransactionHistory;
+export default BuyerTransactionHistory;

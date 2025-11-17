@@ -135,7 +135,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ipfs', ipfsRoutes);
 app.use('/api/email-verification', emailVerificationRoutes);
 app.use('/api/disputes', disputeRoutes);
-
+app.use('/api/transactions', require('./routes/transactions'));
 // ==================== ERROR HANDLING ====================
 
 // 404 handler - Catch undefined routes
