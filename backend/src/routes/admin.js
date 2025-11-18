@@ -310,6 +310,56 @@ router.get('/analytics/payments', async (req, res) => {
   }
 });
 
+// ==================== ADMIN OVERVIEW (For Dashboard) ====================
+router.get('/overview', async (req, res) => {
+  try {
+    const { range = 'today' } = req.query;
+    
+    const result = await adminService.getEnhancedOverview(range);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin overview error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get admin overview'
+    });
+  }
+});
+// Helper function to map action to display text
+function mapActionToText(action) {
+  const actionMap = {
+    'USER_REGISTERED': 'New user registered',
+    'PRODUCT_CREATED': 'Product created',
+    'DISPUTE_RESOLVED': 'Dispute resolved',
+    'PAYMENT_CONFIRMED': 'Payment confirmed',
+    'ORDER_CREATED': 'New order placed'
+  };
+  return actionMap[action] || action;
+}
+
+// Helper function to map action to type
+function mapActionToType(action) {
+  const typeMap = {
+    'USER_REGISTERED': 'USER_REGISTERED',
+    'PRODUCT_CREATED': 'PRODUCT_APPROVED',
+    'DISPUTE_RESOLVED': 'DISPUTE_RESOLVED',
+    'PAYMENT_CONFIRMED': 'PAYMENT_VERIFIED',
+    'ORDER_CREATED': 'ORDER_CREATED'
+  };
+  return typeMap[action] || 'USER_REGISTERED';
+}
+
 // Helper function for payment success rate
 async function getPaymentSuccessRate() {
   const [successful, total] = await Promise.all([

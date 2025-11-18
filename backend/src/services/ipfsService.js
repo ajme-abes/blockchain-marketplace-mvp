@@ -137,7 +137,7 @@ class IPFSService {
             ...formData.getHeaders(),
             'Accept': 'application/json'
           },
-          timeout: 30000
+          timeout: 90000
         }
       );
 
