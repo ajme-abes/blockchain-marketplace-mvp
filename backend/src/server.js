@@ -20,6 +20,7 @@ const emailVerificationRoutes = require('./routes/emailVerification');
 const disputeRoutes = require('./routes/disputes');
 const chatRoutes = require('./routes/chat'); 
 const socketService = require('./services/socketService');
+const analyticsRoutes = require('./routes/analytics');
 
 require('dotenv').config();
 
@@ -233,6 +234,7 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/transactions', require('./routes/transactions'));
 // Chat routes (single registration)
 app.use('/api/chat', chatRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // ==================== UPLOAD / MULTER ERROR HANDLER ====================
 // Handle common multer / busboy errors so they don't bubble as 500s with obscure stack traces
