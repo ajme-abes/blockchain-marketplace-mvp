@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "seed:admin": "node scripts/seedAdmin.js",
+    "db:seed": "npm run seed:admin"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
