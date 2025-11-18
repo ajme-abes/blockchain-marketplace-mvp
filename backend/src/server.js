@@ -3,7 +3,7 @@ const cors = require('cors');
 const http = require('http'); 
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { testConnection } = require('./config/database');
+const dbModule = require('./config/database');
 const blockchainRoutes = require('./routes/blockchain');
 const userRoutes = require('./routes/user');
 const authRoutes = require('./routes/auth'); // NEW
@@ -27,6 +27,59 @@ const app = express();
 const server = http.createServer(app); 
 const PORT = process.env.PORT || 5000;
 
+// Ensure a Prisma (or DB) client is available to services that expect it.
+// If config/database exported a client (dbModule.prisma), reuse it.
+// Otherwise, try to create a PrismaClient fallback (if @prisma/client is installed).
+if (dbModule.prisma) {
+	global.prisma = dbModule.prisma;
+} else {
+	try {
+		const { PrismaClient } = require('@prisma/client');
+		// Only create a global instance once (helps with hot-reload / dev)
+		if (!global.prisma) global.prisma = new PrismaClient();
+	} catch (e) {
+		// eslint-disable-next-line no-console
+		console.warn('Prisma client not available from config/database and @prisma/client cannot be loaded. Some services may fail if they expect a Prisma client.', e?.message || e);
+		global.prisma = global.prisma || undefined;
+	}
+}
+
+// If chatService (or other services) exposes an initializer, pass the client so internal prisma references won't be undefined.
+try {
+	const chatService = require('./services/chatService');
+	if (chatService) {
+		if (typeof chatService.initialize === 'function') {
+			chatService.initialize(global.prisma);
+		} else if (typeof chatService.setPrisma === 'function') {
+			chatService.setPrisma(global.prisma);
+		} else if (typeof chatService.init === 'function') {
+			chatService.init(global.prisma);
+		}
+	}
+} catch (e) {
+	// Not fatal here; just log so we can see if chatService couldn't be initialized.
+	console.warn('Unable to automatically initialize chatService with prisma client:', e?.message || e);
+}
+
+// ===== Add testConnection fallback so routes and startup can call it =====
+const testConnection = dbModule.testConnection
+	|| dbModule.test_connection
+	|| (async () => {
+		// If a Prisma client is available, run a lightweight query to verify connection.
+		if (global.prisma && typeof global.prisma.$queryRaw === 'function') {
+			try {
+				// eslint-disable-next-line no-unused-vars
+				await global.prisma.$queryRaw`SELECT 1`;
+				return true;
+			} catch (err) {
+				console.warn('DB health check failed:', err?.message || err);
+				return false;
+			}
+		}
+		// No explicit test function and no prisma client -> treat as not connected.
+		return false;
+	});
+// =======================================================================
 
 // ==================== MIDDLEWARE (Order Matters!) ====================
 
@@ -67,8 +120,8 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // 3. Input Sanitization & Security
 app.use(securityMiddleware.sanitizeInput);
@@ -178,8 +231,36 @@ app.use('/api/ipfs', ipfsRoutes);
 app.use('/api/email-verification', emailVerificationRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/transactions', require('./routes/transactions'));
-app.use('/api/chat', chatRoutes); // Add this line
+// Chat routes (single registration)
 app.use('/api/chat', chatRoutes);
+
+// ==================== UPLOAD / MULTER ERROR HANDLER ====================
+// Handle common multer / busboy errors so they don't bubble as 500s with obscure stack traces
+app.use((err, req, res, next) => {
+	// Identify multer/busboy related errors by code or message patterns
+	const isMulterError = err && (
+		err.code === 'LIMIT_FILE_SIZE' ||
+		err.code === 'LIMIT_FIELD_VALUE' ||
+		err.code === 'LIMIT_FIELD_COUNT' ||
+		err.code === 'LIMIT_UNEXPECTED_FILE' ||
+		/Unexpected end of multipart data/i.test(err.message || '') ||
+		/Multipart: boundary not found/i.test(err.message || '') ||
+		/busboy/i.test(err.stack || '') ||
+		/write after end/i.test(err.message || '')
+	);
+
+	if (isMulterError) {
+		console.warn('🔧 File upload error:', { message: err.message, code: err.code, path: req.path, method: req.method });
+		return res.status(400).json({
+			status: 'error',
+			message: err.code === 'LIMIT_FILE_SIZE' ? 'Uploaded file is too large' : (err.message || 'Invalid file upload'),
+			timestamp: new Date().toISOString()
+		});
+	}
+
+	// Not a multer/busboy error — pass along to the global error handler
+	return next(err);
+});
 
 // ==================== ERROR HANDLING ====================
 
