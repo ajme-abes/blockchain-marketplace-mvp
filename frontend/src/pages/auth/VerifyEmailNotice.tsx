@@ -15,7 +15,17 @@ const VerifyEmailNotice = () => {
   const [isResending, setIsResending] = useState(false);
   const [resendCount, setResendCount] = useState(0);
   const [cooldown, setCooldown] = useState(0);
-  
+
+  // Simple client-side email validation
+  const isValidEmail = (e: string) => {
+    if (!e) return false;
+    const trimmed = e.trim();
+    if (trimmed === 'your email') return false;
+    // Basic RFC-like pattern (not exhaustive)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+  };
+  const validEmail = isValidEmail(email);
+
   // Get state from location
   const fromLogin = location.state?.fromLogin;
   const canResend = location.state?.canResend ?? true;
@@ -39,6 +49,10 @@ const VerifyEmailNotice = () => {
 
   const handleResendVerification = async () => {
     if (cooldown > 0 || !canResend) return;
+    if (!validEmail) {
+      toast.error('Unable to resend: invalid or missing email address.');
+      return;
+    }
 
     try {
       setIsResending(true);
@@ -49,7 +63,7 @@ const VerifyEmailNotice = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: email.trim() })
       });
       
       const result = await response.json();
@@ -182,7 +196,7 @@ const VerifyEmailNotice = () => {
           <div className="space-y-3">
             <Button
               onClick={handleResendVerification}
-              disabled={isResending || cooldown > 0 || !canResend}
+              disabled={isResending || cooldown > 0 || !canResend || !validEmail}
               className="w-full h-10 text-sm font-semibold rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {!canResend ? (
