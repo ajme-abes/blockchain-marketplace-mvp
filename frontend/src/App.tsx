@@ -49,6 +49,7 @@ import Unauthorized from "./pages/common/Unauthorized";
 import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { SocketProvider } from '@/contexts/SocketContext';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -98,6 +99,7 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
+        <SocketProvider>
           <CartProvider>
               <ChatProvider>
                  <TooltipProvider>
@@ -265,6 +267,7 @@ const App = () => (
           </TooltipProvider>
           </ChatProvider>
           </CartProvider>
+          </SocketProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

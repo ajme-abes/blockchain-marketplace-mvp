@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http'); 
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { testConnection } = require('./config/database');
@@ -18,9 +19,12 @@ const ipfsRoutes = require('./routes/ipfs');
 const emailVerificationRoutes = require('./routes/emailVerification');
 const disputeRoutes = require('./routes/disputes');
 const chatRoutes = require('./routes/chat'); 
+const socketService = require('./services/socketService');
+
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app); 
 const PORT = process.env.PORT || 5000;
 
 
@@ -30,6 +34,8 @@ const PORT = process.env.PORT || 5000;
 app.use(securityMiddleware.securityHeaders);
 app.use(securityMiddleware.limiter);
 app.use(securityMiddleware.auditMiddleware);
+
+socketService.initialize(server);
 
 // 2. Core Express Middleware
 app.use(helmet({
@@ -105,7 +111,8 @@ app.get('/api/health', (req, res) => {
       blockchain: 'Integrated',
       security: 'Enabled',
       notifications: 'Ready',
-      authentication: 'JWT Enabled' // UPDATED
+      authentication: 'JWT Enabled',
+      websocket: 'Active'
     }
   });
 });
@@ -141,6 +148,15 @@ app.get('/api/system-info', (req, res) => {
   });
 });
 
+app.get('/api/socket-test', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'Socket.io server is running',
+    websocket: 'Enabled',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ==================== API ROUTES ====================
 
 // Blockchain routes
@@ -163,6 +179,7 @@ app.use('/api/email-verification', emailVerificationRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/chat', chatRoutes); // Add this line
+app.use('/api/chat', chatRoutes);
 
 // ==================== ERROR HANDLING ====================
 
@@ -214,7 +231,8 @@ const startServer = async () => {
     jobService.startJobs();
     console.log('✅ Background jobs initialized');
 
-    app.listen(PORT, () => {
+    // ✅ FIX: Use server.listen instead of app.listen
+    server.listen(PORT, () => {
       console.log('\n' + '='.repeat(60));
       console.log('🚀 BLOCKCHAIN MARKETPLACE BACKEND STARTED SUCCESSFULLY!');
       console.log('='.repeat(60));
@@ -222,19 +240,21 @@ const startServer = async () => {
       console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Database: PostgreSQL + Prisma ORM`);
       console.log(`⛓️  Blockchain: Integrated (Polygon Mumbai ready)`);
-      console.log(`🔐 Authentication: JWT Enabled`); // UPDATED
+      console.log(`🔐 Authentication: JWT Enabled`);
+      console.log(`💬 WebSocket: Real-time chat enabled`); // ADD THIS
       console.log(`🛡️  Security: Enhanced protection enabled`);
       console.log('='.repeat(60));
       console.log('\n📋 Available Endpoints:');
       console.log(`   GET  /api/health           - System health check`);
       console.log(`   GET  /api/db-health        - Database status`);
       console.log(`   GET  /api/system-info      - System information`);
-      console.log(`   POST /api/auth/login       - User login`); // NEW
-      console.log(`   POST /api/auth/register    - User registration`); // NEW
-      console.log(`   GET  /api/auth/me          - Get current user`); // NEW
-      console.log(`   POST /api/auth/logout      - User logout`); // NEW
+      console.log(`   POST /api/auth/login       - User login`);
+      console.log(`   POST /api/auth/register    - User registration`);
+      console.log(`   GET  /api/auth/me          - Get current user`);
+      console.log(`   POST /api/auth/logout      - User logout`);
       console.log(`   GET  /api/users            - List all users (Admin)`);
       console.log(`   GET  /api/blockchain/status - Blockchain status`);
+      console.log(`   💬  WebSocket             - Real-time chat`); // ADD THIS
       console.log('='.repeat(60) + '\n');
     });
 
