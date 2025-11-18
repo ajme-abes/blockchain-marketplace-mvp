@@ -1,7 +1,8 @@
-// src/pages/common/Chats.tsx - UPDATED FOR NEW CHATCONTEXT
+// src/pages/common/Chats.tsx - UPDATED WITH WEB SOCKET STATUS
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useChat, Chat, Message } from '@/contexts/ChatContext';
+import { useChat, Chat } from '@/contexts/ChatContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -12,7 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Send, Paperclip, Smile, Loader2, MessageSquare } from 'lucide-react';
+import { 
+  Search, 
+  Send, 
+  Paperclip, 
+  Smile, 
+  Loader2, 
+  MessageSquare, 
+  Wifi, 
+  WifiOff, 
+  Circle 
+} from 'lucide-react';
 
 const Chats: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -29,9 +40,13 @@ const Chats: React.FC = () => {
     setCurrentChat,
     markMessagesAsRead
   } = useChat();
+  const { isConnected } = useSocket();
   
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chats on component mount
@@ -70,10 +85,21 @@ const Chats: React.FC = () => {
   const handleSendMessage = async () => {
     if (newMessage.trim() && currentChat) {
       try {
+        setSendingMessage(true);
+        const startTime = new Date();
+        
         await sendMessage(currentChat.id, newMessage);
         setNewMessage('');
+        setLastMessageTime(new Date());
+        
+        const endTime = new Date();
+        const duration = endTime.getTime() - startTime.getTime();
+        console.log(`✅ Message delivered in ${duration}ms via ${isConnected ? 'WebSocket' : 'HTTP'}`);
+        
       } catch (error) {
         console.error('Failed to send message:', error);
+      } finally {
+        setSendingMessage(false);
       }
     }
   };
@@ -156,13 +182,18 @@ const Chats: React.FC = () => {
   };
 
   const filteredChats = chats.filter(chat => {
+    // Add null checks
+    if (!chat) return false;
+    
     const otherUser = getOtherParticipant(chat);
     const lastMessage = getLastMessage(chat);
     
+    const searchTerm = searchQuery.toLowerCase();
+    
     return (
-      otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      getChatTitle(chat).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lastMessage?.content.toLowerCase().includes(searchQuery.toLowerCase())
+      (otherUser?.name && otherUser.name.toLowerCase().includes(searchTerm)) ||
+      (getChatTitle(chat) && getChatTitle(chat).toLowerCase().includes(searchTerm)) ||
+      (lastMessage?.content && lastMessage.content.toLowerCase().includes(searchTerm))
     );
   });
 
@@ -180,6 +211,27 @@ const Chats: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Badge variant={isConnected ? "default" : "secondary"} className="flex items-center gap-1">
+              {isConnected ? (
+                <>
+                  <Wifi className="h-3 w-3" />
+                  <span>Real-time</span>
+                  <Circle className="h-2 w-2 fill-green-500 text-green-500 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3" />
+                  <span>Offline</span>
+                </>
+              )}
+            </Badge>
+            
+            {lastMessageTime && (
+              <Badge variant="outline" className="text-xs">
+                Last: {formatTime(lastMessageTime.toISOString())}
+              </Badge>
+            )}
+            
             <Button variant="outline" onClick={loadUserChats} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
             </Button>
@@ -362,7 +414,10 @@ const Chats: React.FC = () => {
                             >
                               {formatTime(message.createdAt)}
                               {isOwnMessage && message.readBy.length > 0 && (
-                                <span className="text-xs">✓ Read</span>
+                                <span className="text-green-400">✓ Read</span>
+                              )}
+                              {isOwnMessage && message.readBy.length === 0 && (
+                                <span className="text-blue-400">✓ Delivered</span>
                               )}
                             </div>
                           </div>
@@ -375,26 +430,60 @@ const Chats: React.FC = () => {
 
                 {/* Message Input */}
                 <div className="border-t p-4">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     <Button variant="ghost" size="icon">
                       <Paperclip className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon">
                       <Smile className="h-4 w-4" />
                     </Button>
-                    <Input
-                      placeholder="Type your message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="flex-1"
-                    />
+                    
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder={isConnected ? "Type your message (real-time)..." : "Type your message (offline mode)..."}
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="pr-10"
+                        disabled={sendingMessage}
+                      />
+                      
+                      {sendingMessage && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    
                     <Button 
                       onClick={handleSendMessage}
-                      disabled={!newMessage.trim() || loading}
+                      disabled={!newMessage.trim() || sendingMessage}
+                      className="min-w-[80px]"
                     >
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {sendingMessage ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-1" />
+                          Send
+                        </>
+                      )}
                     </Button>
+                  </div>
+                  
+                  {/* Connection Status Info */}
+                  <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+                    {isConnected ? (
+                      <>
+                        <Circle className="h-2 w-2 fill-green-500 text-green-500 animate-pulse" />
+                        <span>Connected - Messages deliver instantly</span>
+                      </>
+                    ) : (
+                      <>
+                        <Circle className="h-2 w-2 fill-yellow-500 text-yellow-500" />
+                        <span>Offline - Using fallback mode</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>

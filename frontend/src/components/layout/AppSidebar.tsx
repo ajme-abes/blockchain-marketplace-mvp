@@ -52,7 +52,7 @@ export const AppSidebar = () => {
 
   const producerLinks = [
     { title: 'My Products', url: '/my-products', icon: Package },
-    { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
+    { title: 'Order Management', url: '/producer/orders', icon: ShoppingCart },
     { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
     { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, // Changed icon
     { title: 'Analytics', url: '/producer/analytics', icon: BarChart2 },
