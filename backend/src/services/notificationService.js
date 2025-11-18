@@ -637,7 +637,7 @@ class NotificationService {
               <p style="margin: 0; font-size: 16px;">${message}</p>
             </div>
             <p>Thank you for choosing our marketplace for secure and transparent transactions.</p>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard" class="button">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:8080'}/dashboard" class="button">
               View Dashboard
             </a>
           </div>
@@ -661,7 +661,7 @@ ${message}
 
 Thank you for choosing Blockchain Marketplace for secure and transparent transactions.
 
-View your dashboard: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard
+View your dashboard: ${process.env.FRONTEND_URL || 'http://localhost:8080'}/dashboard
 
 This is an automated message. Please do not reply to this email.
 
