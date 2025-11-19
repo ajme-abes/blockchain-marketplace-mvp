@@ -253,8 +253,9 @@ class AdminService {
           { email: { contains: search, mode: 'insensitive' } }
         ]
       } : {};
-
+  
       const [users, total] = await Promise.all([
+        // FIXED: Use proper relation queries
         prisma.user.findMany({
           where: whereClause,
           select: {
@@ -264,17 +265,21 @@ class AdminService {
             phone: true,
             role: true,
             registrationDate: true,
-            buyer: {
+            address: true,
+            region: true,
+            // CORRECT: Use include for relations, not select
+            buyerProfile: {
               select: {
                 id: true,
                 preferredPaymentMethod: true
               }
             },
-            producer: {
+            producerProfile: {
               select: {
                 id: true,
                 businessName: true,
-                verificationStatus: true
+                verificationStatus: true,
+                location: true
               }
             }
           },
@@ -284,11 +289,34 @@ class AdminService {
         }),
         prisma.user.count({ where: whereClause })
       ]);
-
+  
+      // Transform the data to match frontend expectations
+      const transformedUsers = users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        registrationDate: user.registrationDate,
+        address: user.address,
+        region: user.region,
+        // Map to the expected frontend structure
+        buyer: user.buyerProfile ? {
+          id: user.buyerProfile.id,
+          preferredPaymentMethod: user.buyerProfile.preferredPaymentMethod
+        } : undefined,
+        producer: user.producerProfile ? {
+          id: user.producerProfile.id,
+          businessName: user.producerProfile.businessName,
+          verificationStatus: user.producerProfile.verificationStatus,
+          location: user.producerProfile.location
+        } : undefined
+      }));
+  
       return {
         success: true,
         data: {
-          users,
+          users: transformedUsers,
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
@@ -305,7 +333,6 @@ class AdminService {
       };
     }
   }
-
   // ==================== PRODUCER VERIFICATION ====================
   async updateProducerVerification(producerId, status, adminId) {
     try {

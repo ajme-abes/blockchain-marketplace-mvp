@@ -259,13 +259,13 @@ const AdminDashboard = () => {
       description: 'Active system notifications'
     },
     { 
-      title: 'Platform Revenue', 
+      title: 'Transaction Volume', 
       value: `ETB ${(overview.totalRevenue / 1000000).toFixed(1)}M`, 
       change: `${overview.revenueGrowth > 0 ? '+' : ''}${overview.revenueGrowth}%`, 
       icon: TrendingUp, 
       color: 'text-emerald-600',
       trend: overview.revenueGrowth > 0 ? 'up' : 'down',
-      description: 'Total transaction volume'
+      description: 'Total marketplace transactions'
     },
   ] : [];
 
