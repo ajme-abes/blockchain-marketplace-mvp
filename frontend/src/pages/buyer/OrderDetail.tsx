@@ -28,6 +28,8 @@ import {
   Calendar
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AlertTriangle, Upload, X, AlertCircle } from 'lucide-react';
+import { disputeService } from '@/services/disputeService';
 
 interface Order {
   id: string;
@@ -75,6 +77,11 @@ interface Order {
     reason?: string;
     timestamp: string;
   }>;
+  dispute?: {
+    id: string;
+    status: string;
+    reason: string;
+  };
 }
 
 interface PaymentStatus {
@@ -83,6 +90,66 @@ interface PaymentStatus {
   confirmedAt?: string;
   transactionHash?: string;
 }
+
+interface DisputeFormData {
+  reason: string;
+  description: string;
+  desiredResolution: string;
+  evidence: File[];
+}
+
+interface DisputeReason {
+  value: string;
+  label: string;
+  description: string;
+}
+
+// Add these constants after the interfaces
+const DISPUTE_REASONS: DisputeReason[] = [
+  {
+    value: 'NOT_DELIVERED',
+    label: 'Order Not Delivered',
+    description: 'Order was not delivered within expected timeframe'
+  },
+  {
+    value: 'WRONG_ITEM',
+    label: 'Wrong Item Received',
+    description: 'Received different product than ordered'
+  },
+  {
+    value: 'DAMAGED',
+    label: 'Damaged Product',
+    description: 'Product arrived damaged or defective'
+  },
+  {
+    value: 'QUALITY_ISSUE',
+    label: 'Quality Issue',
+    description: 'Product quality does not match description'
+  },
+  {
+    value: 'QUANTITY_MISMATCH',
+    label: 'Quantity Mismatch',
+    description: 'Received wrong quantity of items'
+  },
+  {
+    value: 'NO_COMMUNICATION',
+    label: 'No Communication',
+    description: 'Seller is not responding to messages'
+  },
+  {
+    value: 'OTHER',
+    label: 'Other Issue',
+    description: 'Other problem with this order'
+  }
+];
+
+const RESOLUTION_OPTIONS = [
+  'Full Refund',
+  'Partial Refund',
+  'Replacement',
+  'Store Credit',
+  'Other Resolution'
+];
 
 const OrderDetail = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -95,6 +162,16 @@ const OrderDetail = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [creatingDispute, setCreatingDispute] = useState(false);
+  const [disputeForm, setDisputeForm] = useState<DisputeFormData>({
+    reason: '',
+    description: '',
+    desiredResolution: '',
+    evidence: []
+  });
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [checkingDispute, setCheckingDispute] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -179,6 +256,7 @@ const OrderDetail = () => {
         return <Clock className="h-4 w-4" />;
     }
   };
+
   const handleContactSeller = async () => {
     if (!orderId) return;
   
@@ -202,6 +280,34 @@ const OrderDetail = () => {
         description: error.message || "Please try again",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDisputeChat = async () => {
+    if (!orderId || !order?.dispute) return;
+
+    try {
+      setCheckingDispute(true);
+      
+      // First, get the dispute details to find the dispute chat
+      const disputeResult = await disputeService.getDisputeDetails(order.dispute.id);
+      
+      if (disputeResult.status === 'success' && disputeResult.data) {
+        // Navigate to dispute management page with the dispute ID
+        navigate(`/disputes/${order.dispute.id}`);
+      } else {
+        throw new Error('Could not access dispute details');
+      }
+      
+    } catch (error: any) {
+      console.error('Failed to open dispute chat:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to open dispute chat",
+        variant: "destructive",
+      });
+    } finally {
+      setCheckingDispute(false);
     }
   };
   
@@ -246,6 +352,135 @@ const OrderDetail = () => {
   const getPolygonscanUrl = (txHash: string) => {
     return `https://amoy.polygonscan.com/tx/${txHash}`;
   };
+
+  const handleOpenDisputeModal = () => {
+    if (!order) return;
+    
+    // Check if dispute can be raised (order must be confirmed/delivered and not already disputed)
+    if (order.deliveryStatus === 'PENDING') {
+      toast({
+        title: "Cannot Raise Dispute",
+        description: "You can only raise disputes for confirmed or delivered orders",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if dispute already exists
+    if (order.dispute) {
+      toast({
+        title: "Dispute Already Exists",
+        description: "A dispute has already been raised for this order",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setShowDisputeModal(true);
+  };
+  
+  const handleEvidenceUpload = (files: FileList | null) => {
+    if (!files) return;
+    
+    const newFiles = Array.from(files);
+    const validFiles = newFiles.filter(file => {
+      const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf';
+      const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
+      
+      if (!isValidType) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload images or PDF files only",
+          variant: "destructive",
+        });
+      }
+      if (!isValidSize) {
+        toast({
+          title: "File too large",
+          description: "Please upload files smaller than 10MB",
+          variant: "destructive",
+        });
+      }
+      
+      return isValidType && isValidSize;
+    });
+    
+    setDisputeForm(prev => ({
+      ...prev,
+      evidence: [...prev.evidence, ...validFiles]
+    }));
+  };
+  
+  const removeEvidence = (index: number) => {
+    setDisputeForm(prev => ({
+      ...prev,
+      evidence: prev.evidence.filter((_, i) => i !== index)
+    }));
+  };
+  
+  const handleCreateDispute = async () => {
+    if (!orderId || !disputeForm.reason || !disputeForm.description) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    try {
+      setCreatingDispute(true);
+      setUploadProgress(0);
+  
+      const formData = new FormData();
+      formData.append('orderId', orderId);
+      formData.append('reason', disputeForm.reason);
+      formData.append('description', disputeForm.description);
+      formData.append('desiredResolution', disputeForm.desiredResolution);
+  
+      // Add evidence files
+      disputeForm.evidence.forEach((file, index) => {
+        formData.append(`evidence`, file);
+      });
+  
+      const result = await disputeService.createDispute(formData, (progress) => {
+        setUploadProgress(progress);
+      });
+  
+      if (result.status === 'error') {
+        throw new Error(result.message);
+      }
+  
+      toast({
+        title: "Dispute Raised Successfully",
+        description: "Your dispute has been submitted and will be reviewed shortly",
+      });
+  
+      setShowDisputeModal(false);
+      setDisputeForm({
+        reason: '',
+        description: '',
+        desiredResolution: '',
+        evidence: []
+      });
+  
+      // Refresh order details to show the new dispute
+      fetchOrderDetails();
+  
+    } catch (error: any) {
+      console.error('Failed to create dispute:', error);
+      toast({
+        title: "Failed to Raise Dispute",
+        description: error.message || "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingDispute(false);
+      setUploadProgress(0);
+    }
+  };
+  
+  const selectedReason = DISPUTE_REASONS.find(r => r.value === disputeForm.reason);
 
   if (loading) {
     return (
@@ -292,6 +527,7 @@ const OrderDetail = () => {
 
   const isProducer = user?.role === 'PRODUCER';
   const canUpdateStatus = isProducer || user?.role === 'ADMIN';
+  const hasActiveDispute = order.dispute && order.dispute.status !== 'RESOLVED' && order.dispute.status !== 'CANCELLED';
 
   return (
     <SidebarProvider>
@@ -319,6 +555,12 @@ const OrderDetail = () => {
                     <CardTitle className="flex items-center gap-2">
                       <Package className="h-5 w-5" />
                       Order Status
+                      {hasActiveDispute && (
+                        <Badge variant="destructive" className="ml-2">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Dispute: {order.dispute?.status}
+                        </Badge>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -573,72 +815,313 @@ const OrderDetail = () => {
                 </Card>
 
                 {/* Contact Information */}
+
 <Card>
-<CardHeader>
-  <CardTitle>Contact Information</CardTitle>
-</CardHeader>
-<CardContent className="space-y-3">
-  {isProducer && order.buyer ? (
-    <>
-      <div>
-        <p className="font-semibold">{order.buyer.user.name}</p>
-        <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
-        <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
-      </div>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="w-full"
-        onClick={handleSendMessage}
-        disabled={chatLoading}
-      >
-        {chatLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        ) : (
-          <MessageSquare className="h-4 w-4 mr-2" />
+  <CardHeader>
+    <CardTitle>Contact & Support</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    {isProducer && order?.buyer ? (
+      <>
+        <div>
+          <p className="font-semibold">{order.buyer.user.name}</p>
+          <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
+          <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full"
+          onClick={handleSendMessage}
+          disabled={chatLoading}
+        >
+          {chatLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <MessageSquare className="h-4 w-4 mr-2" />
+          )}
+          Send Message
+        </Button>
+
+        {/* Show Dispute Chat if dispute exists */}
+        {order.dispute && (
+          <>
+            <Separator className="my-2" />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+              onClick={handleDisputeChat}
+              disabled={checkingDispute}
+            >
+              {checkingDispute ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <AlertCircle className="h-4 w-4 mr-2" />
+              )}
+              Dispute Chat ({order.dispute.status})
+            </Button>
+          </>
         )}
-        Send Message
-      </Button>
-    </>
-  ) : order.items[0]?.product.producer && (
-    <>
-      <div>
-        <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
-        <p className="text-sm text-muted-foreground">
-          Contact: {order.items[0].product.producer.user.name}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {order.items[0].product.producer.user.email}
-        </p>
-      </div>
-<Button 
-  variant="outline" 
-  size="sm" 
-  className="w-full"
-  onClick={handleContactSeller}
-  disabled={chatLoading}
->
-  {chatLoading ? (
-    <>
-      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-      Opening Chat...
-    </>
-  ) : (
-    <>
-      <MessageSquare className="h-4 w-4 mr-2" />
-      Contact Seller
-    </>
-  )}
-</Button>
-    </>
-  )}
-</CardContent>
+      </>
+    ) : order?.items[0]?.product.producer && (
+      <>
+        <div>
+          <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
+          <p className="text-sm text-muted-foreground">
+            Contact: {order.items[0].product.producer.user.name}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {order.items[0].product.producer.user.email}
+          </p>
+        </div>
+        
+        {/* Regular Contact Button - ALWAYS SHOW */}
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full"
+          onClick={handleContactSeller}
+          disabled={chatLoading}
+        >
+          {chatLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Opening Chat...
+            </>
+          ) : (
+            <>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Contact Seller
+            </>
+          )}
+        </Button>
+        
+        {/* SIMPLIFIED DISPUTE BUTTON LOGIC */}
+        <Separator className="my-2" />
+        
+        {/* Show Dispute Chat if dispute exists */}
+        {order.dispute ? (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+            onClick={handleDisputeChat}
+            disabled={checkingDispute}
+          >
+            {checkingDispute ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <AlertCircle className="h-4 w-4 mr-2" />
+            )}
+            Dispute Chat ({order.dispute.status})
+          </Button>
+        ) : (
+          /* Show Raise Dispute button if no dispute exists */
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={handleOpenDisputeModal}
+            disabled={order.deliveryStatus === 'PENDING'}
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Raise Dispute
+            {order.deliveryStatus === 'PENDING' && (
+              <span className="ml-1 text-xs">(Available after confirmation)</span>
+            )}
+          </Button>
+        )}
+        
+        {/* Show info text if order is pending */}
+        {order.deliveryStatus === 'PENDING' && !order.dispute && (
+          <p className="text-xs text-muted-foreground text-center mt-1">
+            Disputes can be raised after order is confirmed
+          </p>
+        )}
+      </>
+    )}
+  </CardContent>
 </Card>
               </div>
             </div>
           </main>
         </div>
       </div>
+
+      {/* Dispute Creation Modal */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  Raise Dispute
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDisputeModal(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Order #{order?.id.slice(-8)} - {order?.items[0]?.product.name}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Dispute Reason */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Reason for Dispute *
+                </label>
+                <select
+                  value={disputeForm.reason}
+                  onChange={(e) => setDisputeForm(prev => ({ ...prev, reason: e.target.value }))}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="">Select a reason</option>
+                  {DISPUTE_REASONS.map(reason => (
+                    <option key={reason.value} value={reason.value}>
+                      {reason.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedReason && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedReason.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Detailed Description *
+                </label>
+                <textarea
+                  value={disputeForm.description}
+                  onChange={(e) => setDisputeForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Please describe the issue in detail..."
+                  className="w-full p-2 border rounded-md min-h-[100px]"
+                  required
+                />
+              </div>
+
+              {/* Desired Resolution */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Desired Resolution
+                </label>
+                <select
+                  value={disputeForm.desiredResolution}
+                  onChange={(e) => setDisputeForm(prev => ({ ...prev, desiredResolution: e.target.value }))}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Select desired resolution</option>
+                  {RESOLUTION_OPTIONS.map(option => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Evidence Upload */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Supporting Evidence
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleEvidenceUpload(e.target.files)}
+                    className="hidden"
+                    id="evidence-upload"
+                  />
+                  <label htmlFor="evidence-upload" className="cursor-pointer">
+                    <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600">
+                      Click to upload evidence (images, PDFs)
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Maximum 10MB per file
+                    </p>
+                  </label>
+                </div>
+
+                {/* Uploaded Files Preview */}
+                {disputeForm.evidence.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium">Uploaded Files:</p>
+                    {disputeForm.evidence.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <span className="text-sm truncate flex-1">{file.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeEvidence(index)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Progress */}
+              {creatingDispute && uploadProgress > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Uploading evidence...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDisputeModal(false)}
+                disabled={creatingDispute}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateDispute}
+                disabled={creatingDispute || !disputeForm.reason || !disputeForm.description}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {creatingDispute ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Submitting Dispute...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Submit Dispute
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </SidebarProvider>
   );
 };
