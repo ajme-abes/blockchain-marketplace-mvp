@@ -36,7 +36,13 @@ class AuthService {
     try {
       console.log('🔧 Creating session for user:', userId);
       
-      const token = this.generateAccessToken({ id: userId });
+        
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, role: true }
+      });
+
+      const token = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 

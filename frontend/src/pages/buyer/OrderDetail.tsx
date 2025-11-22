@@ -432,107 +432,29 @@ const OrderDetail = () => {
       setCreatingDispute(true);
       setUploadProgress(0);
   
-      console.log('🔄 [FRONTEND] Starting dispute creation...');
+      const formData = new FormData();
+      formData.append('orderId', orderId);
+      formData.append('reason', disputeForm.reason);
+      formData.append('description', disputeForm.description);
+      formData.append('desiredResolution', disputeForm.desiredResolution);
   
-      // First, create the dispute to get a real dispute ID
-      const disputeData = {
-        orderId,
-        reason: disputeForm.reason,
-        description: disputeForm.description,
-        desiredResolution: disputeForm.desiredResolution,
-      };
+      // Add evidence files
+      disputeForm.evidence.forEach((file, index) => {
+        formData.append(`evidence`, file);
+      });
   
-      console.log('📦 [FRONTEND] Creating dispute with data:', disputeData);
+      const result = await disputeService.createDispute(formData, (progress) => {
+        setUploadProgress(progress);
+      });
   
-      // Create the dispute first
-      const disputeResponse = await disputeService.createDispute(disputeData);
-  
-      console.log('✅ [FRONTEND] Dispute creation response:', disputeResponse);
-  
-      if (disputeResponse.status === 'error') {
-        throw new Error(disputeResponse.message);
+      if (result.status === 'error') {
+        throw new Error(result.message);
       }
   
-      if (!disputeResponse.data || !disputeResponse.data.id) {
-        throw new Error('Failed to create dispute - no dispute ID returned');
-      }
-  
-      const disputeId = disputeResponse.data.id;
-      console.log('🎉 [FRONTEND] Dispute created with ID:', disputeId);
-  
-      // Now upload evidence files using the REAL dispute ID
-      const evidenceFiles = disputeForm.evidence;
-      if (evidenceFiles.length > 0) {
-        console.log(`📎 [FRONTEND] Uploading ${evidenceFiles.length} evidence files to dispute ${disputeId}...`);
-        console.log('📁 Evidence files:', evidenceFiles);
-  
-        let uploadedCount = 0;
-        let failedUploads: string[] = [];
-        
-        for (let i = 0; i < evidenceFiles.length; i++) {
-          const file = evidenceFiles[i];
-          try {
-            console.log(`📤 [FRONTEND] Uploading file ${i + 1}/${evidenceFiles.length}:`, {
-              name: file.name,
-              size: file.size,
-              type: file.type
-            });
-            
-            // Update progress
-            const progress = Math.round(((i + 1) / evidenceFiles.length) * 100);
-            setUploadProgress(progress);
-  
-            // Use the REAL dispute ID
-            console.log(`🔄 [FRONTEND] Calling uploadEvidence with disputeId: ${disputeId}`);
-            
-            const uploadResult = await disputeService.uploadEvidence(
-              disputeId, // REAL dispute ID
-              file, 
-              `Evidence for dispute: ${disputeForm.reason}`
-            );
-  
-            console.log(`📤 [FRONTEND] Upload result:`, uploadResult);
-  
-            if (uploadResult.status === 'error') {
-              console.error(`❌ [FRONTEND] Failed to upload ${file.name}:`, uploadResult.message);
-              failedUploads.push(`${file.name}: ${uploadResult.message}`);
-            } else {
-              console.log(`✅ [FRONTEND] Successfully uploaded: ${file.name}`);
-              uploadedCount++;
-            }
-  
-          } catch (fileError: any) {
-            console.error(`❌ [FRONTEND] Error uploading ${file.name}:`, fileError);
-            failedUploads.push(`${file.name}: ${fileError.message}`);
-          }
-        }
-  
-        console.log(`✅ [FRONTEND] Completed evidence upload: ${uploadedCount}/${evidenceFiles.length} files`);
-        
-        // Show summary of upload results
-        if (failedUploads.length > 0) {
-          console.warn('⚠️ Some files failed to upload:', failedUploads);
-          toast({
-            title: "Partial Success",
-            description: `Dispute created but ${failedUploads.length} file(s) failed to upload. Check console for details.`,
-            variant: "destructive",
-          });
-        } else if (uploadedCount > 0) {
-          toast({
-            title: "Success",
-            description: `Dispute created with ${uploadedCount} evidence file(s)`,
-          });
-        }
-      } else {
-        // No evidence files
-        toast({
-          title: "Dispute Raised Successfully",
-          description: "Your dispute has been submitted without evidence files",
-        });
-      }
-  
-      // Final progress
-      setUploadProgress(100);
+      toast({
+        title: "Dispute Raised Successfully",
+        description: "Your dispute has been submitted and will be reviewed shortly",
+      });
   
       setShowDisputeModal(false);
       setDisputeForm({
