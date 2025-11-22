@@ -10,14 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ShieldCheck, Star, Filter, Search, X, Loader2 } from 'lucide-react';
+import { ShieldCheck, Star, Filter, Search, X, Loader2, ShoppingCart, Eye, Zap } from 'lucide-react';
 import { categories, regions } from '@/lib/mockData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { productService, Product } from '@/services/productService';
 import { useCart } from '@/contexts/CartContext';
-
 
 const Marketplace = () => {
   const { t } = useLanguage();
@@ -378,14 +377,14 @@ const Marketplace = () => {
                   return (
                     <Card
                       key={product.id}
-                      className="overflow-hidden shadow-card hover:shadow-glow transition-smooth"
+                      className="overflow-hidden shadow-card hover:shadow-lg transition-all duration-300 border border-gray-200 hover:border-primary/20"
                     >
                       <Link to={`/products/${product.id}`}>
-                        <div className="aspect-square overflow-hidden">
+                        <div className="aspect-square overflow-hidden bg-gray-100">
                           <img
                             src={getDisplayImage(product)}
                             alt={product.name}
-                            className="w-full h-full object-cover hover:scale-105 transition-smooth"
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                             onError={(e) => {
                               e.currentTarget.src = 'https://via.placeholder.com/300x300?text=Image+Not+Found';
@@ -396,123 +395,152 @@ const Marketplace = () => {
 
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-lg mb-1 line-clamp-1">{product.name}</h3>
-                            <p className="text-sm text-muted-foreground">by {getProducerName(product)}</p>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-lg mb-1 line-clamp-2 leading-tight">{product.name}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-1">by {getProducerName(product)}</p>
                           </div>
 
                           {product.verified && (
-                            <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0" />
+                            <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0 ml-2" />
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="secondary" className="capitalize">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          <Badge variant="secondary" className="capitalize text-xs">
                             {product.category}
                           </Badge>
-                          <Badge variant="outline">{product.region || 'Local'}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {product.region || 'Local'}
+                          </Badge>
 
                           <div className="flex items-center gap-1 text-sm ml-auto">
                             <Star
                               className={`h-4 w-4 ${
-                                ratingInfo.hasRating ? 'fill-accent text-accent' : 'text-muted-foreground'
+                                ratingInfo.hasRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
                               }`}
                             />
-                            <span className={ratingInfo.hasRating ? 'text-foreground' : 'text-muted-foreground'}>
+                            <span className={ratingInfo.hasRating ? 'text-foreground font-medium' : 'text-muted-foreground'}>
                               {ratingInfo.display}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
                             <div className="text-2xl font-bold text-primary">
-                              {product.price} ETB/{displayUnit}
+                              {product.price} ETB
                             </div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              In stock: <span className="font-medium text-foreground">{stock}</span> {displayUnit}
+                            <div className="text-sm text-muted-foreground">
+                              /{displayUnit}
                             </div>
                           </div>
-
-                          {/* optional small CTA or stock indicator */}
-                          <div className="text-sm text-right">
-                            {stock === 0 ? (
-                              <span className="text-destructive font-semibold">Out of stock</span>
-                            ) : stock < 5 ? (
-                              <span className="text-warning font-medium">{stock} left</span>
-                            ) : null}
+                          
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Stock:</span>
+                            <span className={`font-medium ${
+                              stock === 0 ? 'text-destructive' : 
+                              stock < 5 ? 'text-orange-500' : 'text-green-600'
+                            }`}>
+                              {stock === 0 ? 'Out of stock' : `${stock} ${displayUnit} available`}
+                            </span>
                           </div>
                         </div>
                       </CardContent>
 
-<CardFooter className="p-4 pt-0 flex gap-2">
-  {isAuthenticated && user?.role === 'BUYER' ? (
-    <>
-      {/* Add to Cart Button */}
-      <Button 
-        variant="outline" 
-        className="flex-1"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          addToCart({
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-            image: getDisplayImage(product),
-            category: product.category,
-            region: product.region || 'Local',
-            unit: product.unit || 'unit',
-            stock: product.stock || product.quantityAvailable || 0,
-            producerId: product.producer?.id || '',
-            producerName: getProducerName(product),
-          });
-        }}
-        disabled={!product.stock || product.stock === 0}
-      >
-        {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
-      </Button>
-      
-      {/* Buy Now Button */}
-      <Link to={`/products/${product.id}`} className="flex-1">
-        <Button variant="default" className="w-full">
-          Buy Now
-        </Button>
-      </Link>
-      
-      {/* View Details Button */}
-      <Link to={`/products/${product.id}`} className="flex-1">
-        <Button variant="secondary" className="w-full">
-          View Details
-        </Button>
-      </Link>
-    </>
-  ) : isAuthenticated && user?.role === 'PRODUCER' ? (
-    <>
-      {/* Producer sees only View Details */}
-      <Link to={`/products/${product.id}`} className="flex-1">
-        <Button variant="default" className="w-full">
-          View Details
-        </Button>
-      </Link>
-    </>
-  ) : (
-    <>
-      {/* Guest/Non-authenticated users */}
-      <Link to={`/products/${product.id}`} className="flex-1">
-        <Button variant="default" className="w-full">
-          View Details
-        </Button>
-      </Link>
-      <Link to="/login" className="flex-1">
-        <Button variant="secondary" className="w-full">
-          Login to Buy
-        </Button>
-      </Link>
-    </>
-  )}
-</CardFooter>
+                      <CardFooter className="p-4 pt-0">
+                        <div className="w-full space-y-2">
+                          {isAuthenticated && user?.role === 'BUYER' ? (
+                            <>
+                              <div className="grid grid-cols-3 gap-2">
+                                {/* Add to Cart Button */}
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="h-10 flex items-center gap-1"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    addToCart({
+                                      productId: product.id,
+                                      name: product.name,
+                                      price: product.price,
+                                      quantity: 1,
+                                      image: getDisplayImage(product),
+                                      category: product.category,
+                                      region: product.region || 'Local',
+                                      unit: product.unit || 'unit',
+                                      stock: product.stock || product.quantityAvailable || 0,
+                                      producerId: product.producer?.id || '',
+                                      producerName: getProducerName(product),
+                                    });
+                                    toast({
+                                      title: "Added to cart",
+                                      description: `${product.name} has been added to your cart`,
+                                    });
+                                  }}
+                                  disabled={!stock || stock === 0}
+                                >
+                                  <ShoppingCart className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Cart</span>
+                                </Button>
+                                
+                                {/* Buy Now Button */}
+                                <Link to={`/products/${product.id}`} className="block">
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    className="h-10 w-full flex items-center gap-1"
+                                  >
+                                    <Zap className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Buy</span>
+                                  </Button>
+                                </Link>
+                                
+                                {/* View Details Button */}
+                                <Link to={`/products/${product.id}`} className="block">
+                                  <Button 
+                                    variant="secondary" 
+                                    size="sm"
+                                    className="h-10 w-full flex items-center gap-1"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Details</span>
+                                  </Button>
+                                </Link>
+                              </div>
+                              
+                              {/* Stock warning for low stock items */}
+                              {stock > 0 && stock < 5 && (
+                                <div className="text-xs text-orange-600 text-center font-medium">
+                                  Only {stock} left!
+                                </div>
+                              )}
+                            </>
+                          ) : isAuthenticated && user?.role === 'PRODUCER' ? (
+                            <Link to={`/products/${product.id}`} className="block">
+                              <Button variant="default" className="w-full flex items-center gap-2">
+                                <Eye className="h-4 w-4" />
+                                View Product Details
+                              </Button>
+                            </Link>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Guest/Non-authenticated users */}
+                              <Link to={`/products/${product.id}`} className="block">
+                                <Button variant="default" className="w-full flex items-center gap-2">
+                                  <Eye className="h-4 w-4" />
+                                  Details
+                                </Button>
+                              </Link>
+                              <Link to="/login" className="block">
+                                <Button variant="secondary" className="w-full">
+                                  Login to Buy
+                                </Button>
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      </CardFooter>
                     </Card>
                   );
                 })}
