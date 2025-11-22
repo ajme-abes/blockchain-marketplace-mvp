@@ -30,9 +30,9 @@ class ApiService {
   // FIXED: Properly handle both 'data' and 'body' properties
   async request<T>(endpoint: string, options: any = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     console.log('🔧 API Request:', url, options);
-  
+
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -40,10 +40,10 @@ class ApiService {
       },
       method: options.method || 'GET',
     };
-  
+
     // FIX: Handle 'data' property (used by userService) OR 'body' property
     let requestBody = options.data || options.body;
-    
+
     if (requestBody) {
       if (typeof requestBody === 'object') {
         config.body = JSON.stringify(requestBody);
@@ -52,23 +52,23 @@ class ApiService {
         config.body = requestBody;
       }
     }
-  
+
     if (this.token) {
       config.headers = {
         ...config.headers,
         'Authorization': `Bearer ${this.token}`,
       };
     }
-  
+
     try {
       const response = await fetch(url, config);
-      
+
       console.log('🔧 API Response Status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('🔧 API Error Response:', errorText);
-        
+
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = JSON.parse(errorText);
@@ -76,16 +76,16 @@ class ApiService {
         } catch {
           // If not JSON, use the text as is
         }
-        
+
         throw new Error(errorMessage);
       }
-  
+
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
-      
+
       console.log('🔧 API Response Data:', data);
       return data;
-      
+
     } catch (error) {
       console.error('🔧 API Request Failed:', error);
       throw error;
@@ -98,7 +98,7 @@ class ApiService {
       method: 'POST',
       data: { email, password }, // Changed from body to data
     });
-    
+
     if (response.token) {
       this.setToken(response.token);
     }

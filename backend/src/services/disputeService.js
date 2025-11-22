@@ -117,6 +117,12 @@ class DisputeService {
 async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
   try {
     console.log('🔧 Adding evidence to dispute:', disputeId);
+    console.log('📎 File details:', {
+      fileName,
+      fileSize: fileBuffer.length,
+      mimeType: ipfsService.getMimeType(fileName),
+      userId
+    });
 
     // Verify dispute exists and user has access
     const dispute = await prisma.dispute.findUnique({
@@ -150,25 +156,38 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
       throw new Error('You are not authorized to add evidence to this dispute');
     }
 
-    // Upload file to IPFS - FIX: Don't pass productId for dispute evidence
+    console.log('🔄 Uploading file to IPFS...');
+    
+    // Upload file to IPFS
     const uploadResult = await ipfsService.uploadFile(
       fileBuffer,
       fileName,
-      'DOCUMENT', // Using existing IPFS category
-      userId
-      // Remove productId parameter since we're uploading for dispute, not product
+      'DOCUMENT',
+      userId,
+      null // No productId for dispute evidence
     );
 
+    console.log('🔧 IPFS Upload Result:', uploadResult);
+
     if (!uploadResult.success) {
-      throw new Error(`Failed to upload evidence: ${uploadResult.error}`);
+      console.error('❌ IPFS Upload failed:', uploadResult.error);
+      throw new Error(`Failed to upload evidence to IPFS: ${uploadResult.error}`);
     }
+
+    console.log('✅ IPFS Upload successful, creating evidence record...');
+
+    // FIX: Use the correct URL from IPFS response
+    const evidenceUrl = uploadResult.pinataUrl || 
+                       `https://gateway.pinata.cloud/ipfs/${uploadResult.cid}`;
+
+    console.log('🔧 Using evidence URL:', evidenceUrl);
 
     // Create evidence record
     const evidence = await prisma.disputeEvidence.create({
       data: {
         disputeId,
         type: evidenceData.type || 'OTHER',
-        url: uploadResult.gatewayUrl,
+        url: evidenceUrl, // FIXED: Use the correct URL
         filename: fileName,
         fileSize: fileBuffer.length,
         mimeType: ipfsService.getMimeType(fileName),
@@ -186,7 +205,8 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
       }
     });
 
-    console.log('✅ Evidence added:', evidence.id);
+    console.log('✅ Evidence added to database:', evidence.id);
+    console.log('✅ Evidence URL stored:', evidence.url);
 
     // Add system message about new evidence
     await prisma.disputeMessage.create({
@@ -306,33 +326,53 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
     }
   }
 
-  async updateDisputeStatus(disputeId, statusData, adminId) {
+  async updateDisputeStatus(disputeId, statusData, userId) {
     try {
       const { status, resolution, refundAmount } = statusData;
-
-      console.log('🔧 Updating dispute status:', disputeId, status);
-
-      // Verify admin role
-      const admin = await prisma.user.findUnique({
-        where: { id: adminId },
+  
+      console.log('🔧 [BACKEND] Updating dispute status:', disputeId, status);
+  
+      // Get the user's role
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
         select: { role: true }
       });
-
-      if (admin.role !== 'ADMIN') {
+  
+      // Get the dispute to check ownership
+      const dispute = await prisma.dispute.findUnique({
+        where: { id: disputeId },
+        include: {
+          raisedBy: true
+        }
+      });
+  
+      if (!dispute) {
+        throw new Error('Dispute not found');
+      }
+  
+      // Check permissions: Admin OR dispute raiser resolving their own dispute
+      const isAdmin = user.role === 'ADMIN';
+      const isDisputeRaiser = dispute.raisedById === userId;
+      const isResolvingOwnDispute = isDisputeRaiser && status === 'RESOLVED';
+  
+      if (!isAdmin && !isResolvingOwnDispute) {
         throw new Error('Only admins can update dispute status');
       }
-
+  
       // Update dispute
       const updateData = {
         status,
-        resolvedById: adminId,
-        resolvedAt: new Date()
+        ...(resolution && { resolution }),
+        ...(refundAmount !== undefined && { refundAmount })
       };
-
-      if (resolution) updateData.resolution = resolution;
-      if (refundAmount !== undefined) updateData.refundAmount = refundAmount;
-
-      const dispute = await prisma.dispute.update({
+  
+      // Only set resolvedBy and resolvedAt for admins or when resolving
+      if (isAdmin || status === 'RESOLVED') {
+        updateData.resolvedById = userId;
+        updateData.resolvedAt = new Date();
+      }
+  
+      const updatedDispute = await prisma.dispute.update({
         where: { id: disputeId },
         data: updateData,
         include: {
@@ -355,36 +395,37 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
           }
         }
       });
-
-      console.log('✅ Dispute status updated:', dispute.id, status);
-
+  
+      console.log('✅ [BACKEND] Dispute status updated:', disputeId, status);
+  
       // Add system message about status change
       await prisma.disputeMessage.create({
         data: {
           disputeId,
-          senderId: adminId,
+          senderId: userId,
           content: `Dispute status changed to: ${status}` + (resolution ? ` - ${resolution}` : ''),
           type: 'STATUS_CHANGE'
         }
       });
-
-      // Notify parties about resolution
-      await this.notifyDisputeResolution(dispute);
-
+  
+      // Notify parties about resolution (only for admins to avoid spam)
+      if (isAdmin) {
+        await this.notifyDisputeResolution(updatedDispute);
+      }
+  
       return {
         success: true,
-        dispute: this.formatDisputeResponse(dispute)
+        dispute: this.formatDisputeResponse(updatedDispute)
       };
-
+  
     } catch (error) {
-      console.error('❌ Update dispute status error:', error);
+      console.error('❌ [BACKEND] Update dispute status error:', error);
       return {
         success: false,
         error: error.message
       };
     }
   }
-
   async getUserDisputes(userId, filters = {}) {
     try {
       const { status, page = 1, limit = 10 } = filters;
@@ -786,6 +827,260 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
 
     return Array.from(users);
   }
+  // Add these methods to your DisputeService class
+
+async getDisputeEvidence(disputeId, userId) {
+  try {
+    console.log('🔧 Fetching evidence for dispute:', disputeId);
+
+    // Verify dispute exists and user has access
+    const dispute = await prisma.dispute.findUnique({
+      where: { id: disputeId },
+      include: {
+        raisedBy: true,
+        order: {
+          include: {
+            buyer: true,
+            orderItems: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!dispute) {
+      throw new Error('Dispute not found');
+    }
+
+    // Check if user has access
+    const hasAccess = await this.checkUserAccess(dispute, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this dispute');
+    }
+
+    // Get evidence
+    const evidence = await prisma.disputeEvidence.findMany({
+      where: { disputeId },
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { uploadedAt: 'desc' }
+    });
+
+    console.log('✅ Evidence fetched:', evidence.length, 'items');
+
+    return {
+      success: true,
+      data: evidence.map(ev => this.formatEvidenceResponse(ev))
+    };
+
+  } catch (error) {
+    console.error('❌ Get dispute evidence error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async getDisputeMessages(disputeId, userId) {
+  try {
+    console.log('🔧 Fetching messages for dispute:', disputeId);
+
+    // Verify dispute exists and user has access
+    const dispute = await prisma.dispute.findUnique({
+      where: { id: disputeId },
+      include: {
+        raisedBy: true,
+        order: {
+          include: {
+            buyer: true,
+            orderItems: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!dispute) {
+      throw new Error('Dispute not found');
+    }
+
+    // Check if user has access
+    const hasAccess = await this.checkUserAccess(dispute, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this dispute');
+    }
+
+    // Get messages (exclude internal notes for non-admins)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    const where = { disputeId };
+    if (user.role !== 'ADMIN') {
+      where.isInternal = false;
+    }
+
+    const messages = await prisma.disputeMessage.findMany({
+      where,
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    console.log('✅ Messages fetched:', messages.length);
+
+    return {
+      success: true,
+      data: messages.map(msg => this.formatMessageResponse(msg))
+    };
+
+  } catch (error) {
+    console.error('❌ Get dispute messages error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async addDisputeMessage(disputeId, messageData, userId) {
+  try {
+    const { content, type = 'MESSAGE', isInternal = false } = messageData;
+
+    console.log('🔧 Adding message to dispute:', disputeId);
+
+    // Verify dispute exists and user has access
+    const dispute = await prisma.dispute.findUnique({
+      where: { id: disputeId },
+      include: {
+        raisedBy: true,
+        order: {
+          include: {
+            buyer: true,
+            orderItems: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!dispute) {
+      throw new Error('Dispute not found');
+    }
+
+    // For internal notes, only admin can add
+    if (isInternal) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+      });
+
+      if (user.role !== 'ADMIN') {
+        throw new Error('Only admins can add internal notes');
+      }
+    } else {
+      // For regular messages, check if user is involved
+      const isInvolved = this.isUserInvolvedInDispute(dispute, userId);
+      if (!isInvolved) {
+        throw new Error('You are not authorized to message in this dispute');
+      }
+    }
+
+    // Create message
+    const message = await prisma.disputeMessage.create({
+      data: {
+        disputeId,
+        senderId: userId,
+        content,
+        type,
+        isInternal
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+
+    console.log('✅ Message added:', message.id);
+
+    // Notify other parties (if not internal note)
+    if (!isInternal) {
+      await this.notifyNewMessage(dispute, message, userId);
+    }
+
+    return {
+      success: true,
+      data: this.formatMessageResponse(message)
+    };
+
+  } catch (error) {
+    console.error('❌ Add message error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Helper method to check user access
+async checkUserAccess(dispute, userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+
+  if (user.role === 'ADMIN') {
+    return true;
+  }
+
+  return this.isUserInvolvedInDispute(dispute, userId);
+}
 
   // ==================== RESPONSE FORMATTERS ====================
 
@@ -833,16 +1128,24 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
     };
   }
 
-  formatMessageResponse(message) {
-    return {
-      id: message.id,
-      content: message.content,
-      type: message.type,
-      isInternal: message.isInternal,
-      createdAt: message.createdAt,
-      sender: message.sender
-    };
-  }
+formatMessageResponse(message) {
+  return {
+    id: message.id,
+    content: message.content,
+    type: message.type,
+    isInternal: message.isInternal,
+    createdAt: message.createdAt,
+    sender: message.sender,
+    // Include attachments if you have them
+    attachments: message.attachments ? message.attachments.map(att => ({
+      id: att.id,
+      fileName: att.fileName,
+      fileUrl: att.fileUrl,
+      fileType: att.fileType,
+      fileSize: att.fileSize
+    })) : []
+  };
+}
 }
 
 module.exports = new DisputeService();

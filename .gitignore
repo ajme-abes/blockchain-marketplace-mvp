@@ -49,3 +49,4 @@ docker-compose.dev.yml
 docker-compose.yml
 frontend/.dockerignore
 /database/init.sql
+contract-info.json

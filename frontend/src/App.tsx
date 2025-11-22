@@ -37,6 +37,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
+import DisputesList from "./pages/buyer/DisputesList";
+import DisputeDetail from "./pages/common/DisputeDetail";
 import ProducerOrders from "./pages/producer/ProducerOrders";
 import ProducerReviews from "./pages/producer/ProducerReviews";
 import ProducerAnalytics from "./pages/producer/ProducerAnalytics";
@@ -85,7 +87,11 @@ const RoleRoute = ({ allowedRoles, children }: { allowedRoles: string[]; childre
     return <Navigate to="/login" replace />;
   }
 
-  if (!user || !allowedRoles.includes(user.role.toLowerCase())) {
+  // Check roles case-insensitively
+  const normalizedUserRole = user?.role?.toLowerCase();
+  const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase());
+
+  if (!user || !normalizedAllowedRoles.includes(normalizedUserRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -99,174 +105,197 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-        <SocketProvider>
-          <CartProvider>
+          <SocketProvider>
+            <CartProvider>
               <ChatProvider>
-                 <TooltipProvider>
-                    <Toaster />
-                      <Sonner />
-                        <BrowserRouter>
-<Routes>
-{/* ==================== PUBLIC ROUTES ==================== */}
-<Route path="/" element={<Home />} />
-<Route path="/login" element={<Login />} />
-<Route path="/register" element={<Register />} />
-<Route path="/marketplace" element={<Marketplace />} />
-<Route path="/products/:id" element={<ProductDetail />} />
-<Route path="/about" element={<About />} />
-<Route path="/contact" element={<Contact />} />
-<Route path="/unauthorized" element={<Unauthorized />} />
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Routes>
+                      {/* ==================== PUBLIC ROUTES ==================== */}
+                      <Route path="/" element={<Home />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/marketplace" element={<Marketplace />} />
+                      <Route path="/products/:id" element={<ProductDetail />} />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/unauthorized" element={<Unauthorized />} />
 
-{/* ==================== AUTH & VERIFICATION ROUTES ==================== */}
-<Route path="/verify-email" element={<VerifyEmail />} />
-<Route path="/verify-email-notice" element={<VerifyEmailNotice />} />
-<Route path="/forgot-password" element={<ForgotPassword />} />
-<Route path="/reset-password" element={<ResetPassword />} />
+                      {/* ==================== AUTH & VERIFICATION ROUTES ==================== */}
+                      <Route path="/verify-email" element={<VerifyEmail />} />
+                      <Route path="/verify-email-notice" element={<VerifyEmailNotice />} />
+                      <Route path="/forgot-password" element={<ForgotPassword />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
 
-{/* ==================== PROTECTED COMMON ROUTES ==================== */}
-{/* All authenticated users */}
-<Route path="/dashboard" element={
-  <ProtectedRoute>
-    <Dashboard />
-  </ProtectedRoute>
-} />
-<Route path="/profile" element={
-  <ProtectedRoute>
-    <Profile />
-  </ProtectedRoute>
-} />
-<Route path="/chats" element={
-  <ProtectedRoute>
-    <Chats />
-  </ProtectedRoute>
-} />
-<Route path="/settings" element={
-  <ProtectedRoute>
-    <Settings />
-  </ProtectedRoute>
-} />
-<Route path="/change-password" element={
-  <ProtectedRoute>
-    <ChangePassword />
-  </ProtectedRoute>
-} />
-<Route path="/transaction/:transactionId" element={
-  <ProtectedRoute>
-    <TransactionDetail />
-  </ProtectedRoute>
-} />
+                      {/* ==================== PROTECTED COMMON ROUTES ==================== */}
+                      {/* All authenticated users */}
+                      <Route path="/dashboard" element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/profile" element={
+                        <ProtectedRoute>
+                          <Profile />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/chats" element={
+                        <ProtectedRoute>
+                          <Chats />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/settings" element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/change-password" element={
+                        <ProtectedRoute>
+                          <ChangePassword />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/transaction/:transactionId" element={
+                        <ProtectedRoute>
+                          <TransactionDetail />
+                        </ProtectedRoute>
+                      } />
 
-{/* ==================== BUYER-ONLY ROUTES ==================== */}
-<Route path="/cart" element={
-  <RoleRoute allowedRoles={['buyer']}>
-    <Cart />
-  </RoleRoute>
-} />
-<Route path="/checkout" element={
-  <RoleRoute allowedRoles={['buyer']}>
-    <Checkout />
-  </RoleRoute>
-} />
-<Route path="/my-orders" element={
-  <RoleRoute allowedRoles={['buyer']}>
-    <Orders />
-  </RoleRoute>
-} />
-<Route path="/buyer/transactions" element={
-  <RoleRoute allowedRoles={['buyer']}>
-    <BuyerTransactionHistory />
-  </RoleRoute>
-} />
-<Route path="/order/:orderId/success" element={
-  <RoleRoute allowedRoles={['buyer']}>
-    <PaymentSuccess />
-  </RoleRoute>
-} />
+                      {/* ==================== BUYER-ONLY ROUTES ==================== */}
+                      <Route path="/cart" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <Cart />
+                        </RoleRoute>
+                      } />
+                      <Route path="/checkout" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <Checkout />
+                        </RoleRoute>
+                      } />
+                      <Route path="/my-orders" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <Orders />
+                        </RoleRoute>
+                      } />
+                      <Route path="/buyer/transactions" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <BuyerTransactionHistory />
+                        </RoleRoute>
+                      } />
+                      <Route path="/order/:orderId/success" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <PaymentSuccess />
+                        </RoleRoute>
+                      } />
+                      <Route path="/buyer/disputes" element={
+                        <RoleRoute allowedRoles={['buyer']}>
+                          <DisputesList />
+                        </RoleRoute>
+                      } />
 
-{/* ==================== PRODUCER-ONLY ROUTES ==================== */}
-<Route path="/my-products" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <Products />
-  </RoleRoute>
-} />
-<Route path="/products/add" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <AddProduct />
-  </RoleRoute>
-} />
-<Route path="/products/edit/:id" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <EditProduct />
-  </RoleRoute>
-} />
-<Route path="/producer/orders" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <ProducerOrders />
-  </RoleRoute>
-} />
-<Route path="/producer/reviews" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <ProducerReviews />
-  </RoleRoute>
-} />
-<Route path="/producer/analytics" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <ProducerAnalytics />
-  </RoleRoute>
-} />
-<Route path="/producer/store-settings" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <StoreSettings />
-  </RoleRoute>
-} />
-<Route path="/producer/transactionhistory" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <TransactionHistory />
-  </RoleRoute>
-} />
-<Route path="/sellers/:id/contact" element={
-  <RoleRoute allowedRoles={['producer']}>
-    <SellerContact />
-  </RoleRoute>
-} />
+                      {/* ==================== PRODUCER-ONLY ROUTES ==================== */}
+                      <Route path="/my-products" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <Products />
+                        </RoleRoute>
+                      } />
+                      <Route path="/products/add" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <AddProduct />
+                        </RoleRoute>
+                      } />
+                      <Route path="/products/edit/:id" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <EditProduct />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/orders" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <ProducerOrders />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/reviews" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <ProducerReviews />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/analytics" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <ProducerAnalytics />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/store-settings" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <StoreSettings />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/transactionhistory" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <TransactionHistory />
+                        </RoleRoute>
+                      } />
+                      <Route path="/sellers/:id/contact" element={
+                        <RoleRoute allowedRoles={['producer']}>
+                          <SellerContact />
+                        </RoleRoute>
+                      } />
+                      <Route path="/producer/disputes" element={
+                        <RoleRoute allowedRoles={['PRODUCER']}>
+                          <DisputesList />
+                        </RoleRoute>
+                      } />
 
-{/* ==================== SHARED ORDER ROUTES ==================== */}
-{/* Accessible by both buyers and producers */}
-<Route path="/orders/:orderId" element={
-  <RoleRoute allowedRoles={['buyer', 'producer']}>
-    <OrderDetail />
-  </RoleRoute>
-} />
+                      {/* ==================== SHARED  ROUTES ==================== */}
+                      {/* Accessible by both buyers and producers */}
+                      <Route path="/orders/:orderId" element={
+                        <RoleRoute allowedRoles={['buyer', 'producer']}>
+                          <OrderDetail />
+                        </RoleRoute>
+                      } />
 
-{/* ==================== ADMIN-ONLY ROUTES ==================== */}
-<Route path="/admin" element={
-  <RoleRoute allowedRoles={['admin']}>
-    <AdminDashboard />
-  </RoleRoute>
-} />
-<Route path="/admin/users" element={
-  <RoleRoute allowedRoles={['admin']}>
-    <UserManagement />
-  </RoleRoute>
-} />
-<Route path="/admin/products" element={
-  <RoleRoute allowedRoles={['admin']}>
-    <ProductManagement />
-  </RoleRoute>
-} />
-<Route path="/admin/disputes" element={
-  <RoleRoute allowedRoles={['admin']}>
-    <DisputeManagement />
-  </RoleRoute>
-} />
+                      {/* ==================== ADMIN-ONLY ROUTES ==================== */}
+                      <Route path="/admin" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <AdminDashboard />
+                        </RoleRoute>
+                      } />
+                      <Route path="/admin/users" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <UserManagement />
+                        </RoleRoute>
+                      } />
+                      <Route path="/admin/products" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <ProductManagement />
+                        </RoleRoute>
+                      } />
+                      <Route path="/admin/disputes" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <DisputeManagement />
+                        </RoleRoute>
+                      } />
+                      <Route path="/disputes" element={
+                        <RoleRoute allowedRoles={['BUYER', 'PRODUCER']}>
+                          <DisputesList />
+                        </RoleRoute>
+                      } />
+                      <Route path="/disputes/:disputeId" element={
+                        <RoleRoute allowedRoles={['BUYER', 'PRODUCER', 'admin']}>
+                          <DisputeDetail />
+                        </RoleRoute>
+                      } />
 
-{/* ==================== FALLBACK ROUTE ==================== */}
-<Route path="*" element={<NotFound />} />
-</Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-          </ChatProvider>
-          </CartProvider>
+
+
+
+                      {/* ==================== FALLBACK ROUTE ==================== */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </ChatProvider>
+            </CartProvider>
           </SocketProvider>
         </AuthProvider>
       </LanguageProvider>

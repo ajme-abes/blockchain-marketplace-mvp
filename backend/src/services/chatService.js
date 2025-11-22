@@ -27,43 +27,54 @@ class ChatService {
       
       console.log('🔧 Starting chat creation transaction...');
       
+      // FIX: Remove duplicate participants first
+      const uniqueParticipants = participants.filter((participant, index, self) => 
+        index === self.findIndex(p => p.userId === participant.userId)
+      );
+      
+      console.log('🔧 Unique participants after deduplication:', uniqueParticipants.length);
+      
       const chat = await prisma.$transaction(async (tx) => {
         console.log('🔧 Inside transaction - creating chat...');
         
-        // Create the chat
+        // Create the chat with participants in one operation to avoid duplicates
         const newChat = await tx.chat.create({
           data: {
             orderId: orderId || null,
             productId: productId || null,
-            lastMessageAt: new Date()
+            lastMessageAt: new Date(),
+            // FIX: Create participants in the same operation
+            participants: {
+              create: uniqueParticipants.map(participant => ({
+                userId: participant.userId,
+                lastReadAt: new Date()
+              }))
+            }
+          },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    avatarUrl: true
+                  }
+                }
+              }
+            }
           }
         });
         
-        console.log('🔧 Chat created:', newChat.id);
-        
-        // Add participants
-        console.log('🔧 Adding participants...');
-        const chatParticipants = await Promise.all(
-          participants.map(participant => 
-            tx.chatParticipant.create({
-              data: {
-                chatId: newChat.id,
-                userId: participant.userId,
-                lastReadAt: new Date()
-              }
-            })
-          )
-        );
-        
-        console.log('✅ Participants added:', chatParticipants.length);
-        
+        console.log('✅ Chat created with participants:', newChat.id);
         return newChat;
       });
       
       console.log('✅ Chat creation transaction completed successfully');
       
-      // Return the full chat with participants
-      return await this.getChatById(chat.id, createdBy);
+      return chat; // Return the chat we already have with participants
       
     } catch (error) {
       console.error('❌ createChat error:', error);
@@ -77,6 +88,12 @@ class ChatService {
       }
       if (error.message === 'CREATOR_MUST_BE_PARTICIPANT') {
         throw new Error('Chat creator must be a participant');
+      }
+      
+      // Handle Prisma unique constraint error
+      if (error.code === 'P2002') {
+        console.error('Duplicate chat participant detected');
+        throw new Error('CHAT_ALREADY_EXISTS');
       }
       
       throw error;

@@ -1,5 +1,5 @@
-// src/services/disputeService.ts
-import apiService from './api'; // Import your API service
+// src/services/disputeService.ts - FIXED VERSION
+import apiService from './api';
 
 export interface Dispute {
   id: string;
@@ -95,45 +95,25 @@ export interface DisputesResponse {
 
 class DisputeService {
   async createDispute(
-    formData: FormData, 
-    onProgress?: (progress: number) => void
+    disputeData: CreateDisputeData
   ): Promise<CreateDisputeResponse> {
     try {
-      console.log('🔄 [FRONTEND] Starting dispute creation...');
-      
-      // Extract data from FormData for the main dispute creation
-      const disputeData = {
-        orderId: formData.get('orderId') as string,
-        reason: formData.get('reason') as string,
-        description: formData.get('description') as string,
-      };
+      console.log('🔄 [FRONTEND] Starting dispute creation with data:', disputeData);
 
-      console.log('📦 [FRONTEND] Dispute data to send:', disputeData);
-
-      // First create the dispute using your API service
-      console.log('🔄 [FRONTEND] Sending to backend...');
-      
-      // Use your API service with 'data' property
       const disputeResponse = await apiService.request('/disputes', {
         method: 'POST',
-        data: disputeData, // Use 'data' instead of 'body'
+        data: disputeData,
       });
 
       console.log('✅ [FRONTEND] Backend response:', disputeResponse);
 
-      // Extract the dispute from response based on your API structure
       const dispute = disputeResponse.data || disputeResponse;
-      console.log('🎉 [FRONTEND] Dispute created with ID:', dispute?.id);
-
-      // Then upload evidence files if any
-      const evidenceFiles = formData.getAll('evidence') as File[];
-      if (evidenceFiles.length > 0 && dispute?.id) {
-        console.log(`📎 [FRONTEND] Uploading ${evidenceFiles.length} evidence files...`);
-        
-        for (const file of evidenceFiles) {
-          await this.addEvidence(dispute.id, file, 'OTHER', '', onProgress);
-        }
+      
+      if (!dispute || !dispute.id) {
+        throw new Error('Failed to create dispute - no dispute ID returned');
       }
+
+      console.log('🎉 [FRONTEND] Dispute created with ID:', dispute.id);
 
       return {
         status: 'success',
@@ -143,56 +123,70 @@ class DisputeService {
 
     } catch (error: any) {
       console.error('❌ [FRONTEND] Create dispute error:', error);
-      
-      const errorMessage = error.message || 'Failed to create dispute';
-
       return {
         status: 'error',
-        message: errorMessage
+        message: error.message || 'Failed to create dispute'
+      };
+    }
+  }
+
+  async uploadEvidence(disputeId: string, file: File, description: string = '') {
+    try {
+      console.log('🔄 [FRONTEND] Uploading evidence to dispute:', disputeId);
+      console.log('📎 [FRONTEND] File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      });
+
+      // Create FormData properly
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', description);
+      formData.append('type', 'OTHER');
+
+      console.log('🔄 [FRONTEND] Sending FormData to backend...');
+
+      // Use fetch directly for FormData to avoid apiService issues
+      const response = await fetch(`http://localhost:5000/api/disputes/${disputeId}/evidence`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          // Don't set Content-Type - let browser set it with boundary
+        },
+        body: formData,
+      });
+
+      console.log('🔧 [FRONTEND] Upload response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [FRONTEND] Upload failed:', errorText);
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [FRONTEND] Evidence upload successful:', result);
+      return result;
+
+    } catch (error: any) {
+      console.error('❌ [FRONTEND] Upload evidence error:', error);
+      return {
+        status: 'error',
+        message: error.message || 'Failed to upload evidence'
       };
     }
   }
 
   async addEvidence(
-    disputeId: string, 
-    file: File, 
+    disputeId: string,
+    file: File,
     type: string = 'OTHER',
     description?: string,
     onProgress?: (progress: number) => void
   ) {
-    try {
-      console.log('🔄 Adding evidence to dispute:', disputeId);
-
-      // For file uploads, we need to use FormData directly
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', type);
-      if (description) formData.append('description', description);
-
-      const response = await fetch(`/api/disputes/${disputeId}/evidence`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Evidence added successfully');
-      return result;
-
-    } catch (error: any) {
-      console.error('❌ Add evidence error:', error);
-      
-      return {
-        status: 'error',
-        message: error.message || 'Failed to add evidence'
-      };
-    }
+    // Simply call uploadEvidence to avoid duplication
+    return this.uploadEvidence(disputeId, file, description || '');
   }
 
   async getUserDisputes(filters?: {
@@ -220,7 +214,6 @@ class DisputeService {
 
     } catch (error: any) {
       console.error('❌ Get user disputes error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to fetch disputes'
@@ -231,17 +224,13 @@ class DisputeService {
   async getDisputeDetails(disputeId: string) {
     try {
       console.log('🔄 Fetching dispute details:', disputeId);
-
       const response = await apiService.request(`/disputes/${disputeId}`, {
         method: 'GET',
       });
-
       console.log('✅ Dispute details fetched successfully');
       return response;
-
     } catch (error: any) {
       console.error('❌ Get dispute details error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to fetch dispute details'
@@ -250,14 +239,13 @@ class DisputeService {
   }
 
   async addMessage(
-    disputeId: string, 
-    content: string, 
+    disputeId: string,
+    content: string,
     type: string = 'MESSAGE',
     isInternal: boolean = false
   ) {
     try {
       console.log('🔄 Adding message to dispute:', disputeId);
-
       const response = await apiService.request(`/disputes/${disputeId}/messages`, {
         method: 'POST',
         data: {
@@ -266,13 +254,10 @@ class DisputeService {
           isInternal
         },
       });
-
       console.log('✅ Message added successfully');
       return response;
-
     } catch (error: any) {
       console.error('❌ Add message error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to add message'
@@ -288,7 +273,6 @@ class DisputeService {
   ) {
     try {
       console.log('🔄 Updating dispute status:', disputeId, status);
-
       const response = await apiService.request(`/disputes/${disputeId}/status`, {
         method: 'PATCH',
         data: {
@@ -297,13 +281,10 @@ class DisputeService {
           refundAmount
         },
       });
-
       console.log('✅ Dispute status updated successfully');
       return response;
-
     } catch (error: any) {
       console.error('❌ Update dispute status error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to update dispute status'
@@ -318,7 +299,6 @@ class DisputeService {
   }) {
     try {
       console.log('🔄 Fetching all disputes (Admin)');
-
       const params = new URLSearchParams();
       if (filters?.status) params.append('status', filters.status);
       if (filters?.page) params.append('page', filters.page.toString());
@@ -330,13 +310,10 @@ class DisputeService {
       const response = await apiService.request(endpoint, {
         method: 'GET',
       });
-
       console.log('✅ All disputes fetched successfully');
       return response;
-
     } catch (error: any) {
       console.error('❌ Get all disputes error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to fetch disputes'
@@ -344,23 +321,73 @@ class DisputeService {
     }
   }
 
+  async getDisputeEvidence(disputeId: string) {
+    try {
+      const response = await apiService.request(`/disputes/${disputeId}/evidence`, {
+        method: 'GET',
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to fetch evidence'
+      };
+    }
+  }
+
+  async getDisputeMessages(disputeId: string) {
+    try {
+      const response = await apiService.request(`/disputes/${disputeId}/messages`, {
+        method: 'GET',
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to fetch messages'
+      };
+    }
+  }
+
   async getDisputeStats() {
     try {
       console.log('🔄 Fetching dispute statistics');
-
       const response = await apiService.request('/disputes/stats/overview', {
         method: 'GET',
       });
-
       console.log('✅ Dispute stats fetched successfully');
       return response;
-
     } catch (error: any) {
       console.error('❌ Get dispute stats error:', error);
-      
       return {
         status: 'error',
         message: error.message || 'Failed to fetch dispute statistics'
+      };
+    }
+  }
+
+  async resolveDispute(
+    disputeId: string,
+    resolution: string
+  ) {
+    try {
+      console.log('🔄 [FRONTEND] Resolving dispute:', disputeId);
+  
+      const response = await apiService.request(`/disputes/${disputeId}/resolve`, {
+        method: 'PATCH',
+        data: {
+          resolution
+        },
+      });
+  
+      console.log('✅ [FRONTEND] Dispute resolved successfully');
+      return response;
+  
+    } catch (error: any) {
+      console.error('❌ Resolve dispute error:', error);
+      return {
+        status: 'error',
+        message: error.message || 'Failed to resolve dispute'
       };
     }
   }

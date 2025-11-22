@@ -14,7 +14,8 @@ import {
   Info,
   Star,
   BarChart2,
-  History, // ADD THIS IMPORT
+  History, 
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -54,14 +55,16 @@ export const AppSidebar = () => {
     { title: 'My Products', url: '/my-products', icon: Package },
     { title: 'Order Management', url: '/producer/orders', icon: ShoppingCart },
     { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
-    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, // Changed icon
+    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, 
     { title: 'Analytics', url: '/producer/analytics', icon: BarChart2 },
     { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
+    { title: 'Store Disputes', url: '/producer/disputes', icon: AlertTriangle }, 
   ];
 
   const buyerLinks = [
     { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
-    { title: 'Purchase History', url: '/buyer/transactions', icon: History }, // ADDED THIS LINE
+    { title: 'Purchase History', url: '/buyer/transactions', icon: History }, 
+    { title: 'My Disputes', url: '/buyer/disputes', icon: AlertTriangle }, 
   ];
 
   const adminLinks = [

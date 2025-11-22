@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -15,9 +16,11 @@ import {
 
 interface PageHeaderProps {
   title: string;
+  description?: string;
+  action?: ReactNode;
 }
 
-export const PageHeader = ({ title }: PageHeaderProps) => {
+export const PageHeader = ({ title, description, action }: PageHeaderProps) => {
   const { user } = useAuth();
   const { state: cartState } = useCart();
 
@@ -25,18 +28,22 @@ export const PageHeader = ({ title }: PageHeaderProps) => {
     <header className="h-16 border-b border-border flex items-center justify-between px-4 bg-background sticky top-0 z-10">
       <div className="flex items-center">
         <SidebarTrigger />
-        <h1 className="text-xl font-bold ml-4">{title}</h1>
+        <div className="ml-4">
+          <h1 className="text-xl font-bold">{title}</h1>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
       </div>
-      
+
       <div className="flex items-center gap-3">
+        {action && <div className="mr-2">{action}</div>}
         {/* Notifications - For all authenticated users */}
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
-                <Badge 
-                  variant="destructive" 
+                <Badge
+                  variant="destructive"
                   className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
                 >
                   3
@@ -86,8 +93,8 @@ export const PageHeader = ({ title }: PageHeaderProps) => {
             <Button variant="ghost" size="icon" className="relative">
               <ShoppingCart className="h-5 w-5" />
               {cartState.itemCount > 0 && (
-                <Badge 
-                  variant="destructive" 
+                <Badge
+                  variant="destructive"
                   className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
                 >
                   {cartState.itemCount}

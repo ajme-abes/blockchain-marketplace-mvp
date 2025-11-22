@@ -267,7 +267,7 @@ const BuyerDashboard = () => {
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-6 text-xs"
-                                onClick={() => navigate(`/my-orders/${order.id}`)}
+                                onClick={() => navigate(`/orders/${order.id}`)}
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 View
