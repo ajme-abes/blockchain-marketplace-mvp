@@ -37,6 +37,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
+import AdminDisputeDetail from "./pages/admin/AdminDisputeDetail";
 import DisputesList from "./pages/buyer/DisputesList";
 import DisputeDetail from "./pages/common/DisputeDetail";
 import ProducerOrders from "./pages/producer/ProducerOrders";
@@ -283,6 +284,11 @@ const App = () => (
                       <Route path="/disputes/:disputeId" element={
                         <RoleRoute allowedRoles={['BUYER', 'PRODUCER', 'admin']}>
                           <DisputeDetail />
+                        </RoleRoute>
+                      } />
+                      <Route path="/admin/disputes/:disputeId" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <AdminDisputeDetail />
                         </RoleRoute>
                       } />
 

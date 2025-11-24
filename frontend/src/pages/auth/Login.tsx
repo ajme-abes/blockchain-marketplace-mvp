@@ -172,7 +172,7 @@ const Login = () => {
                   <span>Signing in...</span>
                 </div>
               ) : (
-                'Sign In ✨'
+                'Sign In '
               )}
             </Button>
           </form>

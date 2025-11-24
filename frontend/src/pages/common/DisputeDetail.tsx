@@ -556,94 +556,220 @@ const DisputeDetail = () => {
   </Card>
 )}
                             {activeTab === 'chat' && (
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* Messages */}
-                                    <Card className="lg:col-span-2">
-                                        <CardHeader>
-                                            <CardTitle>Dispute Communication</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-4 max-h-96 overflow-y-auto p-2">
-                                                {messages.length === 0 ? (
-                                                    <div className="text-center py-8">
-                                                        <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                                        <p className="text-muted-foreground">No messages yet.</p>
-                                                        <p className="text-sm text-muted-foreground">Start the conversation...</p>
-                                                    </div>
-                                                ) : (
-                                                    messages.map((message) => (
-                                                        <div
-                                                            key={message.id}
-                                                            className={`flex gap-3 ${message.sender.id === user?.id ? 'flex-row-reverse' : ''
-                                                                }`}
-                                                        >
-                                                            <Avatar className="h-8 w-8">
-                                                                <div className="bg-muted flex items-center justify-center h-full w-full rounded-full">
-                                                                    <User className="h-4 w-4" />
-                                                                </div>
-                                                            </Avatar>
-                                                            <div
-                                                                className={`flex-1 max-w-[70%] ${message.sender.id === user?.id ? 'text-right' : ''
-                                                                    }`}
-                                                            >
-                                                                <div
-                                                                    className={`inline-block px-4 py-2 rounded-lg ${message.sender.id === user?.id
-                                                                        ? 'bg-primary text-primary-foreground'
-                                                                        : 'bg-muted'
-                                                                        }`}
-                                                                >
-                                                                    <p>{message.content}</p>
-                                                                </div>
-                                                                <p className="text-xs text-muted-foreground mt-1">
-                                                                    {formatDate(message.createdAt)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                            <div className="mt-4 flex gap-2">
-                                                <Textarea
-                                                    placeholder="Type your message..."
-                                                    value={newMessage}
-                                                    onChange={(e) => setNewMessage(e.target.value)}
-                                                    className="min-h-[80px]"
-                                                />
-                                                <Button
-                                                    className="h-auto"
-                                                    onClick={handleSendMessage}
-                                                    disabled={sendingMessage || !newMessage.trim()}
-                                                >
-                                                    <Send className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    {/* Messages */}
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle>Dispute Communication</CardTitle>
+        <CardDescription>
+          Communicate with the other party to resolve this dispute.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4 max-h-96 overflow-y-auto p-2">
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No messages yet.</p>
+              <p className="text-sm text-muted-foreground">Start the conversation...</p>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex gap-3 ${message.sender.id === user?.id ? 'flex-row-reverse' : ''}`}
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={message.sender.avatarUrl} />
+                  <AvatarFallback className="text-xs">
+                    {message.sender.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`flex-1 max-w-[70%] ${message.sender.id === user?.id ? 'text-right' : ''}`}>
+                  {/* Sender Name and Role Badge */}
+                  <div className={`flex items-center gap-2 mb-1 ${message.sender.id === user?.id ? 'justify-end' : ''}`}>
+                    <span className="text-sm font-medium">
+                      {message.sender.id === user?.id ? 'You' : message.sender.name}
+                    </span>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        message.sender.role === 'ADMIN' 
+                          ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                          : message.sender.role === 'PRODUCER'
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : 'bg-gray-100 text-gray-800 border-gray-200'
+                      }`}
+                    >
+                      {message.sender.role.toLowerCase()}
+                    </Badge>
+                  </div>
+                  
+                  {/* Message Content */}
+                  <div
+                    className={`inline-block px-4 py-2 rounded-lg ${
+                      message.sender.id === user?.id
+                        ? 'bg-primary text-primary-foreground'
+                        : message.sender.role === 'ADMIN'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <p>{message.content}</p>
+                  </div>
+                  
+                  {/* Timestamp */}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDate(message.createdAt)}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* Message Input */}
+        <div className="mt-4 space-y-3">
+          <div className="flex gap-2">
+            <Textarea
+              placeholder="Type your message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="min-h-[80px]"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            <Button
+              className="h-auto"
+              onClick={handleSendMessage}
+              disabled={sendingMessage || !newMessage.trim()}
+            >
+              {sendingMessage ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Press Enter to send, Shift+Enter for new line
+          </p>
+        </div>
+      </CardContent>
+    </Card>
 
-                                    {/* Participants */}
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>Participants</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar>
-                                                        <div className="bg-muted flex items-center justify-center h-full w-full rounded-full">
-                                                            <User className="h-4 w-4" />
-                                                        </div>
-                                                    </Avatar>
-                                                    <div>
-                                                        <p className="font-medium">{dispute.raisedBy.name}</p>
-                                                        <p className="text-xs text-muted-foreground">Buyer (Reporter)</p>
-                                                    </div>
-                                                </div>
-                                                {/* Add other participants if available */}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            )}
+    {/* Participants */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Participants
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Dispute Raiser */}
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-blue-100 text-blue-800">
+                {dispute.raisedBy.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">{dispute.raisedBy.name}</p>
+              <p className="text-sm text-muted-foreground">Buyer (Reporter)</p>
+              <Badge variant="outline" className="bg-gray-100 text-gray-800 mt-1">
+                buyer
+              </Badge>
+            </div>
+          </div>
+
+          {/* Producers (if any) */}
+          {dispute.order?.orderItems?.map((item, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="bg-green-100 text-green-800">
+                  {item.product.producer.businessName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'P'}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium">
+                  {item.product.producer.businessName || 'Producer'}
+                </p>
+                <p className="text-sm text-muted-foreground">Seller</p>
+                <Badge variant="outline" className="bg-green-100 text-green-800 mt-1">
+                  producer
+                </Badge>
+              </div>
+            </div>
+          ))}
+
+          {/* Current User (You) */}
+          <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-purple-100 text-purple-800">
+                You
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">You</p>
+              <p className="text-sm text-muted-foreground">
+                {user?.role === 'BUYER' ? 'Buyer' : 'Producer'}
+              </p>
+              <Badge variant="outline" className={
+                user?.role === 'BUYER' 
+                  ? 'bg-gray-100 text-gray-800 mt-1'
+                  : 'bg-green-100 text-green-800 mt-1'
+              }>
+                {user?.role?.toLowerCase()}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Admin (if involved) */}
+          {messages.some(m => m.sender.role === 'ADMIN') && (
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="bg-blue-100 text-blue-800">
+                  A
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium">Admin Support</p>
+                <p className="text-sm text-muted-foreground">Platform Moderator</p>
+                <Badge variant="outline" className="bg-blue-100 text-blue-800 mt-1">
+                  admin
+                </Badge>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dispute Status Info */}
+        <div className="mt-6 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <p className="text-sm font-medium text-yellow-800">Dispute Status</p>
+          </div>
+          <Badge className={getStatusColor(dispute.status)}>
+            {getStatusIcon(dispute.status)}
+            <span className="ml-1">{dispute.status.replace('_', ' ')}</span>
+          </Badge>
+          <p className="text-xs text-yellow-700 mt-2">
+            {dispute.status === 'OPEN' && 'This dispute is currently open and awaiting resolution.'}
+            {dispute.status === 'UNDER_REVIEW' && 'An admin is currently reviewing this dispute.'}
+            {dispute.status === 'RESOLVED' && 'This dispute has been resolved.'}
+            {dispute.status === 'REFUNDED' && 'A refund has been processed for this dispute.'}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)}
 
 {/* Resolution Modal */}
 {showResolveModal && (

@@ -234,97 +234,106 @@ async addEvidence(disputeId, evidenceData, fileBuffer, fileName, userId) {
     };
   }
 }
-  async addMessage(disputeId, messageData, userId) {
-    try {
-      const { content, type = 'MESSAGE', isInternal = false } = messageData;
+async addMessage(disputeId, messageData, userId) {
+  try {
+    const { content, type = 'MESSAGE', isInternal = false } = messageData;
 
-      console.log('🔧 Adding message to dispute:', disputeId);
+    console.log('🔧 Adding message to dispute:', disputeId);
+    console.log('👤 User ID:', userId);
 
-      // Verify dispute exists and user has access
-      const dispute = await prisma.dispute.findUnique({
-        where: { id: disputeId },
-        include: {
-          raisedBy: true,
-          order: {
-            include: {
-              buyer: true,
-              orderItems: {
-                include: {
-                  product: {
-                    include: {
-                      producer: true
-                    }
+    // Verify dispute exists and user has access
+    const dispute = await prisma.dispute.findUnique({
+      where: { id: disputeId },
+      include: {
+        raisedBy: true,
+        order: {
+          include: {
+            buyer: true,
+            orderItems: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
                   }
                 }
               }
             }
           }
         }
-      });
-
-      if (!dispute) {
-        throw new Error('Dispute not found');
       }
+    });
 
-      // For internal notes, only admin can add
-      if (isInternal) {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { role: true }
-        });
+    if (!dispute) {
+      throw new Error('Dispute not found');
+    }
 
-        if (user.role !== 'ADMIN') {
-          throw new Error('Only admins can add internal notes');
-        }
-      } else {
-        // For regular messages, check if user is involved
-        const isInvolved = this.isUserInvolvedInDispute(dispute, userId);
-        if (!isInvolved) {
-          throw new Error('You are not authorized to message in this dispute');
-        }
+    // Get user role for authorization check
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    console.log('🔍 User role:', user.role);
+
+    // For internal notes, only admin can add
+    if (isInternal) {
+      if (user.role !== 'ADMIN') {
+        throw new Error('Only admins can add internal notes');
       }
+    } else {
+      // FIX: Allow admins to send regular messages too
+      const isAdmin = user.role === 'ADMIN';
+      const isInvolved = this.isUserInvolvedInDispute(dispute, userId);
+      
+      console.log('🔍 Authorization check - Admin:', isAdmin, 'Involved:', isInvolved);
+      
+      // Allow if user is admin OR involved in the dispute
+      if (!isAdmin && !isInvolved) {
+        throw new Error('You are not authorized to message in this dispute');
+      }
+    }
 
-      // Create message
-      const message = await prisma.disputeMessage.create({
-        data: {
-          disputeId,
-          senderId: userId,
-          content,
-          type,
-          isInternal
-        },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true
-            }
+    // Create message
+    const message = await prisma.disputeMessage.create({
+      data: {
+        disputeId,
+        senderId: userId,
+        content,
+        type,
+        isInternal
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
           }
         }
-      });
-
-      console.log('✅ Message added:', message.id);
-
-      // Notify other parties (if not internal note)
-      if (!isInternal) {
-        await this.notifyNewMessage(dispute, message, userId);
       }
+    });
 
-      return {
-        success: true,
-        message: this.formatMessageResponse(message)
-      };
+    console.log('✅ Message added:', message.id);
 
-    } catch (error) {
-      console.error('❌ Add message error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+    // Notify other parties (if not internal note)
+    if (!isInternal) {
+      await this.notifyNewMessage(dispute, message, userId);
     }
+
+    return {
+      success: true,
+      message: this.formatMessageResponse(message)
+    };
+
+  } catch (error) {
+    console.error('❌ Add message error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
+}
 
   async updateDisputeStatus(disputeId, statusData, userId) {
     try {
@@ -980,6 +989,7 @@ async addDisputeMessage(disputeId, messageData, userId) {
     const { content, type = 'MESSAGE', isInternal = false } = messageData;
 
     console.log('🔧 Adding message to dispute:', disputeId);
+    console.log('👤 User ID:', userId);
 
     // Verify dispute exists and user has access
     const dispute = await prisma.dispute.findUnique({
@@ -1007,20 +1017,28 @@ async addDisputeMessage(disputeId, messageData, userId) {
       throw new Error('Dispute not found');
     }
 
+    // Get user role for authorization check
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    console.log('🔍 User role:', user.role);
+
     // For internal notes, only admin can add
     if (isInternal) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true }
-      });
-
       if (user.role !== 'ADMIN') {
         throw new Error('Only admins can add internal notes');
       }
     } else {
-      // For regular messages, check if user is involved
+      // FIX: Allow admins to send regular messages too
+      const isAdmin = user.role === 'ADMIN';
       const isInvolved = this.isUserInvolvedInDispute(dispute, userId);
-      if (!isInvolved) {
+      
+      console.log('🔍 Authorization check - Admin:', isAdmin, 'Involved:', isInvolved);
+      
+      // Allow if user is admin OR involved in the dispute
+      if (!isAdmin && !isInvolved) {
         throw new Error('You are not authorized to message in this dispute');
       }
     }

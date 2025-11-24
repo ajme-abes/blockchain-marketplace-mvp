@@ -1,11 +1,12 @@
+// src/pages/admin/DisputeManagement.tsx - FIXED NAVIGATION
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -16,14 +17,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -33,33 +26,37 @@ import {
 import { 
   AlertCircle, 
   Eye, 
-  CheckCircle, 
-  XCircle, 
   Search,
   Filter,
-  Download,
   RefreshCw,
-  DollarSign,
   MessageSquare,
-  FileText
+  FileText,
+  Shield,
+  TrendingUp,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { disputeService, Dispute } from '@/services/disputeService';
 
 const DisputeManagement = () => {
+  const navigate = useNavigate();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
-  const [resolutionNote, setResolutionNote] = useState('');
-  const [refundAmount, setRefundAmount] = useState('');
+  const [stats, setStats] = useState({
+    total: 0,
+    open: 0,
+    underReview: 0,
+    resolved: 0,
+    recent: 0,
+    resolutionRate: 0
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [resolving, setResolving] = useState(false);
-  const [refunding, setRefunding] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDisputes();
+    fetchStats();
   }, []);
 
   const fetchDisputes = async () => {
@@ -84,79 +81,28 @@ const DisputeManagement = () => {
     }
   };
 
-  const handleResolveDispute = async (status: string, resolution?: string) => {
-    if (!selectedDispute) return;
-
+  const fetchStats = async () => {
     try {
-      setResolving(true);
-      
-      const result = await disputeService.updateDisputeStatus(
-        selectedDispute.id,
-        status,
-        resolution || resolutionNote,
-        refundAmount ? parseFloat(refundAmount) : undefined
-      );
-
-      if (result.status === 'success') {
-        toast({
-          title: "Dispute Resolved",
-          description: `Dispute has been ${status.toLowerCase()}`,
-        });
-        setSelectedDispute(null);
-        setResolutionNote('');
-        setRefundAmount('');
-        await fetchDisputes(); // Refresh the list
-      } else {
-        throw new Error(result.message || 'Failed to resolve dispute');
+      const result = await disputeService.getDisputeStats();
+      if (result.status === 'success' && result.data) {
+        setStats(result.data);
       }
-    } catch (error: any) {
-      console.error('Failed to resolve dispute:', error);
-      toast({
-        title: "Resolution Failed",
-        description: error.message || "Failed to resolve dispute",
-        variant: "destructive",
-      });
-    } finally {
-      setResolving(false);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
     }
   };
 
-  const handleRefund = async () => {
-    if (!selectedDispute || !refundAmount) return;
-
-    try {
-      setRefunding(true);
-      
-      const result = await disputeService.updateDisputeStatus(
-        selectedDispute.id,
-        'REFUNDED',
-        resolutionNote || 'Refund processed by admin',
-        parseFloat(refundAmount)
-      );
-
-      if (result.status === 'success') {
-        toast({
-          title: "Refund Processed",
-          description: `Refund of ${refundAmount} ETB processed successfully`,
-        });
-        setSelectedDispute(null);
-        setResolutionNote('');
-        setRefundAmount('');
-        await fetchDisputes();
-      } else {
-        throw new Error(result.message || 'Failed to process refund');
-      }
-    } catch (error: any) {
-      console.error('Failed to process refund:', error);
-      toast({
-        title: "Refund Failed",
-        description: error.message || "Failed to process refund",
-        variant: "destructive",
-      });
-    } finally {
-      setRefunding(false);
-    }
+  const handleRefresh = async () => {
+    await Promise.all([fetchDisputes(), fetchStats()]);
+    toast({
+      title: "Refreshed",
+      description: "Dispute data updated",
+    });
   };
+
+  // REMOVED: All dialog-related state and functions
+  // REMOVED: selectedDispute, resolutionNote, refundAmount, resolving, refunding
+  // REMOVED: handleResolveDispute, handleRefund functions
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -233,17 +179,61 @@ const DisputeManagement = () => {
         <div className="flex-1 flex flex-col">
           <PageHeader 
             title="Dispute Management"
-            description="Manage and resolve customer disputes"
+            description="Manage and resolve customer disputes with advanced intervention tools"
             action={
-              <Button onClick={fetchDisputes} variant="outline">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             }
           />
 
           <main className="flex-1 p-6">
             <div className="space-y-6">
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold">{stats.total}</div>
+                    <p className="text-xs text-muted-foreground">Total Disputes</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-yellow-600">{stats.open}</div>
+                    <p className="text-xs text-muted-foreground">Open</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-blue-600">{stats.underReview}</div>
+                    <p className="text-xs text-muted-foreground">Under Review</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-green-600">{stats.resolved}</div>
+                    <p className="text-xs text-muted-foreground">Resolved</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-purple-600">{stats.recent}</div>
+                    <p className="text-xs text-muted-foreground">Last 7 Days</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-indigo-600">
+                      {stats.resolutionRate.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">Resolution Rate</p>
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Filters */}
               <Card>
                 <CardContent className="p-4">
@@ -284,9 +274,14 @@ const DisputeManagement = () => {
                       <AlertCircle className="h-5 w-5" />
                       Disputes ({filteredDisputes.length})
                     </div>
-                    <Badge variant="outline">
-                      {disputes.filter(d => d.status === 'OPEN').length} Open
-                    </Badge>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700">
+                        {disputes.filter(d => d.status === 'OPEN').length} Open
+                      </Badge>
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
+                        {disputes.filter(d => d.status === 'UNDER_REVIEW').length} In Review
+                      </Badge>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -301,6 +296,8 @@ const DisputeManagement = () => {
                           <TableHead>Amount</TableHead>
                           <TableHead>Priority</TableHead>
                           <TableHead>Days Open</TableHead>
+                          <TableHead>Evidence</TableHead>
+                          <TableHead>Messages</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Created</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
@@ -309,14 +306,23 @@ const DisputeManagement = () => {
                       <TableBody>
                         {filteredDisputes.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={10} className="text-center py-8">
+                            <TableCell colSpan={12} className="text-center py-8">
                               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                               <p className="text-muted-foreground">No disputes found</p>
+                              {statusFilter !== 'ALL' && (
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => setStatusFilter('ALL')}
+                                  className="mt-2"
+                                >
+                                  View All Disputes
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ) : (
                           filteredDisputes.map((dispute) => (
-                            <TableRow key={dispute.id}>
+                            <TableRow key={dispute.id} className="hover:bg-muted/50">
                               <TableCell className="font-mono text-sm">
                                 {dispute.id.slice(-8)}
                               </TableCell>
@@ -345,9 +351,27 @@ const DisputeManagement = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <span className={getDaysOpen(dispute.createdAt) > 5 ? 'text-red-600 font-semibold' : ''}>
+                                <span className={
+                                  getDaysOpen(dispute.createdAt) > 5 
+                                    ? 'text-red-600 font-semibold' 
+                                    : getDaysOpen(dispute.createdAt) > 2 
+                                    ? 'text-yellow-600 font-semibold' 
+                                    : 'text-green-600 font-semibold'
+                                }>
                                   {getDaysOpen(dispute.createdAt)} days
                                 </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-sm">{dispute.evidenceCount}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-sm">{dispute.messageCount}</span>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Badge className={getStatusColor(dispute.status)}>
@@ -358,13 +382,35 @@ const DisputeManagement = () => {
                                 {formatDate(dispute.createdAt)}
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setSelectedDispute(dispute)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                                <div className="flex justify-end gap-1">
+                                  {/* Main View Button - Goes to Admin Dispute Detail */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate(`/admin/disputes/${dispute.id}`)}
+                                    title="View detailed dispute"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  {/* Quick Chat Access */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate(`/admin/disputes/${dispute.id}?tab=chat`)}
+                                    title="Join conversation"
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                  </Button>
+                                  {/* Quick Evidence Access */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate(`/admin/disputes/${dispute.id}?tab=evidence`)}
+                                    title="Review evidence"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -374,158 +420,81 @@ const DisputeManagement = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                  <CardDescription>
+                    Common administrative tasks for dispute management
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const highPriority = disputes.filter(d => 
+                          getDaysOpen(d.createdAt) > 5 && d.status === 'OPEN'
+                        );
+                        if (highPriority.length > 0) {
+                          navigate(`/admin/disputes/${highPriority[0].id}`);
+                        } else {
+                          toast({
+                            title: "No High Priority",
+                            description: "No disputes require immediate attention",
+                          });
+                        }
+                      }}
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Handle High Priority
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const needsReview = disputes.filter(d => d.status === 'UNDER_REVIEW');
+                        if (needsReview.length > 0) {
+                          navigate(`/admin/disputes/${needsReview[0].id}`);
+                        } else {
+                          toast({
+                            title: "No Reviews Needed",
+                            description: "No disputes are currently under review",
+                          });
+                        }
+                      }}
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Review Pending Cases
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const oldestOpen = disputes
+                          .filter(d => d.status === 'OPEN')
+                          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        if (oldestOpen.length > 0) {
+                          navigate(`/admin/disputes/${oldestOpen[0].id}`);
+                        } else {
+                          toast({
+                            title: "No Open Disputes",
+                            description: "All disputes have been addressed",
+                          });
+                        }
+                      }}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Address Oldest Open
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </main>
         </div>
       </div>
 
-      {/* Resolution Dialog */}
-      <Dialog open={!!selectedDispute} onOpenChange={(open) => !open && setSelectedDispute(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Dispute Resolution - {selectedDispute?.id.slice(-8)}
-            </DialogTitle>
-            <DialogDescription>
-              Order: {selectedDispute?.orderId.slice(-8)} - {selectedDispute?.reason}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedDispute && (
-            <div className="space-y-6">
-              {/* Dispute Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold">Raised By</p>
-                  <p className="text-sm">{selectedDispute.raisedBy.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedDispute.raisedBy.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Order Amount</p>
-                  <p className="text-sm font-semibold">
-                    {selectedDispute.order?.totalAmount ? `${selectedDispute.order.totalAmount} ETB` : 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Status</p>
-                  <Badge className={getStatusColor(selectedDispute.status)}>
-                    {selectedDispute.status.replace('_', ' ')}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Days Open</p>
-                  <p className="text-sm">{getDaysOpen(selectedDispute.createdAt)} days</p>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <p className="text-sm font-semibold mb-2">Description</p>
-                <p className="text-sm bg-muted p-3 rounded-lg">{selectedDispute.description}</p>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm font-semibold">{selectedDispute.evidenceCount}</p>
-                  <p className="text-xs text-muted-foreground">Evidence Files</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm font-semibold">{selectedDispute.messageCount}</p>
-                  <p className="text-xs text-muted-foreground">Messages</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm font-semibold">
-                    {selectedDispute.refundAmount ? `${selectedDispute.refundAmount} ETB` : 'None'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Refund Amount</p>
-                </div>
-              </div>
-
-              {/* Resolution Notes */}
-              <div>
-                <p className="text-sm font-semibold mb-2">Resolution Notes</p>
-                <Textarea
-                  value={resolutionNote}
-                  onChange={(e) => setResolutionNote(e.target.value)}
-                  placeholder="Enter resolution details and reasoning..."
-                  rows={4}
-                />
-              </div>
-
-              {/* Refund Section */}
-              {selectedDispute.status !== 'REFUNDED' && (
-                <div>
-                  <p className="text-sm font-semibold mb-2">Refund Processing</p>
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        placeholder="Refund amount (ETB)"
-                        value={refundAmount}
-                        onChange={(e) => setRefundAmount(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleRefund}
-                      disabled={refunding || !refundAmount || !resolutionNote.trim()}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {refunding ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      ) : (
-                        <DollarSign className="h-4 w-4 mr-2" />
-                      )}
-                      Process Refund
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <DialogFooter className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleResolveDispute('RESOLVED')}
-                  disabled={resolving || !resolutionNote.trim()}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Mark Resolved
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => handleResolveDispute('UNDER_REVIEW')}
-                  disabled={resolving || !resolutionNote.trim()}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Mark Under Review
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => handleResolveDispute('CANCELLED')}
-                  disabled={resolving || !resolutionNote.trim()}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Cancel Dispute
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(`/disputes/${selectedDispute.id}`, '_blank')}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  View Details
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* REMOVED: Entire Dialog component since we're using navigation now */}
     </SidebarProvider>
   );
 };
