@@ -1,6 +1,6 @@
 // backend/src/routes/orders.js
 const express = require('express');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, checkUserStatus } = require('../middleware/auth');
 const orderService = require('../services/orderService');
 const router = express.Router();
 
@@ -28,7 +28,7 @@ function validateOrderStatusTransition(currentStatus, newStatus, userRole) {
 
 
 // Create order (BUYER only)
-router.post('/', authenticateToken, requireRole(['BUYER']), async (req, res) => {
+router.post('/', authenticateToken,checkUserStatus, requireRole(['BUYER']), async (req, res) => {
   try {
     const { items, shippingAddress } = req.body;
 
@@ -121,7 +121,7 @@ router.post('/', authenticateToken, requireRole(['BUYER']), async (req, res) => 
 });
 
 // Get single order
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken,checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -161,7 +161,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Get order status history
-router.get('/:id/history', authenticateToken, async (req, res) => {
+router.get('/:id/history', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -202,7 +202,7 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 });
 
 // Get buyer's orders
-router.get('/my/orders', authenticateToken, requireRole(['BUYER']), async (req, res) => {
+router.get('/my/orders', authenticateToken, checkUserStatus, requireRole(['BUYER']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
@@ -242,7 +242,7 @@ router.get('/my/orders', authenticateToken, requireRole(['BUYER']), async (req, 
 });
 
 // Get producer's orders
-router.get('/producer/orders', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
+router.get('/producer/orders', authenticateToken, checkUserStatus, requireRole(['PRODUCER']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
@@ -282,7 +282,7 @@ router.get('/producer/orders', authenticateToken, requireRole(['PRODUCER']), asy
 });
 
 // Update order status (PRODUCER or ADMIN only)
-router.put('/:id/status', authenticateToken, requireRole(['PRODUCER', 'ADMIN']), async (req, res) => {
+router.put('/:id/status', authenticateToken, checkUserStatus, requireRole(['PRODUCER', 'ADMIN']), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
@@ -339,7 +339,7 @@ router.put('/:id/status', authenticateToken, requireRole(['PRODUCER', 'ADMIN']),
 });
 
 // Cancel order (BUYER only)
-router.post('/:id/cancel', authenticateToken, requireRole(['BUYER']), async (req, res) => {
+router.post('/:id/cancel', authenticateToken, checkUserStatus, requireRole(['BUYER']), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;

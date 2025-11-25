@@ -1,12 +1,12 @@
 // backend/src/routes/payments.js
 const express = require('express');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, checkUserStatus, requireRole } = require('../middleware/auth');
 const paymentService = require('../services/paymentService');
 const blockchainService = require('../services/blockchainService');
 const router = express.Router();
 
 // Create payment intent (BUYER only)
-router.post('/create-intent', authenticateToken, requireRole(['BUYER']), async (req, res) => {
+router.post('/create-intent', authenticateToken, checkUserStatus, requireRole(['BUYER']), async (req, res) => {
   try {
     const { orderId, customerInfo = {} } = req.body;
 
@@ -149,7 +149,7 @@ router.post('/debug-contract', async (req, res) => {
   }
 });
 // Get payment status
-router.get('/:orderId/status', authenticateToken, async (req, res) => {
+router.get('/:orderId/status', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { orderId } = req.params;
 

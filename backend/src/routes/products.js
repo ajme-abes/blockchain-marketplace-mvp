@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, checkUserStatus, requireRole } = require('../middleware/auth');
 const productService = require('../services/productService');
 const ipfsService = require('../services/ipfsService');
 const { prisma } = require('../config/database');
@@ -101,7 +101,7 @@ router.get('/:id', async (req, res) => {
 
 router.post(
   '/',
-  authenticateToken,
+  authenticateToken, checkUserStatus,
   requireRole(['PRODUCER']),
   upload.array('images', 5),
   async (req, res) => {
@@ -247,7 +247,7 @@ router.post(
 
 // Update product (Owner only)
 
-router.put('/:id', authenticateToken, upload.array('images', 5), async (req, res) => {
+router.put('/:id', authenticateToken, checkUserStatus, upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, price, category, quantity } = req.body;
@@ -342,7 +342,7 @@ router.put('/:id', authenticateToken, upload.array('images', 5), async (req, res
   }
 });
 // Delete product (Owner only)
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -390,7 +390,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // Get producer's own products
-router.get('/my/products', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
+router.get('/my/products', authenticateToken, checkUserStatus, requireRole(['PRODUCER']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
@@ -416,7 +416,7 @@ router.get('/my/products', authenticateToken, requireRole(['PRODUCER']), async (
   }
 });
 // Add this route to your routes/product.js - Status update endpoint
-router.patch('/:id/status', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
+router.patch('/:id/status', authenticateToken, checkUserStatus, requireRole(['PRODUCER']), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

@@ -255,7 +255,6 @@ class AdminService {
       } : {};
   
       const [users, total] = await Promise.all([
-        // FIXED: Use proper relation queries
         prisma.user.findMany({
           where: whereClause,
           select: {
@@ -267,7 +266,7 @@ class AdminService {
             registrationDate: true,
             address: true,
             region: true,
-            // CORRECT: Use include for relations, not select
+            status: true, // ADD THIS
             buyerProfile: {
               select: {
                 id: true,
@@ -290,33 +289,100 @@ class AdminService {
         prisma.user.count({ where: whereClause })
       ]);
   
-      // Transform the data to match frontend expectations
-      const transformedUsers = users.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        registrationDate: user.registrationDate,
-        address: user.address,
-        region: user.region,
-        // Map to the expected frontend structure
-        buyer: user.buyerProfile ? {
-          id: user.buyerProfile.id,
-          preferredPaymentMethod: user.buyerProfile.preferredPaymentMethod
-        } : undefined,
-        producer: user.producerProfile ? {
-          id: user.producerProfile.id,
-          businessName: user.producerProfile.businessName,
-          verificationStatus: user.producerProfile.verificationStatus,
-          location: user.producerProfile.location
-        } : undefined
-      }));
+      // 🆕 CALCULATE STATISTICS FOR EACH USER
+      const usersWithStats = await Promise.all(
+        users.map(async (user) => {
+          let buyerStats = {};
+          let producerStats = {};
+  
+          if (user.role === 'BUYER' && user.buyerProfile) {
+            const [totalOrders, totalSpent] = await Promise.all([
+              prisma.order.count({
+                where: { buyerId: user.buyerProfile.id }
+              }),
+              prisma.order.aggregate({
+                where: { 
+                  buyerId: user.buyerProfile.id,
+                  paymentStatus: 'CONFIRMED'
+                },
+                _sum: { totalAmount: true }
+              })
+            ]);
+  
+            buyerStats = {
+              totalOrders,
+              totalSpent: totalSpent._sum.totalAmount || 0,
+              averageOrderValue: totalOrders > 0 ? (totalSpent._sum.totalAmount || 0) / totalOrders : 0
+            };
+          }
+  
+          if (user.role === 'PRODUCER' && user.producerProfile) {
+            const [totalProducts, totalSales, ratingData] = await Promise.all([
+              prisma.product.count({
+                where: { producerId: user.producerProfile.id }
+              }),
+              prisma.order.aggregate({
+                where: { 
+                  orderItems: {
+                    some: {
+                      product: {
+                        producerId: user.producerProfile.id
+                      }
+                    }
+                  },
+                  paymentStatus: 'CONFIRMED'
+                },
+                _sum: { totalAmount: true }
+              }),
+              prisma.review.aggregate({
+                where: {
+                  product: {
+                    producerId: user.producerProfile.id
+                  }
+                },
+                _avg: { rating: true },
+                _count: { id: true }
+              })
+            ]);
+  
+            producerStats = {
+              totalProducts,
+              totalSales: totalSales._sum.totalAmount || 0,
+              rating: ratingData._avg.rating || 0,
+              reviewCount: ratingData._count.id || 0
+            };
+          }
+  
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            registrationDate: user.registrationDate,
+            address: user.address,
+            region: user.region,
+            status: user.status, // ADD THIS
+            buyer: user.buyerProfile ? {
+              id: user.buyerProfile.id,
+              preferredPaymentMethod: user.buyerProfile.preferredPaymentMethod,
+              ...buyerStats
+            } : undefined,
+            producer: user.producerProfile ? {
+              id: user.producerProfile.id,
+              businessName: user.producerProfile.businessName,
+              verificationStatus: user.producerProfile.verificationStatus,
+              location: user.producerProfile.location,
+              ...producerStats
+            } : undefined
+          };
+        })
+      );
   
       return {
         success: true,
         data: {
-          users: transformedUsers,
+          users: usersWithStats,
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),

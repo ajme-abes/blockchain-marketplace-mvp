@@ -1,6 +1,6 @@
 const express = require('express');
 const userService = require('../services/userService');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkUserStatus, } = require('../middleware/auth');
 const { prisma } = require('../config/database');
 const router = express.Router();
 
@@ -164,7 +164,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Get user by ID (Protected)
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -258,7 +258,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 
-router.put('/profile', authenticateToken, async (req, res) => {
+router.put('/profile', authenticateToken,  checkUserStatus, async (req, res) => {
   try {
     const { name, phone, address, languagePreference, region, bio } = req.body;
     const userId = req.user.id;

@@ -1,10 +1,10 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkUserStatus } = require('../middleware/auth');
 const notificationService = require('../services/notificationService');
 const router = express.Router();
 
 // Get user notifications
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     
@@ -34,7 +34,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Mark notification as read
-router.patch('/:id/read', authenticateToken, async (req, res) => {
+router.patch('/:id/read', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -60,7 +60,7 @@ router.patch('/:id/read', authenticateToken, async (req, res) => {
 });
 
 // Mark all notifications as read
-router.patch('/read-all', authenticateToken, async (req, res) => {
+router.patch('/read-all', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const result = await notificationService.markAllAsRead(req.user.id);
 

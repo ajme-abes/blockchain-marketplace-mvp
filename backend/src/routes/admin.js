@@ -1,10 +1,10 @@
 const express = require('express');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, checkUserStatus  } = require('../middleware/auth');
 const adminService = require('../services/adminService');
 const router = express.Router();
 
 // All admin routes require ADMIN role
-router.use(authenticateToken, requireRole(['ADMIN']));
+router.use(authenticateToken, checkUserStatus, requireRole(['ADMIN']));
 
 // ==================== DASHBOARD STATISTICS ====================
 router.get('/dashboard/stats', async (req, res) => {
@@ -306,6 +306,408 @@ router.get('/analytics/payments', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get payment analytics'
+    });
+  }
+});
+
+// ==================== ENHANCED USER MANAGEMENT ====================
+router.get('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        producerProfile: {
+          include: {
+            products: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                listingDate: true
+              }
+            }
+          }
+        },
+        buyerProfile: {
+          include: {
+            orders: {
+              include: {
+                orderItems: {
+                  include: {
+                    product: {
+                      select: {
+                        name: true,
+                        price: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: {
+                orderDate: 'desc'
+              },
+              take: 10
+            },
+            reviews: {
+              include: {
+                product: {
+                  select: {
+                    name: true
+                  }
+                }
+              },
+              orderBy: {
+                reviewDate: 'desc'
+              },
+              take: 10
+            }
+          }
+        },
+        orders: {
+          include: {
+            orderItems: {
+              include: {
+                product: {
+                  select: {
+                    name: true,
+                    price: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            orderDate: 'desc'
+          },
+          take: 10 // 🆕 INCREASE THIS
+        },
+        sessions: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 5
+        },
+        auditLogs: {
+          orderBy: {
+            timestamp: 'desc'
+          },
+          take: 10
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // 🆕 CALCULATE RATING FOR PRODUCERS
+    let producerRating = { rating: 0, reviewCount: 0 };
+    if (user.role === 'PRODUCER' && user.producerProfile) {
+      const ratingData = await prisma.review.aggregate({
+        where: {
+          product: {
+            producerId: user.producerProfile.id
+          }
+        },
+        _avg: { rating: true },
+        _count: { id: true }
+      });
+      
+      producerRating = {
+        rating: ratingData._avg.rating || 0,
+        reviewCount: ratingData._count.id || 0
+      };
+    }
+
+    // Calculate stats
+    const totalOrders = await prisma.order.count({
+      where: { buyerId: user.buyerProfile?.id }
+    });
+
+    const totalSpent = await prisma.order.aggregate({
+      where: { 
+        buyerId: user.buyerProfile?.id,
+        paymentStatus: 'CONFIRMED'
+      },
+      _sum: { totalAmount: true }
+    });
+
+    const totalProducts = await prisma.product.count({
+      where: { producerId: user.producerProfile?.id }
+    });
+
+    const totalSales = await prisma.order.aggregate({
+      where: { 
+        orderItems: {
+          some: {
+            product: {
+              producerId: user.producerProfile?.id
+            }
+          }
+        },
+        paymentStatus: 'CONFIRMED'
+      },
+      _sum: { totalAmount: true }
+    });
+
+    const userWithStats = {
+      ...user,
+      buyer: user.buyerProfile ? {
+        ...user.buyerProfile,
+        totalOrders,
+        totalSpent: totalSpent._sum.totalAmount || 0,
+        averageOrderValue: totalOrders > 0 ? (totalSpent._sum.totalAmount || 0) / totalOrders : 0
+      } : null,
+      producer: user.producerProfile ? {
+        ...user.producerProfile,
+        totalProducts,
+        totalSales: totalSales._sum.totalAmount || 0,
+        ...producerRating // 🆕 ADD RATING DATA
+      } : null
+    };
+
+    res.json({
+      status: 'success',
+      data: {
+        user: userWithStats
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin get user details error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get user details'
+    });
+  }
+});
+
+// SUSPEND USER
+router.patch('/users/:id/suspend', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { status: 'SUSPENDED' }
+    });
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_SUSPENDED',
+        entity: 'USER',
+        entityId: id,
+        userId: req.user.id,
+        oldValues: { status: 'ACTIVE' },
+        newValues: { status: 'SUSPENDED', reason },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User suspended successfully',
+      data: { user }
+    });
+
+  } catch (error) {
+    console.error('Admin suspend user error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to suspend user'
+    });
+  }
+});
+
+// ACTIVATE USER
+router.patch('/users/:id/activate', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { status: 'ACTIVE' }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_ACTIVATED',
+        entity: 'USER',
+        entityId: id,
+        userId: req.user.id,
+        oldValues: { status: 'SUSPENDED' },
+        newValues: { status: 'ACTIVE' },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User activated successfully',
+      data: { user }
+    });
+
+  } catch (error) {
+    console.error('Admin activate user error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to activate user'
+    });
+  }
+});
+
+// DELETE USER
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Use transaction to delete related records
+    await prisma.$transaction(async (tx) => {
+      // Delete user and related records will cascade
+      await tx.user.delete({
+        where: { id }
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_DELETED',
+        entity: 'USER',
+        entityId: id,
+        userId: req.user.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Admin delete user error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete user'
+    });
+  }
+});
+
+// ENHANCED USER LISTING WITH STATS
+router.get('/users-with-stats', async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search = '', role, status, verification } = req.query;
+    
+    const skip = (page - 1) * limit;
+    
+    // Build where clause with filters
+    const whereClause = {};
+    
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (role && role !== 'all') {
+      whereClause.role = role;
+    }
+    
+    if (status && status !== 'all') {
+      whereClause.status = status;
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where: whereClause,
+        include: {
+          buyerProfile: {
+            select: {
+              id: true,
+              preferredPaymentMethod: true
+            }
+          },
+          producerProfile: {
+            select: {
+              id: true,
+              businessName: true,
+              verificationStatus: true,
+              location: true
+            }
+          }
+        },
+        orderBy: { registrationDate: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.user.count({ where: whereClause })
+    ]);
+
+    // Calculate stats for the cards
+    const stats = {
+      total: await prisma.user.count(),
+      buyers: await prisma.user.count({ where: { role: 'BUYER' } }),
+      producers: await prisma.user.count({ where: { role: 'PRODUCER' } }),
+      admins: await prisma.user.count({ where: { role: 'ADMIN' } }),
+      pendingVerifications: await prisma.producer.count({ 
+        where: { verificationStatus: 'PENDING' } 
+      }),
+      suspended: await prisma.user.count({ where: { status: 'SUSPENDED' } })
+    };
+
+    // Transform users to match frontend structure
+    const transformedUsers = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      registrationDate: user.registrationDate,
+      address: user.address,
+      region: user.region,
+      status: user.status,
+      buyer: user.buyerProfile ? {
+        id: user.buyerProfile.id,
+        preferredPaymentMethod: user.buyerProfile.preferredPaymentMethod
+      } : undefined,
+      producer: user.producerProfile ? {
+        id: user.producerProfile.id,
+        businessName: user.producerProfile.businessName,
+        verificationStatus: user.producerProfile.verificationStatus,
+        location: user.producerProfile.location
+      } : undefined
+    }));
+
+    res.json({
+      status: 'success',
+      data: {
+        users: transformedUsers,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        },
+        stats // This will fix your stats cards!
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin get users with stats error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get users with stats'
     });
   }
 });

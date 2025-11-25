@@ -26,6 +26,7 @@ model User {
   verificationTokenExpires DateTime?
   resetToken               String?   @unique
   resetTokenExpires        DateTime?
+  status UserStatus @default(ACTIVE)
 
   // Relations
   chatParticipants ChatParticipant[]
@@ -417,6 +418,12 @@ enum IPFSCategory {
   DOCUMENT
   PAYMENT_PROOF
   BUSINESS_LICENSE
+}
+enum UserStatus {
+  ACTIVE
+  SUSPENDED  
+  INACTIVE
+  BANNED
 }
 
 model Dispute {

@@ -33,12 +33,8 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     console.log('🔧 Verifying JWT token...');
-    console.log('🔧 JWT Secret exists:', !!process.env.JWT_SECRET);
-    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('🔧 Token decoded successfully:', decoded);
     
-    // Check if prisma is available
     if (!prisma) {
       console.error('❌ Prisma client not available in middleware');
       return res.status(500).json({ 
@@ -47,14 +43,16 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Verify user still exists and is active
+    // 🆕 GET USER WITH STATUS INFORMATION
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
         id: true,
         email: true,
         role: true,
-        name: true
+        name: true,
+        status: true, // 🆕 ADD STATUS
+        emailVerified: true // 🆕 ADD EMAIL VERIFIED
       }
     });
 
@@ -66,7 +64,17 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    console.log('✅ User authenticated:', user.email);
+    // 🆕 CHECK USER STATUS IMMEDIATELY
+    if (user.status === 'SUSPENDED' || user.status === 'BANNED') {
+      console.log(`🚫 Blocked suspended user during auth: ${user.email} (${user.status})`);
+      return res.status(403).json({ 
+        error: 'Your account has been suspended. Please contact support.',
+        code: 'ACCOUNT_SUSPENDED',
+        status: user.status
+      });
+    }
+
+    console.log('✅ User authenticated:', { email: user.email, role: user.role, status: user.status });
     req.user = user;
     next();
   } catch (error) {
@@ -110,6 +118,59 @@ const requireRole = (roles) => {
   };
 };
 
+const checkUserStatus = async (req, res, next) => {
+  // Only check if user is authenticated
+  if (req.user && req.user.id) {
+    try {
+      // Get full user data including status
+      const userWithStatus = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          name: true,
+          status: true, // 🆕 CHECK STATUS
+          emailVerified: true
+        }
+      });
+
+      if (!userWithStatus) {
+        return res.status(401).json({ 
+          error: 'User account not found',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+
+      // 🆕 CHECK IF USER IS SUSPENDED OR BANNED
+      if (userWithStatus.status === 'SUSPENDED' || userWithStatus.status === 'BANNED') {
+        console.log(`🚫 Blocked suspended user access: ${userWithStatus.email} (${userWithStatus.status})`);
+        return res.status(403).json({ 
+          error: 'Your account has been suspended. Please contact support.',
+          code: 'ACCOUNT_SUSPENDED',
+          status: userWithStatus.status
+        });
+      }
+
+      // 🆕 OPTIONAL: Check for inactive users
+      if (userWithStatus.status === 'INACTIVE') {
+        console.log(`⚠️ Inactive user accessing: ${userWithStatus.email}`);
+        // You can choose to block or allow with warning
+      }
+
+      // Update req.user with status information
+      req.user.status = userWithStatus.status;
+      req.user.emailVerified = userWithStatus.emailVerified;
+
+    } catch (error) {
+      console.error('❌ Error checking user status:', error);
+      // Don't block access if status check fails, but log it
+      console.warn('⚠️ Could not verify user status, proceeding with caution');
+    }
+  }
+  next();
+};
+
 const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -138,7 +199,8 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = { 
   authenticateToken, 
-  requireRole, 
+  requireRole,
+  checkUserStatus, 
   optionalAuth,
   requireVerifiedEmail: require('./requireVerifiedEmail').requireVerifiedEmail 
 };

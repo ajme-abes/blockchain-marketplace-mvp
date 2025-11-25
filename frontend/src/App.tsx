@@ -35,6 +35,7 @@ import TransactionDetail from "./pages/common/TransactionDetail";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
+import UserDetail from "./pages/admin/UserDetail";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
 import AdminDisputeDetail from "./pages/admin/AdminDisputeDetail";
@@ -291,10 +292,12 @@ const App = () => (
                           <AdminDisputeDetail />
                         </RoleRoute>
                       } />
-
-
-
-
+                      <Route path="/admin/users/:userId" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                          <UserDetail />
+                        </RoleRoute>
+                      } />
+                      
                       {/* ==================== FALLBACK ROUTE ==================== */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
