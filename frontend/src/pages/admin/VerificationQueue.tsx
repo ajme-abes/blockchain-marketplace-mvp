@@ -43,7 +43,9 @@ import {
   Download,
   ArrowLeft,
   Store,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw,
+  Images
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,6 +60,7 @@ interface Producer {
     registrationDate: string;
     region?: string;
     avatarUrl?: string;
+    fileSize?: number; 
   };
   businessName: string;
   businessDescription?: string;
@@ -76,6 +79,11 @@ interface Producer {
   rejectionReason?: string;
   verifiedAt?: string;
   verifiedBy?: string;
+  products?: Array<{ // 🆕 ADD PRODUCTS COUNT
+    id: string;
+    name: string;
+    status: string;
+  }>;
 }
 
 const VerificationQueue = () => {
@@ -88,6 +96,9 @@ const VerificationQueue = () => {
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<'verify' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState<any>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -274,7 +285,7 @@ const VerificationQueue = () => {
                         <div className="text-2xl font-bold">
                           {producers.filter(p => getDaysInQueue(p.verificationSubmittedAt) > 7).length}
                         </div>
-                        <div className="text-sm text-muted-foreground">Overdue (>7 days)</div>
+                        <div className="text-sm text-muted-foreground">Overdue ({'>'}7 days)</div>
                       </div>
                     </div>
                   </CardContent>
@@ -494,7 +505,7 @@ const VerificationQueue = () => {
               Review business information and documents for verification
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedProducer && (
             <div className="space-y-6">
               {/* Business Header */}
@@ -535,7 +546,7 @@ const VerificationQueue = () => {
                         <div className="text-sm text-muted-foreground">Business Owner</div>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
@@ -590,30 +601,67 @@ const VerificationQueue = () => {
                   )}
 
                   {/* Business Documents */}
-                  {selectedProducer.documents && selectedProducer.documents.length > 0 && (
+                  {selectedProducer.documents && selectedProducer.documents.length > 0 ? (
                     <div>
-                      <div className="text-sm text-muted-foreground mb-2">Submitted Documents</div>
-                      <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground mb-3">Submitted Documents</div>
+                      <div className="space-y-3">
                         {selectedProducer.documents.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-5 w-5 text-blue-500" />
-                              <div>
+                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                            <div className="flex items-center gap-3 flex-1">
+                              {/* Document Icon based on type */}
+                              {doc.type.includes('image') ? (
+                                <Images className="h-8 w-8 text-blue-500" />
+                              ) : doc.type.includes('pdf') ? (
+                                <FileText className="h-8 w-8 text-red-500" />
+                              ) : (
+                                <FileText className="h-8 w-8 text-gray-500" />
+                              )}
+                              <div className="flex-1">
                                 <div className="font-medium">{doc.filename}</div>
                                 <div className="text-sm text-muted-foreground">
-                                  {doc.type} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                                  {doc.type} • {Math.round((doc.fileSize || 0) / 1024)} KB •
+                                  {new Date(doc.uploadedAt).toLocaleDateString()}
                                 </div>
                               </div>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => window.open(doc.url, '_blank')}
-                            >
-                              View Document
-                            </Button>
+                            <div className="flex gap-2">
+                              {/* 🆕 PREVIEW BUTTON */}
+                              <Button
+  variant="outline"
+  size="sm"
+  onClick={() => {
+    setCurrentDocument(doc);
+    setPreviewModalOpen(true);
+  }}
+>
+  <Eye className="h-4 w-4 mr-1" />
+  Preview
+</Button>
+                              {/* 🆕 DOWNLOAD BUTTON */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = doc.url;
+                                  link.download = doc.filename;
+                                  link.click();
+                                }}
+                              >
+                                <Download className="h-4 w-4 mr-1" />
+                                Download
+                              </Button>
+                            </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 border rounded-lg bg-muted/20">
+                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <div className="text-muted-foreground">No documents submitted</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        This producer hasn't uploaded any verification documents yet.
                       </div>
                     </div>
                   )}
@@ -701,6 +749,77 @@ const VerificationQueue = () => {
               {selectedAction === 'verify' && 'Verify Producer'}
               {selectedAction === 'reject' && 'Reject Verification'}
             </Button>
+            <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+  <DialogContent className="max-w-4xl max-h-[90vh]">
+    <DialogHeader>
+      <DialogTitle>{currentDocument?.filename}</DialogTitle>
+      <DialogDescription>
+        Document preview - {currentDocument?.type}
+      </DialogDescription>
+    </DialogHeader>
+    
+    {currentDocument && (
+      <div className="flex justify-center">
+        {currentDocument.type.includes('image') ? (
+          // Image Preview
+          <img 
+            src={currentDocument.url} 
+            alt={currentDocument.filename}
+            className="max-w-full max-h-[70vh] object-contain rounded-lg"
+          />
+        ) : currentDocument.type.includes('pdf') ? (
+          // PDF Preview (embedded)
+          <div className="w-full h-[70vh] border rounded-lg">
+            <iframe 
+              src={currentDocument.url} 
+              className="w-full h-full"
+              title={currentDocument.filename}
+            />
+          </div>
+        ) : (
+          // Other file types - download only
+          <div className="text-center py-12">
+            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <div className="text-lg font-medium mb-2">Document Preview Not Available</div>
+            <div className="text-muted-foreground mb-4">
+              This file type cannot be previewed in the browser.
+            </div>
+            <Button
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = currentDocument.url;
+                link.download = currentDocument.filename;
+                link.click();
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download File
+            </Button>
+          </div>
+        )}
+      </div>
+    )}
+    
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => {
+          const link = document.createElement('a');
+          link.href = currentDocument.url;
+          link.download = currentDocument.filename;
+          link.click();
+        }}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        Download
+      </Button>
+      <Button onClick={() => setPreviewModalOpen(false)}>
+        Close Preview
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+            
           </DialogFooter>
         </DialogContent>
       </Dialog>

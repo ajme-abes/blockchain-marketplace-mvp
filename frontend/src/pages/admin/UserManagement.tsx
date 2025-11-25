@@ -360,12 +360,12 @@ const fetchUsers = async (page = 1, search = '') => {
                   Refresh
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => navigate('/admin/users/verifications')}
-                >
-                  <UserCheck className="h-4 w-4 mr-2" />
-                  Verifications ({stats.pendingVerifications})
-                </Button>
+  variant="outline"
+  onClick={() => navigate('/admin/verification-queue')}
+>
+  <UserCheck className="h-4 w-4 mr-2" />
+  Verification Queue ({stats.pendingVerifications})
+</Button>
               </div>
             }
           />

@@ -65,11 +65,30 @@ model Producer {
   userId   String    @unique
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   products Product[]
+  documents      ProducerDocument[]
 
   @@index([verificationStatus])
   @@index([businessName])
   @@index([userId])
   @@map("producers")
+}
+
+model ProducerDocument {
+  id          String   @id @default(uuid())
+  producerId  String
+  type        String   // LICENSE, TAX_ID, BUSINESS_REGISTRATION, etc.
+  url         String
+  filename    String
+  fileSize    Int?
+  mimeType    String?
+  uploadedAt  DateTime @default(now())
+
+  // Relations - ONLY ONE RELATION NEEDED
+  producer    Producer @relation(fields: [producerId], references: [id], onDelete: Cascade)
+
+  @@index([producerId])
+  @@index([type]) // Changed from documentType to type
+  @@map("producer_documents")
 }
 
 model Buyer {

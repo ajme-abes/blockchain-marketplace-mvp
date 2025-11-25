@@ -306,27 +306,70 @@ const UserDetail = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader
-            title="User Management"
-            description={`Managing ${user.name}'s account`}
-            action={
-              <div className="flex gap-2">
+<PageHeader
+  title="User Management"
+  description={`Managing ${user.name}'s account`}
+  action={
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        onClick={() => navigate('/admin/users')}
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Users
+      </Button>
+      
+      {/* 🆕 ADD VERIFICATION QUEUE BUTTON FOR PRODUCERS */}
+      {user.role === 'PRODUCER' && user.producer && (
+        <Button
+          variant="outline"
+          onClick={() => navigate('/admin/verification-queue')}
+        >
+          <UserCheck className="h-4 w-4 mr-2" />
+          Verification Queue
+        </Button>
+      )}
+      
+      {/* Action Buttons based on user status */}
+      {user.status === 'ACTIVE' ? (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSelectedAction('suspend');
+            setActionDialogOpen(true);
+          }}
+        >
+          <Ban className="h-4 w-4 mr-2" />
+          Suspend User
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSelectedAction('activate');
+            setActionDialogOpen(true);
+          }}
+        >
+          <UserCheck className="h-4 w-4 mr-2" />
+          Activate User
+        </Button>
+      )}
 
-                {/* Producer Verification */}
-                {user.role === 'PRODUCER' && user.producer?.verificationStatus === 'PENDING' && (
-                  <Button
-                    onClick={() => {
-                      setSelectedAction('verify');
-                      setActionDialogOpen(true);
-                    }}
-                  >
-                    <UserCheck className="h-4 w-4 mr-2" />
-                    Verify Producer
-                  </Button>
-                )}
-              </div>
-            }
-          />
+      {/* Producer Verification */}
+      {user.role === 'PRODUCER' && user.producer?.verificationStatus === 'PENDING' && (
+        <Button
+          onClick={() => {
+            setSelectedAction('verify');
+            setActionDialogOpen(true);
+          }}
+        >
+          <UserCheck className="h-4 w-4 mr-2" />
+          Verify Producer
+        </Button>
+      )}
+    </div>
+  }
+/>
 
           <main className="flex-1 p-6">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -705,6 +748,23 @@ const UserDetail = () => {
                               )}
                             </div>
                           )}
+{user.role === 'PRODUCER' && (
+  <div className="flex items-center justify-between p-4 border rounded-lg">
+    <div>
+      <div className="font-medium">Verification Management</div>
+      <div className="text-sm text-muted-foreground">
+        Manage this producer's verification status and view all pending verifications
+      </div>
+    </div>
+    <Button
+  variant="outline"
+  onClick={() => navigate('/admin/verification-queue')}
+>
+  <UserCheck className="h-4 w-4 mr-2" />
+  View Verification Queue
+</Button>
+  </div>
+)}
 
                           <div className="flex items-center justify-between p-4 border rounded-lg">
                             <div>

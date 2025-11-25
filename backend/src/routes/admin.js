@@ -66,7 +66,7 @@ router.get('/users', async (req, res) => {
 router.patch('/producers/:producerId/verify', async (req, res) => {
   try {
     const { producerId } = req.params;
-    const { status } = req.body;
+    const { status, reason } = req.body;
     const adminId = req.user.id;
 
     if (!['VERIFIED', 'REJECTED'].includes(status)) {
@@ -76,24 +76,57 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
       });
     }
 
-    const result = await adminService.updateProducerVerification(
-      producerId, 
-      status, 
-      adminId
+    // Update producer verification status
+    const producer = await prisma.producer.update({
+      where: { id: producerId },
+      data: { 
+        verificationStatus: status 
+      },
+      include: {
+        user: {
+          select: { name: true, email: true }
+        }
+      }
+    });
+
+    // 🆕 CREATE NOTIFICATION FOR PRODUCER
+    const notificationService = require('../services/notificationService');
+    let notificationMessage = '';
+    
+    if (status === 'VERIFIED') {
+      notificationMessage = 'Your producer account has been verified! You can now list products and start selling.';
+    } else {
+      notificationMessage = `Your producer verification was rejected.${reason ? ` Reason: ${reason}` : ''}`;
+    }
+
+    await notificationService.createNotification(
+      producer.userId,
+      notificationMessage,
+      'SECURITY'
     );
 
-    if (result.success) {
-      res.json({
-        status: 'success',
-        message: `Producer verification ${status.toLowerCase()} successfully`,
-        data: result.producer
-      });
-    } else {
-      res.status(400).json({
-        status: 'error',
-        message: result.error
-      });
-    }
+    // 🆕 LOG THE ACTION
+    await prisma.auditLog.create({
+      data: {
+        action: status === 'VERIFIED' ? 'PRODUCER_VERIFIED' : 'PRODUCER_REJECTED',
+        entity: 'PRODUCER',
+        entityId: producerId,
+        userId: adminId,
+        newValues: { 
+          verificationStatus: status,
+          ...(reason && { rejectionReason: reason })
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: `Producer verification ${status.toLowerCase()} successfully`,
+      data: { producer }
+    });
+
   } catch (error) {
     console.error('Admin verify producer error:', error);
     res.status(500).json({
@@ -708,6 +741,88 @@ router.get('/users-with-stats', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get users with stats'
+    });
+  }
+});
+
+// ==================== VERIFICATION QUEUE ====================
+router.get('/producers/verification-queue', async (req, res) => {
+  try {
+    // Get producers with PENDING verification status
+    const producers = await prisma.producer.findMany({
+      where: { 
+        verificationStatus: 'PENDING' 
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            registrationDate: true,
+            region: true,
+            avatarUrl: true
+          }
+        },
+        products: {
+          select: {
+            id: true,
+            name: true,
+            status: true
+          }
+        },
+        // 🆕 INCLUDE DOCUMENTS
+        documents: {
+          select: {
+            id: true,
+            type: true,
+            url: true,
+            filename: true,
+            uploadedAt: true
+          }
+        }
+      },
+      orderBy: {
+        user: {
+          registrationDate: 'desc'
+        }
+      }
+    });
+
+    // Transform to match frontend interface
+    const transformedProducers = producers.map(producer => ({
+      id: producer.id,
+      userId: producer.userId,
+      user: producer.user,
+      businessName: producer.businessName,
+      businessDescription: producer.businessDescription,
+      location: producer.location,
+      verificationStatus: producer.verificationStatus,
+      verificationSubmittedAt: producer.user.registrationDate,
+      // 🆕 NOW INCLUDES REAL DOCUMENTS
+      documents: producer.documents.map(doc => ({
+        id: doc.id,
+        type: doc.type,
+        url: doc.url,
+        filename: doc.filename,
+        uploadedAt: doc.uploadedAt
+      })),
+      products: producer.products // 🆕 ADD PRODUCTS COUNT
+    }));
+
+    res.json({
+      status: 'success',
+      data: {
+        producers: transformedProducers
+      }
+    });
+
+  } catch (error) {
+    console.error('Get verification queue error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get verification queue'
     });
   }
 });

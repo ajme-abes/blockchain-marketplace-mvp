@@ -39,6 +39,7 @@ import UserDetail from "./pages/admin/UserDetail";
 import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
 import AdminDisputeDetail from "./pages/admin/AdminDisputeDetail";
+import VerificationQueue from "./pages/admin/VerificationQueue";
 import DisputesList from "./pages/buyer/DisputesList";
 import DisputeDetail from "./pages/common/DisputeDetail";
 import ProducerOrders from "./pages/producer/ProducerOrders";
@@ -295,6 +296,11 @@ const App = () => (
                       <Route path="/admin/users/:userId" element={
                         <RoleRoute allowedRoles={['admin']}>
                           <UserDetail />
+                        </RoleRoute>
+                      } />
+                     <Route path="/admin/verification-queue" element={
+                        <RoleRoute allowedRoles={['admin']}>
+                            <VerificationQueue />
                         </RoleRoute>
                       } />
                       
