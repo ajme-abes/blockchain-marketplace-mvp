@@ -1167,6 +1167,281 @@ router.get('/products/pending-review', async (req, res) => {
   }
 });
 
+// ==================== ORDER MANAGEMENT ====================
+
+// Get all orders with admin filters
+router.get('/orders', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      paymentStatus, 
+      deliveryStatus,
+      search = '',
+      dateFrom,
+      dateTo,
+      buyerId,
+      producerId,
+      minAmount,
+      maxAmount,
+      sortBy = 'orderDate',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    const result = await adminService.getAdminOrders({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      paymentStatus,
+      deliveryStatus,
+      search,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      buyerId,
+      producerId,
+      minAmount: minAmount ? parseFloat(minAmount) : undefined,
+      maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
+      sortBy,
+      sortOrder
+    });
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get orders error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get orders'
+    });
+  }
+});
+
+// Get order statistics
+router.get('/orders/stats', async (req, res) => {
+  try {
+    const { period = 'monthly' } = req.query; // daily, weekly, monthly, yearly
+    
+    const result = await adminService.getOrderStats(period);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin order stats error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get order statistics'
+    });
+  }
+});
+
+// Get order detail for admin
+router.get('/orders/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const result = await adminService.getAdminOrderDetail(orderId);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(404).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get order detail error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get order details'
+    });
+  }
+});
+
+// Update order status (admin override)
+router.patch('/orders/:orderId/status', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, reason } = req.body;
+    const adminId = req.user.id;
+
+    const validStatuses = ['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    const result = await adminService.updateOrderStatus(orderId, status, adminId, reason);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: `Order status updated to ${status}`,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin update order status error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update order status'
+    });
+  }
+});
+
+// Cancel order (admin override)
+router.post('/orders/:orderId/cancel', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.id;
+
+    const result = await adminService.cancelOrder(orderId, adminId, reason);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: 'Order cancelled successfully',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin cancel order error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to cancel order'
+    });
+  }
+});
+
+// Bulk order actions
+router.post('/orders/bulk-actions', async (req, res) => {
+  try {
+    const { orderIds, action, reason } = req.body;
+    const adminId = req.user.id;
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Order IDs are required and must be an array'
+      });
+    }
+
+    const validActions = ['cancel', 'mark_shipped', 'mark_delivered'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid action. Must be one of: ${validActions.join(', ')}`
+      });
+    }
+
+    const result = await adminService.bulkOrderActions(orderIds, action, adminId, reason);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: `Bulk action completed: ${result.data.processed} orders processed`,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin bulk order actions error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to perform bulk actions'
+    });
+  }
+});
+
+// Get revenue analytics
+router.get('/analytics/revenue', async (req, res) => {
+  try {
+    const { period = 'monthly', months = 12 } = req.query;
+    
+    const result = await adminService.getRevenueAnalytics(period, parseInt(months));
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin revenue analytics error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get revenue analytics'
+    });
+  }
+});
+
+// Get orders requiring attention
+router.get('/orders/attention-required', async (req, res) => {
+  try {
+    const result = await adminService.getOrdersRequiringAttention();
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get attention required orders error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get orders requiring attention'
+    });
+  }
+});
+
 // Helper function to map action to display text
 function mapActionToText(action) {
   const actionMap = {

@@ -40,6 +40,7 @@ import ProductManagement from "./pages/admin/ProductManagement";
 import DisputeManagement from "./pages/admin/DisputeManagement";
 import AdminDisputeDetail from "./pages/admin/AdminDisputeDetail";
 import VerificationQueue from "./pages/admin/VerificationQueue";
+import OrderManagement from "./pages/admin/OrderManagement";
 import DisputesList from "./pages/buyer/DisputesList";
 import DisputeDetail from "./pages/common/DisputeDetail";
 import ProducerOrders from "./pages/producer/ProducerOrders";
@@ -299,7 +300,14 @@ const App = () => (
                             <VerificationQueue />
                         </RoleRoute>
                       } />
-                      
+
+                      <Route path="/admin/orders" element = {
+                        <RoleRoute allowedRoles={['admin']}>
+                           <OrderManagement />
+                        </RoleRoute>
+
+                      } />
+                       
                       {/* ==================== FALLBACK ROUTE ==================== */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
