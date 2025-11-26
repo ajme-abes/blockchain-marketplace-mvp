@@ -16,6 +16,9 @@ import {
   BarChart2,
   History, 
   AlertTriangle,
+  Shield,
+  FileText,
+  TrendingUp,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -42,23 +45,43 @@ export const AppSidebar = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, toggleLanguage } = useLanguage();
 
-  const commonLinks = [
+  // Core links for ALL roles
+  const coreLinks = [
     { title: 'Dashboard', url: '/dashboard', icon: Home },
-    { title: 'Marketplace', url: '/marketplace', icon: ShoppingBag },
-    { title: 'Chats', url: '/chats', icon: MessageSquare },
     { title: 'Profile', url: '/profile', icon: User },
     { title: 'Settings', url: '/settings', icon: Settings },
     { title: 'About Us', url: '/about', icon: Info },
   ];
+
+  // Role-specific additional common links
+  const getRoleSpecificLinks = (role: string) => {
+    switch (role) {
+      case 'BUYER':
+        return [
+          { title: 'Marketplace', url: '/marketplace', icon: ShoppingBag },
+          { title: 'Chats', url: '/chats', icon: MessageSquare },
+        ];
+      case 'PRODUCER':
+        return [
+          { title: 'Chats', url: '/chats', icon: MessageSquare },
+        ];
+      case 'ADMIN':
+        return [
+          { title: 'System Monitor', url: '/admin/monitor', icon: Shield },
+        ];
+      default:
+        return [];
+    }
+  };
 
   const producerLinks = [
     { title: 'My Products', url: '/my-products', icon: Package },
     { title: 'Order Management', url: '/producer/orders', icon: ShoppingCart },
     { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
     { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, 
-    { title: 'Analytics', url: '/producer/analytics', icon: BarChart2 },
+    { title: 'Sales Analytics', url: '/producer/analytics', icon: BarChart2 },
     { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
-    { title: 'Store Disputes', url: '/producer/disputes', icon: AlertTriangle }, 
+    { title: 'My Disputes', url: '/producer/disputes', icon: AlertTriangle }, 
   ];
 
   const buyerLinks = [
@@ -68,11 +91,18 @@ export const AppSidebar = () => {
   ];
 
   const adminLinks = [
-    { title: 'Manage Users', url: '/admin/users', icon: Users },
-    { title: 'Manage Products', url: '/admin/products', icon: Wrench },
-    { title: 'Disputes', url: '/admin/disputes', icon: Scale },
+    { title: 'Admin Dashboard', url: '/admin/dashboard', icon: BarChart2 },
+    { title: 'User Management', url: '/admin/users', icon: Users },
+    { title: 'Product Management', url: '/admin/products', icon: Package },
+    { title: 'Order Management', url: '/admin/orders', icon: ShoppingCart },
+    { title: 'Dispute Management', url: '/admin/disputes', icon: Scale },
+    { title: 'System Analytics', url: '/admin/analytics', icon: TrendingUp },
+    { title: 'Audit Logs', url: '/admin/logs', icon: FileText },
+    { title: 'System Settings', url: '/admin/settings', icon: Settings },
   ];
 
+  const commonLinks = [...coreLinks, ...getRoleSpecificLinks(user?.role || '')];
+  
   let roleLinks: typeof commonLinks = [];
   if (user?.role === 'PRODUCER') roleLinks = producerLinks;
   if (user?.role === 'BUYER') roleLinks = buyerLinks;
@@ -103,7 +133,7 @@ export const AppSidebar = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {commonLinks.map((item) => (
@@ -126,7 +156,10 @@ export const AppSidebar = () => {
 
         {roleLinks.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>{user?.role === 'ADMIN' ? 'Admin' : 'My Activity'}</SidebarGroupLabel>
+            <SidebarGroupLabel>
+              {user?.role === 'ADMIN' ? 'Admin Controls' : 
+               user?.role === 'PRODUCER' ? 'Business Tools' : 'My Activity'}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {roleLinks.map((item) => (

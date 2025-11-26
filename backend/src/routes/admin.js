@@ -853,6 +853,320 @@ router.get('/overview', async (req, res) => {
     });
   }
 });
+
+// ==================== PRODUCT MANAGEMENT ====================
+
+// Get all products with admin filters
+router.get('/products', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      status, 
+      category, 
+      search = '',
+      producerId,
+      verificationStatus,
+      minPrice,
+      maxPrice,
+      sortBy = 'listingDate',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    const result = await adminService.getAdminProducts({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      status,
+      category,
+      search,
+      producerId,
+      verificationStatus,
+      minPrice: minPrice ? parseFloat(minPrice) : undefined,
+      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+      sortBy,
+      sortOrder
+    });
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get products error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get products'
+    });
+  }
+});
+
+// Get product statistics
+router.get('/products/stats', async (req, res) => {
+  try {
+    const result = await adminService.getProductStats();
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin product stats error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get product statistics'
+    });
+  }
+});
+
+// Update product status (approve, reject, activate, deactivate)
+router.patch('/products/:productId/status', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { status, reason } = req.body;
+    const adminId = req.user.id;
+
+    const validStatuses = ['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK', 'PENDING_REVIEW', 'REJECTED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    const result = await adminService.updateProductStatus(productId, status, adminId, reason);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: `Product ${status.toLowerCase()} successfully`,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin update product status error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update product status'
+    });
+  }
+});
+
+// Bulk product actions
+router.post('/products/bulk-actions', async (req, res) => {
+  try {
+    const { productIds, action, reason } = req.body;
+    const adminId = req.user.id;
+
+    if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Product IDs are required and must be an array'
+      });
+    }
+
+    const validActions = ['activate', 'deactivate', 'approve', 'reject', 'delete'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid action. Must be one of: ${validActions.join(', ')}`
+      });
+    }
+
+    const result = await adminService.bulkProductActions(productIds, action, adminId, reason);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        message: `Bulk action completed: ${result.data.processed} products ${action}ed`,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin bulk product actions error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to perform bulk actions'
+    });
+  }
+});
+
+// Get product detail for admin
+router.get('/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const result = await adminService.getAdminProductDetail(productId);
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(404).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get product detail error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get product details'
+    });
+  }
+});
+
+// ==================== DELETE PRODUCT ====================
+router.delete('/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const adminId = req.user.id;
+
+    // Check if product exists
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: { name: true, email: true }
+            }
+          }
+        },
+        orderItems: {
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Product not found'
+      });
+    }
+
+    // Check if product has orders
+    if (product.orderItems && product.orderItems.length > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cannot delete product with existing orders. Please deactivate the product instead.',
+        data: {
+          orderCount: product.orderItems.length
+        }
+      });
+    }
+
+    // Use transaction to safely delete related records
+    await prisma.$transaction(async (tx) => {
+      // Delete IPFS file associations first
+      await tx.iPFSMetadata.updateMany({
+        where: { productId },
+        data: { productId: null }
+      });
+
+      // Delete the product
+      await tx.product.delete({
+        where: { id: productId }
+      });
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'PRODUCT_DELETED',
+        entity: 'PRODUCT',
+        entityId: productId,
+        userId: adminId,
+        oldValues: { 
+          name: product.name,
+          price: product.price,
+          status: product.status 
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    // Create notification for producer
+    const notificationService = require('./notificationService');
+    await notificationService.createNotification(
+      product.producer.userId,
+      `Your product "${product.name}" has been deleted by an administrator.`,
+      'SYSTEM'
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Product deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Admin delete product error:', error);
+    
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete product',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get products needing review (pending approval)
+router.get('/products/pending-review', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const result = await adminService.getPendingReviewProducts(
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    if (result.success) {
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        status: 'error',
+        message: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Admin get pending review products error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get pending review products'
+    });
+  }
+});
+
 // Helper function to map action to display text
 function mapActionToText(action) {
   const actionMap = {

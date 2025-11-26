@@ -435,6 +435,609 @@ class AdminService {
     }
   }
 
+  // ==================== PRODUCT MANAGEMENT ====================
+
+async getAdminProducts(filters = {}) {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      category,
+      search = '',
+      producerId,
+      verificationStatus,
+      minPrice,
+      maxPrice,
+      sortBy = 'listingDate',
+      sortOrder = 'desc'
+    } = filters;
+
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where = {};
+
+    if (status) where.status = status;
+    if (category) where.category = { contains: category, mode: 'insensitive' };
+    if (producerId) where.producerId = producerId;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      if (minPrice !== undefined) where.price.gte = minPrice;
+      if (maxPrice !== undefined) where.price.lte = maxPrice;
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { category: { contains: search, mode: 'insensitive' } },
+        {
+          producer: {
+            businessName: { contains: search, mode: 'insensitive' }
+          }
+        }
+      ];
+    }
+
+    // Add producer verification status filter
+    if (verificationStatus) {
+      where.producer = {
+        ...where.producer,
+        verificationStatus: verificationStatus
+      };
+    }
+
+    // Define allowed sort fields
+    const allowedSortFields = ['listingDate', 'price', 'name', 'averageRating', 'updatedAt'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'listingDate';
+    const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: {
+          producer: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true
+                }
+              }
+            }
+          },
+          reviews: {
+            select: {
+              rating: true
+            }
+          },
+          ipfsFiles: true,
+          _count: {
+            select: {
+              orderItems: true,
+              reviews: true
+            }
+          }
+        },
+        orderBy: { [sortField]: orderDirection },
+        skip,
+        take: limit
+      }),
+      prisma.product.count({ where })
+    ]);
+
+    // Format products with additional stats
+    const formattedProducts = products.map(product => {
+      const avgRating = product.reviews && product.reviews.length > 0 
+        ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
+        : null;
+
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.category,
+        quantityAvailable: product.quantityAvailable,
+        status: product.status,
+        imageUrl: product.imageUrl,
+        averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+        reviewCount: product.reviews.length,
+        orderCount: product._count.orderItems,
+        producer: {
+          id: product.producer.id,
+          businessName: product.producer.businessName,
+          verificationStatus: product.producer.verificationStatus,
+          location: product.producer.location,
+          user: product.producer.user
+        },
+        listingDate: product.listingDate,
+        updatedAt: product.updatedAt,
+        ipfsFiles: product.ipfsFiles
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        products: formattedProducts,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Get admin products error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async getProductStats() {
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      inactiveProducts,
+      outOfStockProducts,
+      pendingReviewProducts,
+      totalProducers,
+      categories,
+      recentProducts
+    ] = await Promise.all([
+      // Total products count
+      prisma.product.count(),
+      
+      // Active products
+      prisma.product.count({ where: { status: 'ACTIVE' } }),
+      
+      // Inactive products
+      prisma.product.count({ where: { status: 'INACTIVE' } }),
+      
+      // Out of stock products
+      prisma.product.count({ where: { status: 'OUT_OF_STOCK' } }),
+      
+      // Products pending review (if you have this status)
+      prisma.product.count({ where: { status: 'PENDING_REVIEW' } }),
+      
+      // Total producers with products
+      prisma.producer.count({
+        where: {
+          products: { some: {} }
+        }
+      }),
+      
+      // Category distribution
+      prisma.product.groupBy({
+        by: ['category'],
+        _count: { id: true },
+        where: { status: 'ACTIVE' }
+      }),
+      
+      // Recent products (last 7 days)
+      prisma.product.findMany({
+        where: {
+          listingDate: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          }
+        },
+        include: {
+          producer: {
+            include: {
+              user: {
+                select: { name: true }
+              }
+            }
+          }
+        },
+        orderBy: { listingDate: 'desc' },
+        take: 10
+      })
+    ]);
+
+    // Calculate category percentages
+    const categoryStats = categories.map(cat => ({
+      category: cat.category,
+      count: cat._count.id,
+      percentage: totalProducts > 0 ? (cat._count.id / totalProducts * 100) : 0
+    }));
+
+    return {
+      success: true,
+      data: {
+        overview: {
+          totalProducts,
+          activeProducts,
+          inactiveProducts,
+          outOfStockProducts,
+          pendingReviewProducts,
+          totalProducers
+        },
+        categories: categoryStats,
+        recentProducts: recentProducts.map(product => ({
+          id: product.id,
+          name: product.name,
+          category: product.category,
+          price: product.price,
+          status: product.status,
+          producer: product.producer.user.name,
+          listingDate: product.listingDate
+        })),
+        charts: {
+          statusDistribution: [
+            { status: 'Active', count: activeProducts },
+            { status: 'Inactive', count: inactiveProducts },
+            { status: 'Out of Stock', count: outOfStockProducts },
+            { status: 'Pending Review', count: pendingReviewProducts }
+          ]
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Get product stats error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async updateProductStatus(productId, status, adminId, reason = '') {
+  try {
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: { status },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: `PRODUCT_${status.toUpperCase()}`,
+        entity: 'PRODUCT',
+        entityId: productId,
+        userId: adminId,
+        oldValues: { status: product.status }, // Note: This shows the new status, would need previous state for accurate logging
+        newValues: { status, reason },
+        ipAddress: '127.0.0.1', // You might want to pass req.ip from the route
+        userAgent: 'Admin Service'
+      }
+    });
+
+    // Create notification for producer if status affects them
+    if (['INACTIVE', 'REJECTED', 'PENDING_REVIEW'].includes(status)) {
+      const notificationService = require('./notificationService');
+      let message = '';
+      
+      switch (status) {
+        case 'INACTIVE':
+          message = `Your product "${product.name}" has been deactivated.${reason ? ` Reason: ${reason}` : ''}`;
+          break;
+        case 'REJECTED':
+          message = `Your product "${product.name}" has been rejected.${reason ? ` Reason: ${reason}` : ''}`;
+          break;
+        case 'PENDING_REVIEW':
+          message = `Your product "${product.name}" is under review by administrators.`;
+          break;
+      }
+
+      if (message) {
+        await notificationService.createNotification(
+          product.producer.userId,
+          message,
+          'SYSTEM'
+        );
+      }
+    }
+
+    return {
+      success: true,
+      data: product
+    };
+  } catch (error) {
+    console.error('Update product status error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async bulkProductActions(productIds, action, adminId, reason = '') {
+  try {
+    let status;
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    // Map action to status
+    switch (action) {
+      case 'activate':
+        status = 'ACTIVE';
+        break;
+      case 'deactivate':
+        status = 'INACTIVE';
+        break;
+      case 'approve':
+        status = 'ACTIVE';
+        break;
+      case 'reject':
+        status = 'REJECTED';
+        break;
+      case 'delete':
+        // Handle delete separately
+        break;
+    }
+
+    if (action === 'delete') {
+      // Bulk delete products
+      for (const productId of productIds) {
+        try {
+          await prisma.product.delete({
+            where: { id: productId }
+          });
+          processed++;
+          results.push({ productId, success: true, action: 'deleted' });
+        } catch (error) {
+          failed++;
+          results.push({ productId, success: false, error: error.message });
+        }
+      }
+    } else {
+      // Bulk status update
+      for (const productId of productIds) {
+        try {
+          const product = await prisma.product.update({
+            where: { id: productId },
+            data: { status }
+          });
+          processed++;
+          results.push({ productId, success: true, action: 'updated', status });
+        } catch (error) {
+          failed++;
+          results.push({ productId, success: false, error: error.message });
+        }
+      }
+    }
+
+    // Create audit log for bulk action
+    await prisma.auditLog.create({
+      data: {
+        action: `BULK_PRODUCT_${action.toUpperCase()}`,
+        entity: 'PRODUCT',
+        entityId: `multiple_${productIds.length}`,
+        userId: adminId,
+        newValues: { 
+          action,
+          processed,
+          failed,
+          total: productIds.length,
+          reason 
+        },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Admin Service'
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        processed,
+        failed,
+        total: productIds.length,
+        results
+      }
+    };
+  } catch (error) {
+    console.error('Bulk product actions error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async getAdminProductDetail(productId) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                registrationDate: true
+              }
+            }
+          }
+        },
+        reviews: {
+          include: {
+            buyer: {
+              include: {
+                user: {
+                  select: {
+                    name: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: { reviewDate: 'desc' }
+        },
+        ipfsFiles: true,
+        orderItems: {
+          include: {
+            order: {
+              select: {
+                id: true,
+                orderDate: true,
+                totalAmount: true,
+                paymentStatus: true
+              }
+            }
+          },
+          orderBy: {
+            order: {
+              orderDate: 'desc'
+            }
+          },
+          take: 20
+        }
+      }
+    });
+
+    if (!product) {
+      return {
+        success: false,
+        error: 'Product not found'
+      };
+    }
+
+    // Calculate additional stats
+    const totalSales = product.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const totalOrders = new Set(product.orderItems.map(item => item.orderId)).size;
+
+    const avgRating = product.reviews.length > 0 
+      ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
+      : null;
+
+    const productWithStats = {
+      ...product,
+      totalSales,
+      totalOrders,
+      averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+      reviewCount: product.reviews.length
+    };
+
+    return {
+      success: true,
+      data: productWithStats
+    };
+  } catch (error) {
+    console.error('Get admin product detail error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+async getPendingReviewProducts(page = 1, limit = 20) {
+  try {
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: { 
+          status: 'PENDING_REVIEW' 
+        },
+        include: {
+          producer: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true,
+                  registrationDate: true
+                }
+              }
+            }
+          },
+          ipfsFiles: true,
+          _count: {
+            select: {
+              reviews: true,
+              orderItems: true
+            }
+          }
+        },
+        orderBy: { listingDate: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.product.count({ where: { status: 'PENDING_REVIEW' } })
+    ]);
+
+    const formattedProducts = products.map(product => {
+      const avgRating = product._count.reviews > 0 
+        ? product.reviews?.reduce((sum, review) => sum + review.rating, 0) / product._count.reviews 
+        : null;
+
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.category,
+        quantityAvailable: product.quantityAvailable,
+        status: product.status,
+        imageUrl: product.imageUrl,
+        averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+        reviewCount: product._count.reviews,
+        orderCount: product._count.orderItems,
+        producer: {
+          id: product.producer.id,
+          businessName: product.producer.businessName,
+          verificationStatus: product.producer.verificationStatus,
+          location: product.producer.location,
+          user: product.producer.user
+        },
+        listingDate: product.listingDate,
+        ipfsFiles: product.ipfsFiles
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        products: formattedProducts,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Get pending review products error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+
+
   // ==================== SYSTEM HEALTH ====================
   async getSystemHealth() {
     try {
