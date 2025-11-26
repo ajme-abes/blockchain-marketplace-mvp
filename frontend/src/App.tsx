@@ -186,11 +186,7 @@ const App = () => (
                           <BuyerTransactionHistory />
                         </RoleRoute>
                       } />
-                      <Route path="/order/:orderId/success" element={
-                        <RoleRoute allowedRoles={['buyer']}>
-                          <PaymentSuccess />
-                        </RoleRoute>
-                      } />
+                      <Route path="/order/:orderId/success" element={<PaymentSuccess />} />
                       <Route path="/buyer/disputes" element={
                         <RoleRoute allowedRoles={['buyer']}>
                           <DisputesList />

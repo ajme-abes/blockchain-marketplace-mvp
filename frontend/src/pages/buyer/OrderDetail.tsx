@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { orderService } from '@/services/orderService';
-import { paymentService } from '@/services/paymentService';
+import { paymentService, PaymentIntent } from '@/services/paymentService';
 import { useChat } from '@/contexts/ChatContext';
 import { MessageSquare, Loader2 } from 'lucide-react';
 import { 
@@ -164,6 +164,8 @@ const OrderDetail = () => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [creatingDispute, setCreatingDispute] = useState(false);
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
+  const [creatingPaymentLink, setCreatingPaymentLink] = useState(false);
   const [disputeForm, setDisputeForm] = useState<DisputeFormData>({
     reason: '',
     description: '',
@@ -481,6 +483,40 @@ const OrderDetail = () => {
   };
   
   const selectedReason = DISPUTE_REASONS.find(r => r.value === disputeForm.reason);
+  const isProducer = user?.role === 'PRODUCER';
+  const isBuyer = user?.role === 'BUYER';
+  const canUpdateStatus = isProducer || user?.role === 'ADMIN';
+  const hasActiveDispute = order?.dispute && order.dispute.status !== 'RESOLVED' && order.dispute.status !== 'CANCELLED';
+
+  const handleCreatePaymentLink = async () => {
+    if (!order || !isBuyer) return;
+
+    try {
+      setCreatingPaymentLink(true);
+      const intent = await paymentService.createPaymentIntent({
+        orderId: order.id,
+        customerInfo: {
+          name: order.shippingAddress?.fullName || user?.name || 'Customer',
+          email: order.shippingAddress?.email || user?.email || '',
+          phone: order.shippingAddress?.phone || user?.phone || ''
+        }
+      });
+      setPaymentIntent(intent);
+      toast({
+        title: 'Payment link created',
+        description: 'Use the link below to complete your payment.'
+      });
+    } catch (error: any) {
+      console.error('Failed to create payment intent:', error);
+      toast({
+        title: 'Unable to create payment link',
+        description: error.message || 'Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setCreatingPaymentLink(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -525,9 +561,6 @@ const OrderDetail = () => {
     );
   }
 
-  const isProducer = user?.role === 'PRODUCER';
-  const canUpdateStatus = isProducer || user?.role === 'ADMIN';
-  const hasActiveDispute = order.dispute && order.dispute.status !== 'RESOLVED' && order.dispute.status !== 'CANCELLED';
 
   return (
     <SidebarProvider>
@@ -773,6 +806,55 @@ const OrderDetail = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Payment Link */}
+                {isBuyer && order.paymentStatus !== 'CONFIRMED' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ExternalLink className="h-5 w-5" />
+                        Payment Link
+                      </CardTitle>
+                      <CardDescription>Generate a secure payment link to complete this order</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {paymentIntent ? (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Payment Reference</p>
+                            <p className="font-mono text-sm break-all">{paymentIntent.paymentReference}</p>
+                          </div>
+                          <Button
+                            className="w-full"
+                            onClick={() => window.open(paymentIntent.paymentUrl, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open Payment Portal
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Share this link with the buyer or open it to pay using your preferred method.
+                          </p>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={handleCreatePaymentLink}
+                          disabled={creatingPaymentLink}
+                        >
+                          {creatingPaymentLink ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Generating Link...
+                            </>
+                          ) : (
+                            'Generate Payment Link'
+                          )}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Blockchain Verification */}
                 <Card>

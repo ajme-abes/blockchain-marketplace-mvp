@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle, Package, Shield, Download, Copy, ExternalLink } from 'lucide-react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { CheckCircle, Package, Shield, Download, Copy, ExternalLink, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,11 +31,14 @@ interface OrderDetails {
 
 const PaymentSuccess = () => {
   const { orderId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [loadError, setLoadError] = useState<'auth' | 'error' | null>(null);
+  const paymentReference = searchParams.get('reference') || searchParams.get('paymentReference') || '';
 
   useEffect(() => {
     if (orderId) {
@@ -47,13 +50,20 @@ const PaymentSuccess = () => {
     try {
       const response = await api.request(`/orders/${orderId}`);
       setOrder(response.data);
-    } catch (error) {
+      setLoadError(null);
+    } catch (error: any) {
       console.error('Failed to fetch order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load order details",
-        variant: "destructive",
-      });
+      const message = error?.message || '';
+      if (message.toLowerCase().includes('unauthorized') || message.includes('401')) {
+        setLoadError('auth');
+      } else {
+        setLoadError('error');
+        toast({
+          title: "Error",
+          description: "Failed to load order details",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -129,112 +139,150 @@ const PaymentSuccess = () => {
       <div className="container mx-auto px-4 max-w-2xl">
         {/* Success Header */}
         <Card className="mb-6 border-green-200 bg-green-50">
-          <CardContent className="p-6 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-green-800 mb-2">Payment Successful!</h1>
-            <p className="text-green-600 text-lg mb-4">
-              Your order has been confirmed and is being processed
-            </p>
+          <CardContent className="p-6 text-center space-y-4">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+            <div>
+              <h1 className="text-3xl font-bold text-green-800 mb-2">Payment Successful!</h1>
+              <p className="text-green-600 text-lg">
+                Your order has been confirmed and is being processed
+              </p>
+            </div>
             <Badge variant="secondary" className="bg-green-100 text-green-800">
-              Order #{order.id.substring(0, 8).toUpperCase()}
+              Order #{(order?.id || orderId || '').toString().substring(0, 8).toUpperCase()}
             </Badge>
+            <div className="text-left">
+              <p className="text-sm font-medium text-green-900">Payment Reference</p>
+              <div className="flex items-center justify-between bg-white/70 border border-green-100 rounded-lg px-3 py-2 mt-1">
+                <span className="text-xs font-mono break-all">{paymentReference || 'Not provided'}</span>
+                {paymentReference && (
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(paymentReference)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <div className="grid gap-6">
           {/* Order Summary */}
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Order Summary
-              </h2>
-              
-              <div className="space-y-3 mb-4">
-                {order.items.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center py-2 border-b">
-                    <div>
-                      <p className="font-medium">{item.product.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {item.quantity} × {item.product.price} ETB
-                      </p>
+          {order ? (
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Order Summary
+                </h2>
+                
+                <div className="space-y-3 mb-4">
+                  {order.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center py-2 border-b">
+                      <div>
+                        <p className="font-medium">{item.product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} × {item.product.price} ETB
+                        </p>
+                      </div>
+                      <p className="font-semibold">{item.subtotal} ETB</p>
                     </div>
-                    <p className="font-semibold">{item.subtotal} ETB</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total Amount</span>
-                  <span className="text-green-600">{order.totalAmount} ETB</span>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Blockchain Verification */}
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Blockchain Verification
-              </h2>
-
-              {order.blockchainTxHash ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">Transaction Hash</p>
-                      <p className="text-xs font-mono text-blue-600 truncate">
-                        {order.blockchainTxHash}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(order.blockchainTxHash!)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openPolygonScan(order.blockchainTxHash!)}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total Amount</span>
+                    <span className="text-green-600">{order.totalAmount} ETB</span>
                   </div>
-
-                  <Button 
-                    onClick={verifyOnBlockchain}
-                    disabled={verifying}
-                    className="w-full"
-                  >
-                    {verifying ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Verifying...
-                      </>
-                    ) : (
-                      'Verify on Blockchain'
-                    )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center space-y-3">
+                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  {loadError === 'auth'
+                    ? 'Sign in to view detailed order information.'
+                    : 'We could not load the full order details right now.'}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {loadError === 'auth' && (
+                    <Button onClick={() => navigate('/login')}>
+                      Go to Login
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => navigate('/orders')}>
+                    View Orders
                   </Button>
                 </div>
-              ) : (
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-yellow-800">
-                    Blockchain recording in progress...
-                  </p>
-                  <p className="text-sm text-yellow-600 mt-1">
-                    This may take a few moments
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Blockchain Verification */}
+          {order && (
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Blockchain Verification
+                </h2>
+
+                {order.blockchainTxHash ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Transaction Hash</p>
+                        <p className="text-xs font-mono text-blue-600 truncate">
+                          {order.blockchainTxHash}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(order.blockchainTxHash!)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openPolygonScan(order.blockchainTxHash!)}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={verifyOnBlockchain}
+                      disabled={verifying}
+                      className="w-full"
+                    >
+                      {verifying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Verifying...
+                        </>
+                      ) : (
+                        'Verify on Blockchain'
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                    <p className="text-yellow-800">
+                      Blockchain recording in progress...
+                    </p>
+                    <p className="text-sm text-yellow-600 mt-1">
+                      This may take a few moments
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Next Steps */}
           <Card>
