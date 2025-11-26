@@ -60,6 +60,7 @@ model Producer {
   businessName       String
   location           String
   verificationStatus VerificationStatus @default(PENDING)
+  rejectionReason    String?
 
   // Relations
   userId   String    @unique

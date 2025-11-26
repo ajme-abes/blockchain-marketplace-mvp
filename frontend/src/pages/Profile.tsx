@@ -1,5 +1,5 @@
 // src/pages/Profile.tsx - ENHANCED VERSION
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -14,9 +14,30 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, Save, ShieldCheck, Upload, MessageSquare, Loader2, MapPin, Mail, Phone, Key } from 'lucide-react';
+import { 
+  Camera, 
+  Save, 
+  ShieldCheck, 
+  Upload, 
+  MessageSquare, 
+  Loader2, 
+  MapPin, 
+  Mail, 
+  Phone, 
+  Key,
+  FileText,
+  Download,
+  AlertCircle
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { userService } from '@/services/userService';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ProfileData {
   id: string;
@@ -29,7 +50,19 @@ interface ProfileData {
   role: string;
   avatarUrl?: string;
   isVerified: boolean;
+  verificationStatus?: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'NOT_SUBMITTED';
+  rejectionReason?: string | null;
   joinDate: string;
+}
+
+interface ProducerDocument {
+  id: string;
+  type: string;
+  url: string;
+  filename: string;
+  uploadedAt: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 const Profile = () => {
@@ -42,6 +75,9 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [documents, setDocuments] = useState<ProducerDocument[]>([]);
+  const [docType, setDocType] = useState<string>('BUSINESS_LICENSE');
+  const [docUploading, setDocUploading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: profileData?.name || '',
@@ -52,6 +88,15 @@ const Profile = () => {
   });
 
   const isOwnProfile = !id || id === user?.id;
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
+
+  const documentTypeOptions = [
+    { value: 'BUSINESS_LICENSE', label: 'Business License' },
+    { value: 'TAX_ID', label: 'Tax Identification' },
+    { value: 'GOVERNMENT_ID', label: 'Government ID' },
+    { value: 'COOPERATIVE_CERT', label: 'Cooperative Certificate' },
+    { value: 'OTHER', label: 'Other Document' },
+  ];
 
   useEffect(() => {
     if (isOwnProfile && !isAuthenticated) {
@@ -70,6 +115,9 @@ const Profile = () => {
         try {
           const response = await userService.getUserProfile(user!.id);
           console.log('🔧 Fresh profile data from API:', response.data);
+          const verificationStatus = response.data.producerProfile?.verificationStatus || 'NOT_SUBMITTED';
+          const rejectionReason = response.data.producerProfile?.rejectionReason || null;
+
           setProfileData({
             id: response.data.id,
             name: response.data.name,
@@ -78,8 +126,10 @@ const Profile = () => {
             region: response.data.region || '',
             bio: response.data.bio || '',
             role: response.data.role,
-            avatarUrl: response.data.avatarUrl || '', // This will get the actual avatarUrl from DB
-            isVerified: response.data.isVerified || false,
+            avatarUrl: response.data.avatarUrl || '',
+            isVerified: verificationStatus === 'VERIFIED',
+            verificationStatus,
+            rejectionReason,
             joinDate: response.data.registrationDate || response.data.joinDate || new Date().toISOString(),
           });
           
@@ -90,6 +140,12 @@ const Profile = () => {
             region: response.data.region || '',
             bio: response.data.bio || '',
           });
+
+          if (response.data.role === 'PRODUCER') {
+            await fetchProducerDocuments();
+          } else {
+            setDocuments([]);
+          }
         } catch (apiError) {
           console.error('Failed to fetch from API, using auth context:', apiError);
           // Fallback to auth context if API fails
@@ -101,15 +157,25 @@ const Profile = () => {
             region: user!.region || '',
             bio: user!.bio || '',
             role: user!.role,
-            avatarUrl: user!.avatarUrl || '', // This might still be empty
+            avatarUrl: user!.avatarUrl || '',
             isVerified: user!.isVerified || false,
+            verificationStatus: user!.isVerified ? 'VERIFIED' : 'NOT_SUBMITTED',
             joinDate: user!.joinDate || new Date().toISOString(),
           });
+          setDocuments([]);
         }
       } else {
         // For viewing other profiles, fetch from API
         const response = await userService.getUserProfile(id!);
-        setProfileData(response.data);
+        const verificationStatus = response.data.producerProfile?.verificationStatus || 'NOT_SUBMITTED';
+        const rejectionReason = response.data.producerProfile?.rejectionReason || null;
+        setProfileData({
+          ...response.data,
+          isVerified: verificationStatus === 'VERIFIED',
+          verificationStatus,
+          rejectionReason,
+        });
+        setDocuments([]);
       }
     } catch (error: any) {
       console.error('Failed to fetch profile data:', error);
@@ -120,6 +186,26 @@ const Profile = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProducerDocuments = async () => {
+    try {
+      const response = await userService.getProducerDocuments();
+      const docsPayload = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : response?.data?.documents || [];
+      setDocuments(docsPayload as ProducerDocument[]);
+    } catch (error: any) {
+      console.error('Failed to fetch producer documents:', error);
+      setDocuments([]);
+      toast({
+        title: 'Unable to load documents',
+        description: error.message || 'Please try again later.',
+        variant: 'destructive',
+      });
     }
   };
   const handleSave = async () => {
@@ -259,20 +345,49 @@ const Profile = () => {
       e.target.value = '';
     }
   };
-  const handleKYCUpload = async () => {
+  const handleVerificationDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload a document smaller than 10MB.',
+        variant: 'destructive',
+      });
+      e.target.value = '';
+      return;
+    }
+
     try {
-      // Implement KYC upload logic
+      setDocUploading(true);
+      await userService.uploadVerificationDocument(file, docType);
       toast({
-        title: 'KYC Document Uploaded',
-        description: 'Your verification documents have been submitted for review.',
+        title: 'Document uploaded',
+        description: 'Your verification document has been submitted for review.',
       });
+
+      if (profileData) {
+        setProfileData({
+          ...profileData,
+          verificationStatus: 'PENDING',
+          isVerified: false,
+          rejectionReason: null,
+        });
+      }
+
+      await fetchProducerDocuments();
     } catch (error: any) {
-      console.error('Failed to upload KYC:', error);
+      console.error('Failed to upload verification document:', error);
       toast({
-        title: "Error",
-        description: "Failed to upload verification documents",
-        variant: "destructive",
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload verification document',
+        variant: 'destructive',
       });
+    } finally {
+      setDocUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -281,6 +396,53 @@ const Profile = () => {
       year: 'numeric',
       month: 'long'
     });
+  };
+
+  const getVerificationStatusMeta = (status?: string) => {
+    switch (status) {
+      case 'VERIFIED':
+        return {
+          label: 'Verified',
+          description: 'Your business is verified and trusted by buyers.',
+          badgeVariant: 'default' as const,
+        };
+      case 'PENDING':
+        return {
+          label: 'Pending Verification',
+          description: 'Documents submitted and awaiting review from admins.',
+          badgeVariant: 'secondary' as const,
+        };
+      case 'REJECTED':
+        return {
+          label: 'Verification Rejected',
+          description: 'Please review admin feedback and resubmit required documents.',
+          badgeVariant: 'destructive' as const,
+        };
+      default:
+        return {
+          label: 'Not Verified',
+          description: 'Upload business documents to complete verification.',
+          badgeVariant: 'outline' as const,
+        };
+    }
+  };
+
+  const formatDocumentType = (type: string) => {
+    const map: Record<string, string> = {
+      BUSINESS_LICENSE: 'Business License',
+      TAX_ID: 'Tax Identification',
+      GOVERNMENT_ID: 'Government ID',
+      COOPERATIVE_CERT: 'Cooperative Certificate',
+      OTHER: 'Other',
+    };
+    return map[type] || type;
+  };
+
+  const formatFileSize = (size?: number) => {
+    if (!size) return 'Unknown size';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   if (loading) {
@@ -591,7 +753,7 @@ return (
               </CardContent>
             </Card>
 
-            {/* Producer KYC */}
+            {/* Producer Verification */}
             {profileData.role === "PRODUCER" && (
               <Card className="shadow-card">
                 <CardHeader>
@@ -602,38 +764,105 @@ return (
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Verification Status</p>
-                      <p className="text-sm text-muted-foreground">
-                        {profileData.isVerified
-                          ? "Your business is verified and trusted by buyers"
-                          : "Complete verification to increase buyer confidence"}
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Verification Status</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getVerificationStatusMeta(profileData.verificationStatus).description}
+                        </p>
+                      </div>
+
+                      <Badge variant={getVerificationStatusMeta(profileData.verificationStatus).badgeVariant}>
+                        {getVerificationStatusMeta(profileData.verificationStatus).label}
+                      </Badge>
                     </div>
 
-                    <Badge variant={profileData.isVerified ? "default" : "secondary"}>
-                      {profileData.isVerified ? "Verified" : "Pending"}
-                    </Badge>
+                    {profileData.verificationStatus === 'REJECTED' && profileData.rejectionReason && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/40 bg-destructive/10">
+                        <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-destructive">Verification rejected</p>
+                          <p className="text-sm text-destructive/90">{profileData.rejectionReason}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <p className="font-medium">Submitted Documents</p>
+                      {documents.length > 0 ? (
+                        <div className="space-y-3">
+                          {documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <FileText className="h-6 w-6 text-primary" />
+                                <div>
+                                  <p className="font-semibold">{doc.filename}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDocumentType(doc.type)} • {new Date(doc.uploadedAt).toLocaleDateString()} • {formatFileSize(doc.fileSize)}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="sm" asChild>
+                                <a href={doc.url} target="_blank" rel="noreferrer">
+                                  <Download className="h-4 w-4 mr-1" />
+                                  View
+                                </a>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="font-medium">Upload New Document</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <Label>Document Type</Label>
+                          <Select value={docType} onValueChange={setDocType}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select document type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {documentTypeOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <input
+                            ref={documentInputRef}
+                            id="verification-doc-upload"
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,image/*"
+                            onChange={handleVerificationDocumentUpload}
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() => documentInputRef.current?.click()}
+                            disabled={docUploading}
+                          >
+                            {docUploading ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4 mr-2" />
+                            )}
+                            {docUploading ? 'Uploading...' : 'Select & Upload'}
+                          </Button>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Accepts PDF or image files up to 10MB.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-
-                  {!profileData.isVerified && (
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Upload business license, farm certification, or government ID
-                      </p>
-
-                      <Button variant="outline" onClick={handleKYCUpload} disabled={saving}>
-                        {saving ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4 mr-2" />
-                        )}
-                        Upload Documents
-                      </Button>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             )}

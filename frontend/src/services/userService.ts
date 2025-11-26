@@ -41,20 +41,20 @@ export const userService = {
   async uploadAvatar(file: File) {
     try {
       console.log('🔧 Starting avatar upload process...');
-  
+
       // This will now use REAL IPFS uploads automatically!
       const ipfsResult = await ipfsService.uploadImage(file);
-  
+
       console.log('✅ File processed:', ipfsResult.url);
-  
+
       // Send URL to backend
       const response = await api.request('/users/avatar', {
         method: 'PUT',
         data: { avatarUrl: ipfsResult.url },
       });
-  
+
       console.log('✅ Avatar URL saved to backend');
-  
+
       return {
         ...response,
         ipfsResult,
@@ -64,5 +64,44 @@ export const userService = {
       console.error('❌ Failed to upload avatar:', error);
       throw new Error(error.message || 'Failed to upload avatar');
     }
-  }
+  },
+
+  async uploadVerificationDocument(file: File, type: string) {
+    try {
+      console.log('🔧 Starting document upload process...', { type, filename: file.name });
+
+      // Upload to IPFS
+      const ipfsResult = await ipfsService.uploadFile(file, 'DOCUMENT');
+      console.log('✅ Document uploaded to IPFS:', ipfsResult.url);
+
+      // Send metadata to backend
+      const response = await api.request('/producers/documents', {
+        method: 'POST',
+        data: {
+          url: ipfsResult.url,
+          filename: file.name,
+          type: type, // e.g., 'LICENSE', 'ID', etc.
+          fileSize: file.size,
+          mimeType: file.type
+        }
+      });
+
+      console.log('✅ Document metadata saved to backend');
+      return response;
+    } catch (error: any) {
+      console.error('❌ Failed to upload verification document:', error);
+      throw new Error(error.message || 'Failed to upload verification document');
+    }
+  },
+
+  async getProducerDocuments() {
+    try {
+      console.log('🔧 Fetching producer verification documents...');
+      const response = await api.request('/producers/documents');
+      return response;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch verification documents:', error);
+      throw new Error(error.message || 'Failed to fetch verification documents');
+    }
+  },
 };

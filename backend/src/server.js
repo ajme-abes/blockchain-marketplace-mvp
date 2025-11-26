@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const http = require('http'); 
+const http = require('http');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dbModule = require('./config/database');
@@ -18,68 +18,68 @@ const adminRoutes = require('./routes/admin');
 const ipfsRoutes = require('./routes/ipfs');
 const emailVerificationRoutes = require('./routes/emailVerification');
 const disputeRoutes = require('./routes/disputes');
-const chatRoutes = require('./routes/chat'); 
+const chatRoutes = require('./routes/chat');
 const socketService = require('./services/socketService');
 const analyticsRoutes = require('./routes/analytics');
 
 require('dotenv').config();
 
 const app = express();
-const server = http.createServer(app); 
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Ensure a Prisma (or DB) client is available to services that expect it.
 // If config/database exported a client (dbModule.prisma), reuse it.
 // Otherwise, try to create a PrismaClient fallback (if @prisma/client is installed).
 if (dbModule.prisma) {
-	global.prisma = dbModule.prisma;
+  global.prisma = dbModule.prisma;
 } else {
-	try {
-		const { PrismaClient } = require('@prisma/client');
-		// Only create a global instance once (helps with hot-reload / dev)
-		if (!global.prisma) global.prisma = new PrismaClient();
-	} catch (e) {
-		// eslint-disable-next-line no-console
-		console.warn('Prisma client not available from config/database and @prisma/client cannot be loaded. Some services may fail if they expect a Prisma client.', e?.message || e);
-		global.prisma = global.prisma || undefined;
-	}
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    // Only create a global instance once (helps with hot-reload / dev)
+    if (!global.prisma) global.prisma = new PrismaClient();
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Prisma client not available from config/database and @prisma/client cannot be loaded. Some services may fail if they expect a Prisma client.', e?.message || e);
+    global.prisma = global.prisma || undefined;
+  }
 }
 
 // If chatService (or other services) exposes an initializer, pass the client so internal prisma references won't be undefined.
 try {
-	const chatService = require('./services/chatService');
-	if (chatService) {
-		if (typeof chatService.initialize === 'function') {
-			chatService.initialize(global.prisma);
-		} else if (typeof chatService.setPrisma === 'function') {
-			chatService.setPrisma(global.prisma);
-		} else if (typeof chatService.init === 'function') {
-			chatService.init(global.prisma);
-		}
-	}
+  const chatService = require('./services/chatService');
+  if (chatService) {
+    if (typeof chatService.initialize === 'function') {
+      chatService.initialize(global.prisma);
+    } else if (typeof chatService.setPrisma === 'function') {
+      chatService.setPrisma(global.prisma);
+    } else if (typeof chatService.init === 'function') {
+      chatService.init(global.prisma);
+    }
+  }
 } catch (e) {
-	// Not fatal here; just log so we can see if chatService couldn't be initialized.
-	console.warn('Unable to automatically initialize chatService with prisma client:', e?.message || e);
+  // Not fatal here; just log so we can see if chatService couldn't be initialized.
+  console.warn('Unable to automatically initialize chatService with prisma client:', e?.message || e);
 }
 
 // ===== Add testConnection fallback so routes and startup can call it =====
 const testConnection = dbModule.testConnection
-	|| dbModule.test_connection
-	|| (async () => {
-		// If a Prisma client is available, run a lightweight query to verify connection.
-		if (global.prisma && typeof global.prisma.$queryRaw === 'function') {
-			try {
-				// eslint-disable-next-line no-unused-vars
-				await global.prisma.$queryRaw`SELECT 1`;
-				return true;
-			} catch (err) {
-				console.warn('DB health check failed:', err?.message || err);
-				return false;
-			}
-		}
-		// No explicit test function and no prisma client -> treat as not connected.
-		return false;
-	});
+  || dbModule.test_connection
+  || (async () => {
+    // If a Prisma client is available, run a lightweight query to verify connection.
+    if (global.prisma && typeof global.prisma.$queryRaw === 'function') {
+      try {
+        // eslint-disable-next-line no-unused-vars
+        await global.prisma.$queryRaw`SELECT 1`;
+        return true;
+      } catch (err) {
+        console.warn('DB health check failed:', err?.message || err);
+        return false;
+      }
+    }
+    // No explicit test function and no prisma client -> treat as not connected.
+    return false;
+  });
 // =======================================================================
 
 // ==================== MIDDLEWARE (Order Matters!) ====================
@@ -99,16 +99,16 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
       'http://localhost:3000',
-      'http://localhost:8080', 
+      'http://localhost:8080',
       'http://localhost:8081',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
       'http://127.0.0.1:8081'
     ];
-    
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -134,7 +134,7 @@ app.use(securityMiddleware.preventParameterPollution);
 // Database health check
 app.get('/api/db-health', async (req, res) => {
   const isConnected = await testConnection();
-  
+
   if (isConnected) {
     res.status(200).json({
       status: 'success',
@@ -181,7 +181,7 @@ app.get('/api/system-info', (req, res) => {
       environment: process.env.NODE_ENV || 'development',
       features: [
         'User Management',
-        'Product Catalog', 
+        'Product Catalog',
         'Order System',
         'Blockchain Integration',
         'IPFS File Storage',
@@ -235,33 +235,34 @@ app.use('/api/transactions', require('./routes/transactions'));
 // Chat routes (single registration)
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/producers', require('./routes/producer'));
 
 // ==================== UPLOAD / MULTER ERROR HANDLER ====================
 // Handle common multer / busboy errors so they don't bubble as 500s with obscure stack traces
 app.use((err, req, res, next) => {
-	// Identify multer/busboy related errors by code or message patterns
-	const isMulterError = err && (
-		err.code === 'LIMIT_FILE_SIZE' ||
-		err.code === 'LIMIT_FIELD_VALUE' ||
-		err.code === 'LIMIT_FIELD_COUNT' ||
-		err.code === 'LIMIT_UNEXPECTED_FILE' ||
-		/Unexpected end of multipart data/i.test(err.message || '') ||
-		/Multipart: boundary not found/i.test(err.message || '') ||
-		/busboy/i.test(err.stack || '') ||
-		/write after end/i.test(err.message || '')
-	);
+  // Identify multer/busboy related errors by code or message patterns
+  const isMulterError = err && (
+    err.code === 'LIMIT_FILE_SIZE' ||
+    err.code === 'LIMIT_FIELD_VALUE' ||
+    err.code === 'LIMIT_FIELD_COUNT' ||
+    err.code === 'LIMIT_UNEXPECTED_FILE' ||
+    /Unexpected end of multipart data/i.test(err.message || '') ||
+    /Multipart: boundary not found/i.test(err.message || '') ||
+    /busboy/i.test(err.stack || '') ||
+    /write after end/i.test(err.message || '')
+  );
 
-	if (isMulterError) {
-		console.warn('🔧 File upload error:', { message: err.message, code: err.code, path: req.path, method: req.method });
-		return res.status(400).json({
-			status: 'error',
-			message: err.code === 'LIMIT_FILE_SIZE' ? 'Uploaded file is too large' : (err.message || 'Invalid file upload'),
-			timestamp: new Date().toISOString()
-		});
-	}
+  if (isMulterError) {
+    console.warn('🔧 File upload error:', { message: err.message, code: err.code, path: req.path, method: req.method });
+    return res.status(400).json({
+      status: 'error',
+      message: err.code === 'LIMIT_FILE_SIZE' ? 'Uploaded file is too large' : (err.message || 'Invalid file upload'),
+      timestamp: new Date().toISOString()
+    });
+  }
 
-	// Not a multer/busboy error — pass along to the global error handler
-	return next(err);
+  // Not a multer/busboy error — pass along to the global error handler
+  return next(err);
 });
 
 // ==================== ERROR HANDLING ====================
@@ -290,7 +291,7 @@ app.use((error, req, res, next) => {
 
   // Don't leak error details in production
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   res.status(500).json({
     status: 'error',
     message: isProduction ? 'Internal server error' : error.message,
@@ -304,7 +305,7 @@ app.use((error, req, res, next) => {
 const startServer = async () => {
   try {
     const isDbConnected = await testConnection();
-    
+
     if (!isDbConnected) {
       console.error('❌ Failed to start server: Database connection failed');
       process.exit(1);
