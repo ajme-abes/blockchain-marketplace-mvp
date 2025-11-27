@@ -59,6 +59,7 @@ import { SocketProvider } from '@/contexts/SocketContext';
 import SystemAnalytics from "./pages/admin/SystemAnalytics";
 import SystemMonitor from "./pages/admin/SystemMonitor";
 import AuditLogs from "./pages/admin/AuditLogs";
+import SystemSettings from "./pages/admin/SystemSettings";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -324,6 +325,12 @@ const App = () => (
                       <Route path="/admin/logs" element = {
                         <RoleRoute allowedRoles={['admin']}>
                           <AuditLogs  />
+                        </RoleRoute>
+                      } />
+
+                      <Route path = "/admin/settings" element = {
+                        <RoleRoute allowedRoles={['admin']}>
+                          <SystemSettings />
                         </RoleRoute>
                       } />
 
