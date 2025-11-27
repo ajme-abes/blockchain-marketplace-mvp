@@ -56,6 +56,7 @@ import NotFound from "./pages/common/NotFound";
 import { useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { SocketProvider } from '@/contexts/SocketContext';
+import SystemAnalytics from "./pages/admin/SystemAnalytics";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -307,6 +308,12 @@ const App = () => (
                         </RoleRoute>
 
                       } />
+                      <Route path="/admin/analytics" element = {
+                        <RoleRoute allowedRoles={['admin']}>
+                          <SystemAnalytics />
+                        </RoleRoute>
+                      }
+                      />
                        
                       {/* ==================== FALLBACK ROUTE ==================== */}
                       <Route path="*" element={<NotFound />} />
