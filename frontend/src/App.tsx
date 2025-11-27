@@ -58,6 +58,7 @@ import { Navigate } from 'react-router-dom';
 import { SocketProvider } from '@/contexts/SocketContext';
 import SystemAnalytics from "./pages/admin/SystemAnalytics";
 import SystemMonitor from "./pages/admin/SystemMonitor";
+import AuditLogs from "./pages/admin/AuditLogs";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -318,6 +319,11 @@ const App = () => (
                       <Route path="/admin/monitor" element = {
                         <RoleRoute allowedRoles={['admin']}>
                           <SystemMonitor  />
+                        </RoleRoute>
+                      } />
+                      <Route path="/admin/logs" element = {
+                        <RoleRoute allowedRoles={['admin']}>
+                          <AuditLogs  />
                         </RoleRoute>
                       } />
 
