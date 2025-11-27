@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/', authenticateToken, requireRole(['BUYER']), async (req, res) => {
   try {
     const { productId, rating, comment } = req.body;
-    
+
     // FIX: Look up buyerId from userId
     const buyer = await prisma.buyer.findUnique({
       where: { userId: req.user.id }
@@ -33,6 +33,41 @@ router.post('/', authenticateToken, requireRole(['BUYER']), async (req, res) => 
     const result = await reviewService.createReview(buyerId, productId, rating, comment);
 
     if (result.success) {
+      // Send notification to producer
+      try {
+        const notificationService = require('../services/notificationService');
+
+        // Get product and producer info
+        const product = await prisma.product.findUnique({
+          where: { id: productId },
+          include: {
+            producer: {
+              include: {
+                user: {
+                  select: { id: true, name: true }
+                }
+              }
+            }
+          }
+        });
+
+        if (product && product.producer) {
+          const stars = '⭐'.repeat(rating);
+          const message = `${stars} New ${rating}-star review on your product "${product.name}"${comment ? ': "' + comment.substring(0, 50) + (comment.length > 50 ? '..."' : '"') : ''}`;
+
+          await notificationService.createNotification(
+            product.producer.userId,
+            message,
+            'REVIEW_RECEIVED'
+          );
+
+          console.log(`📢 Review notification sent to producer ${product.producer.userId}`);
+        }
+      } catch (notifError) {
+        console.error('Failed to send review notification:', notifError);
+        // Don't fail the review creation if notification fails
+      }
+
       res.status(201).json({
         status: 'success',
         message: 'Review created successfully',
@@ -87,7 +122,7 @@ router.get('/product/:productId', async (req, res) => {
 router.get('/my-reviews', authenticateToken, requireRole(['BUYER']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    
+
     // FIX: Look up buyerId from userId
     const buyer = await prisma.buyer.findUnique({
       where: { userId: req.user.id }
@@ -130,7 +165,7 @@ router.put('/:reviewId', authenticateToken, requireRole(['BUYER']), async (req, 
   try {
     const { reviewId } = req.params;
     const { rating, comment } = req.body;
-    
+
     // FIX: Look up buyerId from userId
     const buyer = await prisma.buyer.findUnique({
       where: { userId: req.user.id }
@@ -173,7 +208,7 @@ router.put('/:reviewId', authenticateToken, requireRole(['BUYER']), async (req, 
 router.delete('/:reviewId', authenticateToken, requireRole(['BUYER']), async (req, res) => {
   try {
     const { reviewId } = req.params;
-    
+
     // FIX: Look up buyerId from userId
     const buyer = await prisma.buyer.findUnique({
       where: { userId: req.user.id }
@@ -242,7 +277,7 @@ router.get('/product/:productId/stats', async (req, res) => {
 router.get('/producer/my-reviews', authenticateToken, requireRole(['PRODUCER']), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    
+
     // Get producer profile
     const producer = await prisma.producer.findUnique({
       where: { userId: req.user.id },

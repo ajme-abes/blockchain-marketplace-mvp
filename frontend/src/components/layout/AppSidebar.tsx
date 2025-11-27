@@ -91,7 +91,6 @@ export const AppSidebar = () => {
   ];
 
   const adminLinks = [
-    { title: 'Admin Dashboard', url: '/admin/dashboard', icon: BarChart2 },
     { title: 'User Management', url: '/admin/users', icon: Users },
     { title: 'Product Management', url: '/admin/products', icon: Package },
     { title: 'Order Management', url: '/admin/orders', icon: ShoppingCart },
