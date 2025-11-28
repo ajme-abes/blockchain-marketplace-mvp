@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2 } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -42,7 +42,7 @@ const ProducerDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     pendingOrders: 0,
@@ -59,44 +59,44 @@ const ProducerDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch producer orders and products in parallel
       const [ordersResponse, productsResponse] = await Promise.all([
         orderService.getProducerOrders(),
         orderService.getProducerProducts() // Use orderService since we moved the method
       ]);
-  
+
       console.log('🔧 Orders response:', ordersResponse);
       console.log('🔧 Products response:', productsResponse);
-  
+
       // Extract data based on your backend response structure
       const orders = ordersResponse?.orders || ordersResponse?.data?.orders || [];
       const products = productsResponse?.products || productsResponse?.data?.products || [];
-  
+
       console.log('🔧 Extracted orders:', orders);
       console.log('🔧 Extracted products:', products);
-  
+
       // Calculate stats
-      const pendingOrders = orders.filter(order => 
+      const pendingOrders = orders.filter(order =>
         ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
       ).length;
-  
+
       const totalEarnings = orders
         .filter(order => order.paymentStatus === 'CONFIRMED')
         .reduce((sum, order) => sum + order.totalAmount, 0);
-  
+
       const growthPercentage = orders.length > 0 ? 12 : 0;
-  
+
       setStats({
         totalProducts: products.length,
         pendingOrders,
         totalEarnings,
         growthPercentage
       });
-  
+
       // Get recent orders (last 5)
       setRecentOrders(orders.slice(0, 5));
-  
+
     } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
       toast({
@@ -132,31 +132,31 @@ const ProducerDashboard = () => {
   };
 
   const statCards = [
-    { 
-      title: 'Total Products', 
-      value: stats.totalProducts.toString(), 
-      icon: Package, 
+    {
+      title: 'Total Products',
+      value: stats.totalProducts.toString(),
+      icon: Package,
       color: 'text-blue-600',
       description: 'Active listings'
     },
-    { 
-      title: 'Pending Orders', 
-      value: stats.pendingOrders.toString(), 
-      icon: ShoppingCart, 
+    {
+      title: 'Pending Orders',
+      value: stats.pendingOrders.toString(),
+      icon: ShoppingCart,
       color: 'text-orange-600',
       description: 'Awaiting processing'
     },
-    { 
-      title: 'Total Earnings', 
-      value: formatPrice(stats.totalEarnings), 
-      icon: DollarSign, 
+    {
+      title: 'Total Earnings',
+      value: formatPrice(stats.totalEarnings),
+      icon: DollarSign,
       color: 'text-green-600',
       description: 'All time revenue'
     },
-    { 
-      title: 'Growth', 
-      value: `${stats.growthPercentage}%`, 
-      icon: TrendingUp, 
+    {
+      title: 'Growth',
+      value: `${stats.growthPercentage}%`,
+      icon: TrendingUp,
       color: stats.growthPercentage >= 0 ? 'text-green-600' : 'text-red-600',
       description: 'This month'
     },
@@ -186,8 +186,8 @@ const ProducerDashboard = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Producer Dashboard" 
+          <PageHeader
+            title="Producer Dashboard"
             description="Manage your products and track business performance"
             action={
               <div className="flex gap-2">
@@ -265,9 +265,9 @@ const ProducerDashboard = () => {
                           </div>
                           <div className="text-right">
                             <div className="font-semibold text-sm">{formatPrice(order.totalAmount)}</div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="h-6 text-xs"
                               onClick={() => navigate(`/orders/${order.id}`)}
                             >
@@ -297,37 +297,45 @@ const ProducerDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/my-products')}
                     >
                       <Package className="h-6 w-6 mb-2" />
                       <span>Manage Products</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/orders')}
                     >
                       <ShoppingCart className="h-6 w-6 mb-2" />
                       <span>View Orders</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/analytics')}
                     >
                       <TrendingUp className="h-6 w-6 mb-2" />
                       <span>Analytics</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/transactionhistory')}
                     >
                       <DollarSign className="h-6 w-6 mb-2" />
                       <span>Transactions</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/producer/store-settings')}
+                    >
+                      <CreditCard className="h-6 w-6 mb-2" />
+                      <span>Bank Accounts</span>
                     </Button>
                   </div>
                 </CardContent>

@@ -14,11 +14,12 @@ import {
   Info,
   Star,
   BarChart2,
-  History, 
+  History,
   AlertTriangle,
   Shield,
   FileText,
   TrendingUp,
+  DollarSign,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -78,22 +79,23 @@ export const AppSidebar = () => {
     { title: 'My Products', url: '/my-products', icon: Package },
     { title: 'Order Management', url: '/producer/orders', icon: ShoppingCart },
     { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
-    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History }, 
+    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History },
     { title: 'Sales Analytics', url: '/producer/analytics', icon: BarChart2 },
     { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
-    { title: 'My Disputes', url: '/producer/disputes', icon: AlertTriangle }, 
+    { title: 'My Disputes', url: '/producer/disputes', icon: AlertTriangle },
   ];
 
   const buyerLinks = [
     { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
-    { title: 'Purchase History', url: '/buyer/transactions', icon: History }, 
-    { title: 'My Disputes', url: '/buyer/disputes', icon: AlertTriangle }, 
+    { title: 'Purchase History', url: '/buyer/transactions', icon: History },
+    { title: 'My Disputes', url: '/buyer/disputes', icon: AlertTriangle },
   ];
 
   const adminLinks = [
     { title: 'User Management', url: '/admin/users', icon: Users },
     { title: 'Product Management', url: '/admin/products', icon: Package },
     { title: 'Order Management', url: '/admin/orders', icon: ShoppingCart },
+    { title: 'Producer Payouts', url: '/admin/payouts', icon: DollarSign },
     { title: 'Dispute Management', url: '/admin/disputes', icon: Scale },
     { title: 'System Analytics', url: '/admin/analytics', icon: TrendingUp },
     { title: 'Audit Logs', url: '/admin/logs', icon: FileText },
@@ -101,7 +103,7 @@ export const AppSidebar = () => {
   ];
 
   const commonLinks = [...coreLinks, ...getRoleSpecificLinks(user?.role || '')];
-  
+
   let roleLinks: typeof commonLinks = [];
   if (user?.role === 'PRODUCER') roleLinks = producerLinks;
   if (user?.role === 'BUYER') roleLinks = buyerLinks;
@@ -114,8 +116,8 @@ export const AppSidebar = () => {
       <SidebarHeader className="border-b border-border p-4">
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage 
-              src={user?.avatarUrl} 
+            <AvatarImage
+              src={user?.avatarUrl}
               alt={user?.name}
               className="object-cover"
             />
@@ -156,8 +158,8 @@ export const AppSidebar = () => {
         {roleLinks.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>
-              {user?.role === 'ADMIN' ? 'Admin Controls' : 
-               user?.role === 'PRODUCER' ? 'Business Tools' : 'My Activity'}
+              {user?.role === 'ADMIN' ? 'Admin Controls' :
+                user?.role === 'PRODUCER' ? 'Business Tools' : 'My Activity'}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>

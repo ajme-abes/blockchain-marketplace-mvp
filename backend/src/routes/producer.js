@@ -107,4 +107,116 @@ router.get('/documents', async (req, res) => {
     }
 });
 
+// Get producer profile
+router.get('/profile', async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const producer = await prisma.producer.findUnique({
+            where: { userId },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true
+                    }
+                }
+            }
+        });
+
+        if (!producer) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Producer profile not found'
+            });
+        }
+
+        res.json({
+            status: 'success',
+            producer: producer
+        });
+
+    } catch (error) {
+        console.error('Get producer profile error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to get producer profile',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+// Update producer profile
+router.put('/update-profile', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { businessName, location, phone } = req.body;
+
+        // Get producer
+        const producer = await prisma.producer.findUnique({
+            where: { userId }
+        });
+
+        if (!producer) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Producer profile not found'
+            });
+        }
+
+        // Update producer and user in transaction
+        const result = await prisma.$transaction(async (tx) => {
+            // Update producer
+            const updatedProducer = await tx.producer.update({
+                where: { id: producer.id },
+                data: {
+                    businessName: businessName || producer.businessName,
+                    location: location || producer.location
+                }
+            });
+
+            // Update user phone if provided
+            if (phone !== undefined) {
+                await tx.user.update({
+                    where: { id: userId },
+                    data: { phone }
+                });
+            }
+
+            return updatedProducer;
+        });
+
+        // Create audit log
+        await prisma.auditLog.create({
+            data: {
+                action: 'UPDATE_PRODUCER_PROFILE',
+                entity: 'Producer',
+                entityId: producer.id,
+                userId: userId,
+                newValues: {
+                    businessName,
+                    location,
+                    phone
+                }
+            }
+        });
+
+        res.json({
+            status: 'success',
+            message: 'Profile updated successfully',
+            producer: result
+        });
+
+    } catch (error) {
+        console.error('Update producer profile error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to update profile',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 module.exports = router;

@@ -3,79 +3,80 @@ const { prisma } = require('../config/database');
 const { DeliveryStatus } = require('@prisma/client');
 
 class OrderService {
-async createOrder(orderData, userId) { // Add userId parameter
-  const { items, shippingAddress, totalAmount } = orderData;
-  // Get buyer ID from user ID
-  const buyer = await prisma.buyer.findUnique({
-    where: { userId: userId }
-  });
-  
-  if (!buyer) {
-    throw new Error('Buyer profile not found');
-  }
-  
-  const buyerId = buyer.id;
+  async createOrder(orderData, userId) { // Add userId parameter
+    const { items, shippingAddress, totalAmount } = orderData;
+    // Get buyer ID from user ID
+    const buyer = await prisma.buyer.findUnique({
+      where: { userId: userId }
+    });
 
-  console.log('🔧 Creating order for buyer:', buyerId);
-  console.log('🔧 Order items:', items);
-
-  // Start transaction to ensure data consistency
-  const order = await prisma.$transaction(async (tx) => {
-    // 1. Verify all products exist and have sufficient quantity
-    for (const item of items) {
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
-        select: { id: true, name: true, quantityAvailable: true, price: true }
-      });
-
-      if (!product) {
-        throw new Error(`Product not found: ${item.productId}`);
-      }
-
-      if (product.quantityAvailable < item.quantity) {
-        throw new Error(`Insufficient quantity for ${product.name}. Available: ${product.quantityAvailable}, Requested: ${item.quantity}`);
-      }
+    if (!buyer) {
+      throw new Error('Buyer profile not found');
     }
 
-    // 2. Create the order
-    const newOrder = await tx.order.create({
-      data: {
-        buyerId,
-        totalAmount,
-        shippingAddress: shippingAddress || {},
-        orderItems: {
-          create: items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.price * item.quantity
-          }))
+    const buyerId = buyer.id;
+
+    console.log('🔧 Creating order for buyer:', buyerId);
+    console.log('🔧 Order items:', items);
+
+    // Start transaction to ensure data consistency
+    const order = await prisma.$transaction(async (tx) => {
+      // 1. Verify all products exist and have sufficient quantity
+      for (const item of items) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { id: true, name: true, quantityAvailable: true, price: true }
+        });
+
+        if (!product) {
+          throw new Error(`Product not found: ${item.productId}`);
         }
-      },
-      include: {
-        buyer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true
-              }
-            }
+
+        if (product.quantityAvailable < item.quantity) {
+          throw new Error(`Insufficient quantity for ${product.name}. Available: ${product.quantityAvailable}, Requested: ${item.quantity}`);
+        }
+      }
+
+      // 2. Create the order
+      const newOrder = await tx.order.create({
+        data: {
+          buyerId,
+          totalAmount,
+          shippingAddress: shippingAddress || {},
+          orderItems: {
+            create: items.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.price * item.quantity
+            }))
           }
         },
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                producer: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        email: true
+        include: {
+          buyer: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true
+                }
+              }
+            }
+          },
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  producer: {
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true
+                        }
                       }
                     }
                   }
@@ -84,37 +85,51 @@ async createOrder(orderData, userId) { // Add userId parameter
             }
           }
         }
-      }
-    });
+      });
 
-    // 3. Create initial status history record - FIXED
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId: newOrder.id,
-        fromStatus: 'PENDING',
-        toStatus: 'PENDING',
-        changedById: userId, // Use the authenticated user's ID
-        reason: 'Order created'
-      }
-    });
-
-    // 4. Update product quantities
-    for (const item of items) {
-      await tx.product.update({
-        where: { id: item.productId },
+      // 3. Create initial status history record - FIXED
+      await tx.orderStatusHistory.create({
         data: {
-          quantityAvailable: {
-            decrement: item.quantity
-          }
+          orderId: newOrder.id,
+          fromStatus: 'PENDING',
+          toStatus: 'PENDING',
+          changedById: userId, // Use the authenticated user's ID
+          reason: 'Order created'
         }
       });
+
+      // 4. Update product quantities
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            quantityAvailable: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+
+      return newOrder;
+    });
+
+    // 5. ✅ NEW: Calculate producer splits and create OrderProducer records
+    try {
+      const payoutService = require('./payoutService');
+      const splitResult = await payoutService.calculateProducerSplits(order.id, order.orderItems);
+
+      if (splitResult.success) {
+        console.log(`✅ Producer splits calculated: ${splitResult.producers.length} producers, ${splitResult.totalCommission} ETB commission`);
+      } else {
+        console.error('⚠️ Failed to calculate producer splits:', splitResult.error);
+      }
+    } catch (splitError) {
+      console.error('⚠️ Error calculating producer splits:', splitError);
+      // Don't fail order creation if split calculation fails
     }
 
-    return newOrder;
-  });
-
-  return this.formatOrderResponse(order);
-}
+    return this.formatOrderResponse(order);
+  }
 
   async getOrderById(id) {
     const order = await prisma.order.findUnique({
@@ -560,68 +575,68 @@ async createOrder(orderData, userId) { // Add userId parameter
   }
 
   // Add to your existing orderService.js
-async validateOrderForDispute(orderId, userId) {
-  try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        buyer: {
-          include: {
-            user: true
-          }
-        },
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                producer: {
-                  include: {
-                    user: true
+  async validateOrderForDispute(orderId, userId) {
+    try {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          buyer: {
+            include: {
+              user: true
+            }
+          },
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  producer: {
+                    include: {
+                      user: true
+                    }
                   }
                 }
               }
             }
           }
         }
+      });
+
+      if (!order) {
+        return { valid: false, error: 'Order not found' };
       }
-    });
 
-    if (!order) {
-      return { valid: false, error: 'Order not found' };
+      // Check if user is involved in the order
+      const isBuyer = order.buyer.userId === userId;
+      const isProducer = order.orderItems.some(item =>
+        item.product.producer.userId === userId
+      );
+
+      if (!isBuyer && !isProducer) {
+        return { valid: false, error: 'You are not authorized to raise a dispute for this order' };
+      }
+
+      // Check if order is in a state that allows disputes
+      const allowedStatuses = ['CONFIRMED', 'SHIPPED', 'DELIVERED'];
+      if (!allowedStatuses.includes(order.deliveryStatus)) {
+        return { valid: false, error: 'Disputes can only be raised for confirmed, shipped, or delivered orders' };
+      }
+
+      // Check if dispute already exists
+      const existingDispute = await prisma.dispute.findUnique({
+        where: { orderId }
+      });
+
+      if (existingDispute) {
+        return { valid: false, error: 'A dispute already exists for this order' };
+      }
+
+      return { valid: true, order };
+
+    } catch (error) {
+      console.error('Validate order for dispute error:', error);
+      return { valid: false, error: error.message };
     }
-
-    // Check if user is involved in the order
-    const isBuyer = order.buyer.userId === userId;
-    const isProducer = order.orderItems.some(item => 
-      item.product.producer.userId === userId
-    );
-
-    if (!isBuyer && !isProducer) {
-      return { valid: false, error: 'You are not authorized to raise a dispute for this order' };
-    }
-
-    // Check if order is in a state that allows disputes
-    const allowedStatuses = ['CONFIRMED', 'SHIPPED', 'DELIVERED'];
-    if (!allowedStatuses.includes(order.deliveryStatus)) {
-      return { valid: false, error: 'Disputes can only be raised for confirmed, shipped, or delivered orders' };
-    }
-
-    // Check if dispute already exists
-    const existingDispute = await prisma.dispute.findUnique({
-      where: { orderId }
-    });
-
-    if (existingDispute) {
-      return { valid: false, error: 'A dispute already exists for this order' };
-    }
-
-    return { valid: true, order };
-
-  } catch (error) {
-    console.error('Validate order for dispute error:', error);
-    return { valid: false, error: error.message };
   }
-}
 
   // Helper function to map string status to Prisma enum
   mapStatusToEnum(status) {
@@ -631,7 +646,7 @@ async validateOrderForDispute(orderId, userId) {
       throw new Error(`Invalid delivery status: ${status}`);
     }
 
-    return DeliveryStatus[upper]; 
+    return DeliveryStatus[upper];
   }
 
   formatOrderResponse(order) {

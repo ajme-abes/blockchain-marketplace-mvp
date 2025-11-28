@@ -43,6 +43,7 @@ import DisputeManagement from "./pages/admin/DisputeManagement";
 import AdminDisputeDetail from "./pages/admin/AdminDisputeDetail";
 import VerificationQueue from "./pages/admin/VerificationQueue";
 import OrderManagement from "./pages/admin/OrderManagement";
+import PayoutManagement from "./pages/admin/PayoutManagement";
 import DisputesList from "./pages/buyer/DisputesList";
 import DisputeDetail from "./pages/common/DisputeDetail";
 import ProducerOrders from "./pages/producer/ProducerOrders";
@@ -319,6 +320,13 @@ const App = () => (
                           </RoleRoute>
 
                         } />
+
+                        <Route path="/admin/payouts" element={
+                          <RoleRoute allowedRoles={['admin']}>
+                            <PayoutManagement />
+                          </RoleRoute>
+                        } />
+
                         <Route path="/admin/analytics" element={
                           <RoleRoute allowedRoles={['admin']}>
                             <SystemAnalytics />

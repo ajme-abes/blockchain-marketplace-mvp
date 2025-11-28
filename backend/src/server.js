@@ -225,6 +225,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payouts', require('./routes/payouts')); // ✅ NEW: Payout routes
+app.use('/api/bank-accounts', require('./routes/bankAccounts')); // ✅ NEW: Bank account routes
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
