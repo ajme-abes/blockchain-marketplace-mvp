@@ -297,4 +297,32 @@ router.get('/producer/:producerId', authenticateToken, requireRole('ADMIN'), asy
     }
 });
 
+/**
+ * GET /api/payouts
+ * Get ALL payouts (all statuses) - Admin only
+ */
+router.get('/', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+        const result = await payoutService.getAllPayouts();
+
+        if (result.success) {
+            res.json({
+                success: true,
+                payouts: result.payouts
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('Get all payouts error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

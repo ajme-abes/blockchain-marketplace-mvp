@@ -50,7 +50,8 @@ import {
     Mail,
     MapPin,
     Building2,
-    CreditCard
+    CreditCard,
+    Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import payoutService, { ProducerPayout } from '../../services/payoutService';
@@ -58,11 +59,13 @@ import payoutService, { ProducerPayout } from '../../services/payoutService';
 const PayoutManagement = () => {
     const [payouts, setPayouts] = useState<ProducerPayout[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'due' | 'pending'>('pending');
+    const [filter, setFilter] = useState<'all' | 'pending' | 'processing' | 'completed'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPayout, setSelectedPayout] = useState<ProducerPayout | null>(null);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [showFailModal, setShowFailModal] = useState(false);
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [scheduleDate, setScheduleDate] = useState('');
     const [payoutReference, setPayoutReference] = useState('');
     const [payoutMethod, setPayoutMethod] = useState('BANK_TRANSFER');
     const [failureReason, setFailureReason] = useState('');
@@ -71,6 +74,11 @@ const PayoutManagement = () => {
     const [selectedProducerDetails, setSelectedProducerDetails] = useState<ProducerPayout | null>(null);
     const [producerBankAccounts, setProducerBankAccounts] = useState<any[]>([]);
     const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
+    const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [selectedPayoutBankAccount, setSelectedPayoutBankAccount] = useState<string>('');
+    const [payoutBankAccounts, setPayoutBankAccounts] = useState<any[]>([]);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -81,20 +89,11 @@ const PayoutManagement = () => {
         try {
             setLoading(true);
             console.log('🔄 Loading payouts with filter:', filter);
-            let data;
 
-            if (filter === 'due') {
-                console.log('📅 Fetching due payouts...');
-                const result = await payoutService.getDuePayouts();
-                console.log('✅ Due payouts result:', result);
-                data = result.payouts;
-            } else {
-                console.log('📋 Fetching all pending payouts...');
-                data = await payoutService.getPendingPayouts();
-                console.log('✅ Pending payouts result:', data);
-            }
+            // Fetch ALL payouts regardless of status
+            const data = await payoutService.getAllPayouts();
+            console.log('✅ All payouts result:', data);
 
-            console.log('📊 Setting payouts:', data);
             setPayouts(data || []);
 
             if (!data || data.length === 0) {
@@ -114,6 +113,52 @@ const PayoutManagement = () => {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSchedulePayout = async () => {
+        if (!selectedPayout || !scheduleDate) {
+            toast({
+                title: 'Validation Error',
+                description: 'Please select a schedule date',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        try {
+            setProcessing(true);
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`http://localhost:5000/api/admin/payouts/${selectedPayout.id}/schedule`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    scheduledFor: scheduleDate
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to schedule payout');
+
+            setShowScheduleModal(false);
+            setScheduleDate('');
+            setSelectedPayout(null);
+            await loadPayouts();
+            toast({
+                title: 'Payout Scheduled',
+                description: 'Payout has been scheduled successfully',
+            });
+        } catch (error) {
+            console.error('Error scheduling payout:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to schedule payout',
+                variant: 'destructive',
+            });
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -139,10 +184,10 @@ const PayoutManagement = () => {
     };
 
     const handleCompletePayout = async () => {
-        if (!selectedPayout || !payoutReference.trim()) {
+        if (!selectedPayout || !payoutReference.trim() || !selectedPayoutBankAccount) {
             toast({
                 title: 'Validation Error',
-                description: 'Please enter a payout reference',
+                description: 'Please select a bank account and enter payment reference',
                 variant: 'destructive',
             });
             return;
@@ -150,18 +195,32 @@ const PayoutManagement = () => {
 
         try {
             setProcessing(true);
+
+            const selectedAccount = payoutBankAccounts.find(acc => acc.id === selectedPayoutBankAccount);
+
             await payoutService.markPayoutComplete(
                 selectedPayout.id,
                 payoutReference,
-                payoutMethod
+                'BANK_TRANSFER',
+                {
+                    bankAccountId: selectedPayoutBankAccount,
+                    bankName: selectedAccount?.bankName,
+                    accountNumber: selectedAccount?.accountNumber,
+                    accountName: selectedAccount?.accountName
+                }
             );
+
             setShowCompleteModal(false);
             setPayoutReference('');
             setSelectedPayout(null);
+            setSelectedPayoutBankAccount('');
+            setPayoutBankAccounts([]);
+
             await loadPayouts();
+
             toast({
                 title: 'Payout Completed',
-                description: 'Payout has been marked as completed successfully',
+                description: `Payment of ${payoutService.formatCurrency(selectedPayout.netAmount)} completed successfully`,
             });
         } catch (error) {
             console.error('Error completing payout:', error);
@@ -230,11 +289,149 @@ const PayoutManagement = () => {
         }
     };
 
-    const filteredPayouts = payouts.filter(payout =>
-        payout.producer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payout.producer.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payout.producer.user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const loadPayoutBankAccounts = async (producerId: string) => {
+        try {
+            console.log('🏦 Loading payout bank accounts for producer:', producerId);
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`http://localhost:5000/api/admin/producer/${producerId}/bank-accounts`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                console.error('❌ Failed to load bank accounts:', response.status);
+                throw new Error('Failed to load bank accounts');
+            }
+
+            const data = await response.json();
+            console.log('📦 Received bank accounts:', data.accounts);
+
+            // Show ALL accounts (including unverified) so admin can see them
+            const allAccounts = data.accounts || [];
+            console.log('💳 Total accounts:', allAccounts.length);
+            console.log('✅ Verified accounts:', allAccounts.filter((acc: any) => acc.isVerified).length);
+
+            setPayoutBankAccounts(allAccounts);
+
+            // Auto-select primary verified account if exists
+            const primaryVerified = allAccounts.find((acc: any) => acc.isPrimary && acc.isVerified);
+            if (primaryVerified) {
+                console.log('🎯 Auto-selecting primary verified account:', primaryVerified.bankName);
+                setSelectedPayoutBankAccount(primaryVerified.id);
+            } else {
+                // If no primary verified, select first verified account
+                const firstVerified = allAccounts.find((acc: any) => acc.isVerified);
+                if (firstVerified) {
+                    console.log('🎯 Auto-selecting first verified account:', firstVerified.bankName);
+                    setSelectedPayoutBankAccount(firstVerified.id);
+                }
+            }
+        } catch (error: any) {
+            console.error('❌ Error loading payout bank accounts:', error);
+            setPayoutBankAccounts([]);
+        }
+    };
+
+    const handleVerifyBankAccount = async (accountId: string) => {
+        try {
+            setProcessing(true);
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`http://localhost:5000/api/admin/bank-accounts/${accountId}/verify`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to verify bank account');
+
+            toast({
+                title: 'Success',
+                description: 'Bank account verified successfully',
+            });
+
+            // Reload bank accounts to show updated status
+            if (selectedProducerDetails) {
+                await loadProducerBankAccounts(selectedProducerDetails.producer.id);
+            }
+        } catch (error: any) {
+            console.error('Error verifying bank account:', error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to verify bank account',
+                variant: 'destructive',
+            });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleRejectBankAccount = async () => {
+        if (!selectedBankAccount || !rejectionReason.trim()) {
+            toast({
+                title: 'Validation Error',
+                description: 'Please enter a rejection reason',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        try {
+            setProcessing(true);
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`http://localhost:5000/api/admin/bank-accounts/${selectedBankAccount.id}/reject`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    reason: rejectionReason
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to reject bank account');
+
+            toast({
+                title: 'Success',
+                description: 'Bank account rejected successfully',
+            });
+
+            setShowRejectModal(false);
+            setSelectedBankAccount(null);
+            setRejectionReason('');
+
+            // Reload bank accounts to show updated status
+            if (selectedProducerDetails) {
+                await loadProducerBankAccounts(selectedProducerDetails.producer.id);
+            }
+        } catch (error: any) {
+            console.error('Error rejecting bank account:', error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Failed to reject bank account',
+                variant: 'destructive',
+            });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const filteredPayouts = payouts.filter(payout => {
+        // Filter by search term
+        const matchesSearch = payout.producer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            payout.producer.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            payout.producer.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+        // Filter by status
+        if (filter === 'all') return matchesSearch;
+        if (filter === 'pending') return matchesSearch && (payout.status === 'PENDING' || payout.status === 'SCHEDULED');
+        if (filter === 'processing') return matchesSearch && payout.status === 'PROCESSING';
+        if (filter === 'completed') return matchesSearch && payout.status === 'COMPLETED';
+
+        return matchesSearch;
+    });
 
     const totalAmount = filteredPayouts.reduce((sum, p) => sum + p.netAmount, 0);
     const totalCommission = filteredPayouts.reduce((sum, p) => sum + p.commission, 0);
@@ -347,13 +544,15 @@ const PayoutManagement = () => {
 
                                         <div className="flex gap-2">
                                             <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-                                                <SelectTrigger className="w-[140px]">
+                                                <SelectTrigger className="w-[160px]">
                                                     <Filter className="h-4 w-4 mr-2" />
                                                     <SelectValue placeholder="Filter" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="due">Due Now</SelectItem>
-                                                    <SelectItem value="pending">All Pending</SelectItem>
+                                                    <SelectItem value="all">All Payouts</SelectItem>
+                                                    <SelectItem value="pending">Pending</SelectItem>
+                                                    <SelectItem value="processing">Processing</SelectItem>
+                                                    <SelectItem value="completed">Completed</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -467,6 +666,22 @@ const PayoutManagement = () => {
                                                                             <Eye className="h-4 w-4 text-blue-600" />
                                                                         </Button>
 
+                                                                        {/* PENDING - Can schedule */}
+                                                                        {payout.status === 'PENDING' && (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    setSelectedPayout(payout);
+                                                                                    setShowScheduleModal(true);
+                                                                                }}
+                                                                                title="Schedule Payout"
+                                                                            >
+                                                                                <Clock className="h-4 w-4 text-blue-600" />
+                                                                            </Button>
+                                                                        )}
+
+                                                                        {/* SCHEDULED - Can process or complete */}
                                                                         {payout.status === 'SCHEDULED' && (
                                                                             <>
                                                                                 <Button
@@ -476,7 +691,7 @@ const PayoutManagement = () => {
                                                                                     disabled={processing}
                                                                                     title="Mark as Processing"
                                                                                 >
-                                                                                    <Clock className="h-4 w-4" />
+                                                                                    <Clock className="h-4 w-4 text-orange-600" />
                                                                                 </Button>
                                                                                 <Button
                                                                                     variant="ghost"
@@ -502,6 +717,8 @@ const PayoutManagement = () => {
                                                                                 </Button>
                                                                             </>
                                                                         )}
+
+                                                                        {/* PROCESSING - Can complete or fail */}
                                                                         {payout.status === 'PROCESSING' && (
                                                                             <>
                                                                                 <Button
@@ -528,8 +745,19 @@ const PayoutManagement = () => {
                                                                                 </Button>
                                                                             </>
                                                                         )}
+
+                                                                        {/* COMPLETED - Show status */}
                                                                         {payout.status === 'COMPLETED' && (
-                                                                            <span className="text-sm text-muted-foreground">Completed</span>
+                                                                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                                                                                ✓ Paid
+                                                                            </Badge>
+                                                                        )}
+
+                                                                        {/* FAILED - Show status */}
+                                                                        {payout.status === 'FAILED' && (
+                                                                            <Badge variant="outline" className="bg-red-50 text-red-700">
+                                                                                ✗ Failed
+                                                                            </Badge>
                                                                         )}
                                                                     </div>
                                                                 </TableCell>
@@ -541,9 +769,13 @@ const PayoutManagement = () => {
                                                                 <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
                                                                 <h3 className="mt-2 text-sm font-medium">No payouts found</h3>
                                                                 <p className="mt-1 text-sm text-muted-foreground">
-                                                                    {filter === 'due'
-                                                                        ? 'No payouts are due for processing right now.'
-                                                                        : 'No pending payouts at the moment.'}
+                                                                    {filter === 'pending'
+                                                                        ? 'No pending payouts at the moment.'
+                                                                        : filter === 'processing'
+                                                                            ? 'No payouts are currently being processed.'
+                                                                            : filter === 'completed'
+                                                                                ? 'No completed payouts yet.'
+                                                                                : 'No payouts found.'}
                                                                 </p>
                                                             </TableCell>
                                                         </TableRow>
@@ -559,13 +791,13 @@ const PayoutManagement = () => {
                 </div>
             </div>
 
-            {/* Complete Payout Dialog */}
-            <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
+            {/* Schedule Payout Dialog */}
+            <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Complete Payout</DialogTitle>
+                        <DialogTitle>Schedule Payout</DialogTitle>
                         <DialogDescription>
-                            Mark this payout as completed and enter payment details
+                            Set the date when this payout should be processed
                         </DialogDescription>
                     </DialogHeader>
 
@@ -585,27 +817,168 @@ const PayoutManagement = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Payout Method</label>
-                                <Select value={payoutMethod} onValueChange={setPayoutMethod}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
-                                        <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
-                                        <SelectItem value="CASH">Cash</SelectItem>
-                                        <SelectItem value="CHECK">Check</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <label className="text-sm font-medium">Schedule Date *</label>
+                                <Input
+                                    type="date"
+                                    value={scheduleDate}
+                                    onChange={(e) => setScheduleDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Select when you want to process this payout
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowScheduleModal(false);
+                                setScheduleDate('');
+                                setSelectedPayout(null);
+                            }}
+                            disabled={processing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSchedulePayout}
+                            disabled={processing || !scheduleDate}
+                        >
+                            {processing ? 'Scheduling...' : 'Schedule Payout'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Complete Payout Dialog */}
+            <Dialog open={showCompleteModal} onOpenChange={(open) => {
+                setShowCompleteModal(open);
+                if (open && selectedPayout) {
+                    // Load bank accounts when modal opens
+                    loadPayoutBankAccounts(selectedPayout.producer.id);
+                }
+            }}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Complete Payout</DialogTitle>
+                        <DialogDescription>
+                            Select the bank account and confirm payment completion
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedPayout && (
+                        <div className="space-y-4">
+                            {/* Payout Summary */}
+                            <div className="p-4 bg-muted rounded-lg space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Producer:</span>
+                                    <span className="font-medium">{selectedPayout.producer.businessName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Amount to Pay:</span>
+                                    <span className="font-bold text-green-600 text-lg">
+                                        {payoutService.formatCurrency(selectedPayout.netAmount)}
+                                    </span>
+                                </div>
                             </div>
 
+                            {/* Bank Account Selection */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Payment Reference *</label>
+                                <label className="text-sm font-medium">Select Bank Account *</label>
+                                {payoutBankAccounts.length > 0 ? (
+                                    <Select
+                                        value={selectedPayoutBankAccount}
+                                        onValueChange={setSelectedPayoutBankAccount}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Choose a bank account..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {payoutBankAccounts.map((account) => (
+                                                <SelectItem key={account.id} value={account.id}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{account.bankName}</span>
+                                                        {account.isPrimary && (
+                                                            <Badge className="bg-blue-500 text-xs">Primary</Badge>
+                                                        )}
+                                                        {account.isVerified && (
+                                                            <Badge variant="outline" className="bg-green-50 text-green-700 text-xs">
+                                                                ✓ Verified
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <div className="flex items-start gap-2">
+                                            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                                            <div className="text-sm text-amber-800">
+                                                <p className="font-medium">No Bank Accounts Found</p>
+                                                <p className="text-xs">Producer hasn't added any bank accounts yet.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Selected Bank Account Details */}
+                            {selectedPayoutBankAccount && (
+                                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                                    <div className="flex items-center gap-2 text-blue-900 font-medium">
+                                        <CreditCard className="h-4 w-4" />
+                                        <span>Payment Details</span>
+                                    </div>
+                                    {(() => {
+                                        const account = payoutBankAccounts.find(a => a.id === selectedPayoutBankAccount);
+                                        return account ? (
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-blue-700">Bank Name:</span>
+                                                    <span className="font-medium text-blue-900">{account.bankName}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-blue-700">Account Name:</span>
+                                                    <span className="font-medium text-blue-900">{account.accountName}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-blue-700">Account Number:</span>
+                                                    <span className="font-mono font-bold text-blue-900 text-lg">
+                                                        {account.accountNumber}
+                                                    </span>
+                                                </div>
+                                                {account.branchName && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-blue-700">Branch:</span>
+                                                        <span className="font-medium text-blue-900">{account.branchName}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between">
+                                                    <span className="text-blue-700">Account Type:</span>
+                                                    <span className="font-medium text-blue-900">{account.accountType}</span>
+                                                </div>
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                </div>
+                            )}
+
+                            {/* Payment Reference */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Payment Reference / Transaction ID *</label>
                                 <Input
                                     value={payoutReference}
                                     onChange={(e) => setPayoutReference(e.target.value)}
-                                    placeholder="e.g., BANK_TRANSFER_123456"
+                                    placeholder="e.g., TXN123456789 or Bank Transfer Reference"
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Enter the transaction ID or reference number from your bank transfer
+                                </p>
                             </div>
                         </div>
                     )}
@@ -617,6 +990,8 @@ const PayoutManagement = () => {
                                 setShowCompleteModal(false);
                                 setPayoutReference('');
                                 setSelectedPayout(null);
+                                setSelectedPayoutBankAccount('');
+                                setPayoutBankAccounts([]);
                             }}
                             disabled={processing}
                         >
@@ -624,9 +999,20 @@ const PayoutManagement = () => {
                         </Button>
                         <Button
                             onClick={handleCompletePayout}
-                            disabled={processing || !payoutReference.trim()}
+                            disabled={processing || !payoutReference.trim() || !selectedPayoutBankAccount}
+                            className="bg-green-600 hover:bg-green-700"
                         >
-                            {processing ? 'Processing...' : 'Complete Payout'}
+                            {processing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Complete Payout
+                                </>
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -681,6 +1067,75 @@ const PayoutManagement = () => {
                             disabled={processing || !failureReason.trim()}
                         >
                             {processing ? 'Processing...' : 'Mark as Failed'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bank Account Rejection Dialog */}
+            <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reject Bank Account</DialogTitle>
+                        <DialogDescription>
+                            Provide a reason for rejecting this bank account
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedBankAccount && (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-muted rounded-lg space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Bank:</span>
+                                    <span className="font-medium">{selectedBankAccount.bankName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Account Name:</span>
+                                    <span className="font-medium">{selectedBankAccount.accountName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Account Number:</span>
+                                    <span className="font-medium">{selectedBankAccount.accountNumber}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Rejection Reason *</label>
+                                <Textarea
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    placeholder="e.g., Invalid account number, Account name doesn't match, etc."
+                                    rows={4}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowRejectModal(false);
+                                setSelectedBankAccount(null);
+                                setRejectionReason('');
+                            }}
+                            disabled={processing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleRejectBankAccount}
+                            disabled={processing || !rejectionReason.trim()}
+                        >
+                            {processing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Rejecting...
+                                </>
+                            ) : (
+                                'Reject Account'
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -831,6 +1286,52 @@ const PayoutManagement = () => {
                                                         <span className="font-medium">Type:</span> {account.accountType}
                                                     </div>
                                                 </div>
+
+                                                {/* Verification Buttons */}
+                                                {!account.isVerified && (
+                                                    <div className="flex gap-2 mt-3 pt-2 border-t">
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => handleVerifyBankAccount(account.id)}
+                                                            disabled={processing}
+                                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                                        >
+                                                            {processing ? (
+                                                                <>
+                                                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                                    Verifying...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                                                    Verify
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={() => {
+                                                                setSelectedBankAccount(account);
+                                                                setShowRejectModal(true);
+                                                            }}
+                                                            disabled={processing}
+                                                        >
+                                                            <XCircle className="h-3 w-3 mr-1" />
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                {/* Already Verified */}
+                                                {account.isVerified && (
+                                                    <div className="mt-3 pt-2 border-t">
+                                                        <div className="flex items-center gap-2 text-xs text-green-600">
+                                                            <CheckCircle className="h-3 w-3" />
+                                                            <span>Account verified and ready for payouts</span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -910,11 +1411,13 @@ const PayoutManagement = () => {
                         >
                             Close
                         </Button>
-                        {selectedProducerDetails && selectedProducerDetails.status === 'SCHEDULED' && (
+                        {selectedProducerDetails && (selectedProducerDetails.status === 'SCHEDULED' || selectedProducerDetails.status === 'PROCESSING') && (
                             <Button
-                                onClick={() => {
+                                onClick={async () => {
                                     setShowDetailsModal(false);
                                     setSelectedPayout(selectedProducerDetails);
+                                    // Load bank accounts for the complete modal
+                                    await loadPayoutBankAccounts(selectedProducerDetails.producer.id);
                                     setShowCompleteModal(true);
                                 }}
                             >

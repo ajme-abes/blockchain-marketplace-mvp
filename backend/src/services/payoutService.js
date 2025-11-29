@@ -225,6 +225,61 @@ class PayoutService {
     }
 
     /**
+     * Get ALL payouts (all statuses)
+     */
+    async getAllPayouts() {
+        try {
+            const payouts = await prisma.producerPayout.findMany({
+                include: {
+                    producer: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
+                        }
+                    },
+                    payoutOrderItems: {
+                        include: {
+                            orderProducer: {
+                                include: {
+                                    order: {
+                                        select: {
+                                            id: true,
+                                            orderDate: true,
+                                            totalAmount: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: [
+                    { status: 'asc' },
+                    { scheduledFor: 'asc' }
+                ]
+            });
+
+            return {
+                success: true,
+                payouts: payouts.map(p => this.formatPayoutResponse(p))
+            };
+
+        } catch (error) {
+            console.error('❌ Error getting all payouts:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
      * Get all pending/scheduled payouts
      */
     async getPendingPayouts() {

@@ -4,11 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Truck, CheckCircle, MessageCircle, Eye, Loader2 } from 'lucide-react';
+import { Package, Truck, CheckCircle, MessageCircle, Eye, Loader2, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -16,6 +24,8 @@ import { orderService } from '@/services/orderService';
 interface Order {
   id: string;
   totalAmount: number;
+  producerShare?: number; // Producer's actual earnings from this order
+  isSharedProduct?: boolean; // Whether this product has multiple producers
   paymentStatus: string;
   deliveryStatus: string;
   orderDate: string;
@@ -29,8 +39,22 @@ interface Order {
     product: {
       name: string;
       price: number;
+      producers?: Array<{
+        id: string;
+        businessName: string;
+        sharePercentage?: number;
+        shareAmount?: number;
+      }>;
     };
     quantity: number;
+    producerShare?: number; // Producer's share for this item
+  }>;
+  allProducers?: Array<{
+    id: string;
+    businessName: string;
+    sharePercentage: number;
+    shareAmount: number;
+    role?: string;
   }>;
 }
 
@@ -38,12 +62,14 @@ const ProducerOrders = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [activeTab, setActiveTab] = useState<'new' | 'shipping' | 'completed'>('new');
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     fetchProducerOrders();
@@ -58,7 +84,7 @@ const ProducerOrders = () => {
       setLoading(true);
       const response = await orderService.getProducerOrders();
       console.log('🔧 Producer orders response:', response);
-      
+
       const ordersData = response?.orders || response?.data?.orders || [];
       setOrders(ordersData);
     } catch (error: any) {
@@ -75,27 +101,27 @@ const ProducerOrders = () => {
 
   const filterOrdersByTab = () => {
     let filtered: Order[] = [];
-    
+
     switch (activeTab) {
       case 'new':
-        filtered = orders.filter(order => 
+        filtered = orders.filter(order =>
           ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
         );
         break;
       case 'shipping':
-        filtered = orders.filter(order => 
+        filtered = orders.filter(order =>
           order.deliveryStatus === 'SHIPPED'
         );
         break;
       case 'completed':
-        filtered = orders.filter(order => 
+        filtered = orders.filter(order =>
           ['DELIVERED', 'CANCELLED'].includes(order.deliveryStatus)
         );
         break;
       default:
         filtered = orders;
     }
-    
+
     setFilteredOrders(filtered);
   };
 
@@ -103,12 +129,12 @@ const ProducerOrders = () => {
     try {
       setUpdatingStatus(orderId);
       await orderService.updateOrderStatus(orderId, newStatus);
-      
+
       toast({
         title: "Success",
         description: `Order status updated to ${newStatus}`,
       });
-      
+
       // Refresh orders
       await fetchProducerOrders();
     } catch (error: any) {
@@ -166,23 +192,23 @@ const ProducerOrders = () => {
   };
 
   const tabConfig = [
-    { 
-      key: 'new' as const, 
-      label: 'New Orders', 
-      icon: Package, 
-      count: orders.filter(order => ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)).length 
+    {
+      key: 'new' as const,
+      label: 'New Orders',
+      icon: Package,
+      count: orders.filter(order => ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)).length
     },
-    { 
-      key: 'shipping' as const, 
-      label: 'To Ship', 
-      icon: Truck, 
-      count: orders.filter(order => order.deliveryStatus === 'SHIPPED').length 
+    {
+      key: 'shipping' as const,
+      label: 'To Ship',
+      icon: Truck,
+      count: orders.filter(order => order.deliveryStatus === 'SHIPPED').length
     },
-    { 
-      key: 'completed' as const, 
-      label: 'Completed', 
-      icon: CheckCircle, 
-      count: orders.filter(order => ['DELIVERED', 'CANCELLED'].includes(order.deliveryStatus)).length 
+    {
+      key: 'completed' as const,
+      label: 'Completed',
+      icon: CheckCircle,
+      count: orders.filter(order => ['DELIVERED', 'CANCELLED'].includes(order.deliveryStatus)).length
     },
   ];
 
@@ -210,8 +236,8 @@ const ProducerOrders = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Order Management" 
+          <PageHeader
+            title="Order Management"
             description="Manage and track your customer orders"
           />
 
@@ -274,10 +300,36 @@ const ProducerOrders = () => {
                             <div className="text-xs text-muted-foreground">{order.buyer.user.email}</div>
                           </div>
                         </TableCell>
-                        <TableCell>{getMainProductName(order)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{getMainProductName(order)}</span>
+                            {order.isSharedProduct && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                <Users className="h-3 w-3 mr-1" />
+                                Shared
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{getTotalQuantity(order)}</TableCell>
                         <TableCell className="font-semibold">
-                          {formatPrice(order.totalAmount)}
+                          {/* Show producer's share if available, otherwise show total */}
+                          {order.producerShare !== undefined ? (
+                            <div>
+                              <div className="font-bold text-green-600">
+                                {formatPrice(order.producerShare)}
+                              </div>
+                              {order.isSharedProduct && (
+                                <div className="text-xs text-muted-foreground">
+                                  of {formatPrice(order.totalAmount)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="font-bold">
+                              {formatPrice(order.totalAmount)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>{formatDate(order.orderDate)}</TableCell>
                         <TableCell>
@@ -293,19 +345,22 @@ const ProducerOrders = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
-                              onClick={() => navigate(`/orders/${order.id}`)}
+                              onClick={() => {
+                                setSelectedOrderDetail(order);
+                                setShowDetailModal(true);
+                              }}
                             >
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
-                            
+
                             {/* Status Update Buttons */}
                             {activeTab === 'new' && order.deliveryStatus === 'PENDING' && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'CONFIRMED')}
                                 disabled={updatingStatus === order.id}
                               >
@@ -317,10 +372,10 @@ const ProducerOrders = () => {
                                 Confirm
                               </Button>
                             )}
-                            
+
                             {activeTab === 'new' && order.deliveryStatus === 'CONFIRMED' && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'SHIPPED')}
                                 disabled={updatingStatus === order.id}
                               >
@@ -332,10 +387,10 @@ const ProducerOrders = () => {
                                 Ship
                               </Button>
                             )}
-                            
+
                             {activeTab === 'shipping' && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'DELIVERED')}
                                 disabled={updatingStatus === order.id}
                               >
@@ -370,6 +425,209 @@ const ProducerOrders = () => {
           </main>
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Order Details
+            </DialogTitle>
+            <DialogDescription>
+              Complete information about this order
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedOrderDetail && (
+            <div className="space-y-6">
+              {/* Order Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Order Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Order ID</p>
+                      <p className="font-mono text-sm">#{selectedOrderDetail.id.slice(-8)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Order Date</p>
+                      <p className="text-sm">{formatDate(selectedOrderDetail.orderDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Payment Status</p>
+                      <Badge variant={selectedOrderDetail.paymentStatus === 'CONFIRMED' ? 'default' : 'secondary'}>
+                        {selectedOrderDetail.paymentStatus}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Delivery Status</p>
+                      <Badge className={getStatusColor(selectedOrderDetail.deliveryStatus)}>
+                        {selectedOrderDetail.deliveryStatus}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Buyer Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Buyer Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Name:</span>
+                    <span className="text-sm font-medium">{selectedOrderDetail.buyer.user.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Email:</span>
+                    <span className="text-sm font-medium">{selectedOrderDetail.buyer.user.email}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Co-Producers Information (if shared product) */}
+              {selectedOrderDetail.isSharedProduct && selectedOrderDetail.allProducers && (
+                <Card className="border-blue-200 bg-blue-50/50">
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <span className="text-blue-900">Co-Producers on This Order</span>
+                    </CardTitle>
+                    <CardDescription className="text-blue-700">
+                      This is a shared product with multiple producers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {selectedOrderDetail.allProducers.map((producer) => (
+                        <div key={producer.id} className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100">
+                          <div>
+                            <p className="font-medium text-sm text-blue-900">{producer.businessName}</p>
+                            {producer.role && (
+                              <p className="text-xs text-blue-600">{producer.role}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-blue-900">{producer.sharePercentage}%</p>
+                            <p className="text-xs text-blue-600">
+                              {formatPrice(producer.shareAmount)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Order Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Order Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {selectedOrderDetail.items.map((item, index) => (
+                      <div key={index} className="flex justify-between items-start p-3 bg-muted rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{item.product.name}</p>
+
+                          {/* Show producers for this item if available */}
+                          {item.product.producers && item.product.producers.length > 1 && (
+                            <div className="mt-1 flex flex-wrap gap-1 items-center">
+                              <span className="text-xs text-muted-foreground">Producers:</span>
+                              {item.product.producers.map((producer, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {producer.businessName}
+                                  {producer.sharePercentage && ` (${producer.sharePercentage}%)`}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {item.quantity} × {formatPrice(item.product.price)}
+                          </p>
+
+                          {/* Show producer's share for this item */}
+                          {item.producerShare !== undefined && (
+                            <p className="text-xs text-green-600 font-medium mt-1">
+                              Your share: {formatPrice(item.producerShare)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm">{formatPrice(item.quantity * item.product.price)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Earnings Summary */}
+              <Card className="border-green-200 bg-green-50/50">
+                <CardHeader>
+                  <CardTitle className="text-sm text-green-900">Your Earnings from This Order</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-green-700">Order Total:</span>
+                      <span className="text-sm font-medium text-green-900">
+                        {formatPrice(selectedOrderDetail.totalAmount)}
+                      </span>
+                    </div>
+                    {selectedOrderDetail.producerShare !== undefined && (
+                      <>
+                        {selectedOrderDetail.isSharedProduct && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-green-700">Your Share:</span>
+                            <span className="text-sm font-medium text-green-900">
+                              {formatPrice(selectedOrderDetail.producerShare / 0.9)} (before commission)
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-sm text-green-700">Platform Commission (10%):</span>
+                          <span className="text-sm font-medium text-red-600">
+                            -{formatPrice((selectedOrderDetail.producerShare / 0.9) * 0.1)}
+                          </span>
+                        </div>
+                        <div className="border-t border-green-200 pt-2 flex justify-between">
+                          <span className="font-semibold text-green-900">Your Net Earnings:</span>
+                          <span className="font-bold text-lg text-green-600">
+                            {formatPrice(selectedOrderDetail.producerShare)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetailModal(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setShowDetailModal(false);
+              navigate(`/orders/${selectedOrderDetail?.id}`);
+            }}>
+              View Full Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 };

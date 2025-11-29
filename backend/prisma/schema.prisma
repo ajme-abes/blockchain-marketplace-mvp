@@ -71,6 +71,7 @@ model Producer {
   orderProducers OrderProducer[]
   producerPayouts ProducerPayout[]
   bankAccounts ProducerBankAccount[]
+  productProducers ProductProducer[] // Multi-producer support
 
   @@index([verificationStatus])
   @@index([businessName])
@@ -150,6 +151,7 @@ model Product {
   orderItems OrderItem[]
   reviews    Review[]
   ipfsFiles  IPFSMetadata[]
+  productProducers ProductProducer[] // Multi-producer support
 
   @@index([name])
   @@index([category])
@@ -161,6 +163,22 @@ model Product {
   @@index([price, category])
   @@index([status, listingDate])
   @@map("products")
+}
+
+model ProductProducer {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  producerId      String
+  producer        Producer @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  sharePercentage Float    // Percentage share (e.g., 40.0 for 40%)
+  role            String?  // Optional role description (e.g., "Grower", "Processor")
+  createdAt       DateTime @default(now())
+  
+  @@unique([productId, producerId])
+  @@index([productId])
+  @@index([producerId])
+  @@map("product_producers")
 }
 
 model Order {

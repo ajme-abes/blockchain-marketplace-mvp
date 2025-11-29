@@ -51,6 +51,30 @@ class PayoutService {
     // ========== ADMIN ENDPOINTS ==========
 
     /**
+     * Get ALL payouts (all statuses)
+     */
+    async getAllPayouts(): Promise<ProducerPayout[]> {
+        console.log('🌐 Fetching all payouts from:', `${API_BASE_URL}/payouts`);
+        const headers = getAuthHeaders();
+
+        const response = await fetch(`${API_BASE_URL}/payouts`, {
+            headers,
+        });
+
+        console.log('📡 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Failed to fetch all payouts: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('📦 Received data:', data);
+        return data.payouts || [];
+    }
+
+    /**
      * Get all pending/scheduled payouts
      */
     async getPendingPayouts(): Promise<ProducerPayout[]> {
@@ -122,12 +146,22 @@ class PayoutService {
     async markPayoutComplete(
         payoutId: string,
         payoutReference: string,
-        payoutMethod: string = 'BANK_TRANSFER'
+        payoutMethod: string = 'BANK_TRANSFER',
+        bankAccountDetails?: {
+            bankAccountId?: string;
+            bankName?: string;
+            accountNumber?: string;
+            accountName?: string;
+        }
     ): Promise<ProducerPayout> {
         const response = await fetch(`${API_BASE_URL}/payouts/${payoutId}/complete`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ payoutReference, payoutMethod }),
+            body: JSON.stringify({
+                payoutReference,
+                payoutMethod,
+                bankAccountDetails
+            }),
         });
         if (!response.ok) throw new Error('Failed to complete payout');
         const data = await response.json();

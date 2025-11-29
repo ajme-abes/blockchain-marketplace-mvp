@@ -161,6 +161,23 @@ class OrderService {
                       }
                     }
                   }
+                },
+                // Include multi-producer information
+                productProducers: {
+                  include: {
+                    producer: {
+                      select: {
+                        id: true,
+                        businessName: true,
+                        user: {
+                          select: {
+                            name: true,
+                            email: true
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -325,6 +342,23 @@ class OrderService {
                         }
                       }
                     }
+                  },
+                  // Include multi-producer information
+                  productProducers: {
+                    include: {
+                      producer: {
+                        select: {
+                          id: true,
+                          businessName: true,
+                          user: {
+                            select: {
+                              name: true,
+                              email: true
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -357,7 +391,36 @@ class OrderService {
       })
     ]);
 
-    const formattedOrders = orders.map(order => this.formatOrderResponse(order));
+    // Calculate producer shares and format response
+    const formattedOrders = orders.map(order => {
+      const producerShare = this.calculateProducerShare(order, producerId);
+      const isSharedProduct = this.hasSharedProducts(order);
+      const allProducers = this.getAllProducersForOrder(order, producerId);
+
+      return {
+        ...this.formatOrderResponse(order),
+        producerShare: producerShare,
+        isSharedProduct: isSharedProduct,
+        allProducers: allProducers,
+        items: order.orderItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+          producerShare: this.calculateItemProducerShare(item, producerId),
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            price: item.price,
+            producer: item.product.producer ? {
+              id: item.product.producer.id,
+              businessName: item.product.producer.businessName,
+              user: item.product.producer.user
+            } : null,
+            producers: this.formatProductProducers(item.product)
+          }
+        }))
+      };
+    });
 
     return {
       orders: formattedOrders,
@@ -672,7 +735,9 @@ class OrderService {
             id: item.product.producer.id,
             businessName: item.product.producer.businessName,
             user: item.product.producer.user
-          } : null
+          } : null,
+          // Add producers array for multi-producer support
+          producers: this.formatProductProducers(item.product)
         },
         quantity: item.quantity,
         subtotal: item.subtotal
@@ -688,6 +753,113 @@ class OrderService {
       createdAt: order.orderDate,
       updatedAt: order.updatedAt
     };
+  }
+
+  // Format producers array for frontend
+  formatProductProducers(product) {
+    // If product has multiple producers, use productProducers
+    if (product.productProducers && product.productProducers.length > 0) {
+      return product.productProducers.map(pp => ({
+        id: pp.producer.id,
+        businessName: pp.producer.businessName,
+        sharePercentage: pp.sharePercentage,
+        role: pp.role
+      }));
+    }
+
+    // Otherwise, return single producer (backward compatibility)
+    if (product.producer) {
+      return [{
+        id: product.producer.id,
+        businessName: product.producer.businessName,
+        sharePercentage: 100 // Single producer gets 100%
+      }];
+    }
+
+    return [];
+  }
+
+  // Calculate producer's share from an order
+  calculateProducerShare(order, producerId) {
+    let totalShare = 0;
+
+    for (const item of order.orderItems) {
+      const itemTotal = item.subtotal;
+      const producerPercentage = this.getProducerPercentage(item.product, producerId);
+      const producerItemShare = itemTotal * (producerPercentage / 100);
+
+      // Apply 10% platform commission
+      const netShare = producerItemShare * 0.9;
+      totalShare += netShare;
+    }
+
+    return totalShare;
+  }
+
+  // Get producer's percentage for a product
+  getProducerPercentage(product, producerId) {
+    // Check if product has multiple producers
+    if (product.productProducers && product.productProducers.length > 0) {
+      const producerEntry = product.productProducers.find(
+        pp => pp.producerId === producerId
+      );
+      return producerEntry ? producerEntry.sharePercentage : 0;
+    }
+
+    // Single producer gets 100%
+    if (product.producerId === producerId) {
+      return 100;
+    }
+
+    return 0;
+  }
+
+  // Check if order has shared products
+  hasSharedProducts(order) {
+    return order.orderItems.some(item =>
+      item.product.productProducers &&
+      item.product.productProducers.length > 1
+    );
+  }
+
+  // Get all producers for an order
+  getAllProducersForOrder(order, currentProducerId) {
+    const producersMap = new Map();
+
+    for (const item of order.orderItems) {
+      const product = item.product;
+
+      if (product.productProducers && product.productProducers.length > 0) {
+        // Multi-producer product
+        for (const pp of product.productProducers) {
+          if (!producersMap.has(pp.producerId)) {
+            const itemTotal = item.subtotal;
+            const producerShare = itemTotal * (pp.sharePercentage / 100);
+            const netShare = producerShare * 0.9; // After 10% commission
+
+            producersMap.set(pp.producerId, {
+              id: pp.producerId,
+              businessName: pp.producer.businessName,
+              sharePercentage: pp.sharePercentage,
+              shareAmount: netShare,
+              role: pp.role
+            });
+          }
+        }
+      }
+    }
+
+    return Array.from(producersMap.values());
+  }
+
+  // Calculate producer's share for a single item
+  calculateItemProducerShare(item, producerId) {
+    const itemTotal = item.subtotal;
+    const producerPercentage = this.getProducerPercentage(item.product, producerId);
+    const producerItemShare = itemTotal * (producerPercentage / 100);
+
+    // Apply 10% platform commission
+    return producerItemShare * 0.9;
   }
 }
 
