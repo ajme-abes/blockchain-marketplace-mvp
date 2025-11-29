@@ -12,11 +12,11 @@ import { orderService } from '@/services/orderService';
 import { paymentService, PaymentIntent } from '@/services/paymentService';
 import { useChat } from '@/contexts/ChatContext';
 import { MessageSquare, Loader2 } from 'lucide-react';
-import { 
-  Package, 
-  Truck, 
-  CheckCircle, 
-  Clock, 
+import {
+  Package,
+  Truck,
+  CheckCircle,
+  Clock,
   ArrowLeft,
   ExternalLink,
   MapPin,
@@ -28,7 +28,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, Upload, X, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Upload, X, AlertCircle, Users } from 'lucide-react';
 import { disputeService } from '@/services/disputeService';
 
 interface Order {
@@ -62,10 +62,19 @@ interface Order {
           email: string;
         };
       };
+      producers?: Array<{
+        id: string;
+        businessName: string;
+        sharePercentage: number;
+        role?: string;
+      }>;
     };
     quantity: number;
     subtotal: number;
+    producerShare?: number;
   }>;
+  producerShare?: number;
+  isSharedProduct?: boolean;
   statusHistory?: Array<{
     id: string;
     fromStatus: string;
@@ -157,7 +166,7 @@ const OrderDetail = () => {
   const navigate = useNavigate();
   const { createOrderChat, loading: chatLoading } = useChat();
   const { toast } = useToast();
-  
+
   const [order, setOrder] = useState<Order | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -261,20 +270,20 @@ const OrderDetail = () => {
 
   const handleContactSeller = async () => {
     if (!orderId) return;
-  
+
     try {
       const chat = await createOrderChat(orderId);
-      
+
       toast({
         title: "Chat opened successfully!",
         description: "Redirecting to messages...",
       });
-  
+
       // Small delay for better UX
       setTimeout(() => {
         navigate(`/chats?chat=${chat.id}`);
       }, 1000);
-      
+
     } catch (error: any) {
       console.error('Failed to create order chat:', error);
       toast({
@@ -290,17 +299,17 @@ const OrderDetail = () => {
 
     try {
       setCheckingDispute(true);
-      
+
       // First, get the dispute details to find the dispute chat
       const disputeResult = await disputeService.getDisputeDetails(order.dispute.id);
-      
+
       if (disputeResult.status === 'success' && disputeResult.data) {
         // Navigate to dispute management page with the dispute ID
         navigate(`/disputes/${order.dispute.id}`);
       } else {
         throw new Error('Could not access dispute details');
       }
-      
+
     } catch (error: any) {
       console.error('Failed to open dispute chat:', error);
       toast({
@@ -312,21 +321,21 @@ const OrderDetail = () => {
       setCheckingDispute(false);
     }
   };
-  
+
   const handleSendMessage = async () => {
     if (!orderId) return;
-  
+
     try {
       const chat = await createOrderChat(orderId);
-      
+
       toast({
         title: "Chat opened",
         description: "You can now message the buyer",
       });
-  
+
       // Navigate to the chat
       navigate(`/chats?chat=${chat.id}`);
-      
+
     } catch (error: any) {
       console.error('Failed to create order chat:', error);
       toast({
@@ -357,7 +366,7 @@ const OrderDetail = () => {
 
   const handleOpenDisputeModal = () => {
     if (!order) return;
-    
+
     // Check if dispute can be raised (order must be confirmed/delivered and not already disputed)
     if (order.deliveryStatus === 'PENDING') {
       toast({
@@ -377,18 +386,18 @@ const OrderDetail = () => {
       });
       return;
     }
-    
+
     setShowDisputeModal(true);
   };
-  
+
   const handleEvidenceUpload = (files: FileList | null) => {
     if (!files) return;
-    
+
     const newFiles = Array.from(files);
     const validFiles = newFiles.filter(file => {
       const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf';
       const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
-      
+
       if (!isValidType) {
         toast({
           title: "Invalid file type",
@@ -403,23 +412,23 @@ const OrderDetail = () => {
           variant: "destructive",
         });
       }
-      
+
       return isValidType && isValidSize;
     });
-    
+
     setDisputeForm(prev => ({
       ...prev,
       evidence: [...prev.evidence, ...validFiles]
     }));
   };
-  
+
   const removeEvidence = (index: number) => {
     setDisputeForm(prev => ({
       ...prev,
       evidence: prev.evidence.filter((_, i) => i !== index)
     }));
   };
-  
+
   const handleCreateDispute = async () => {
     if (!orderId || !disputeForm.reason || !disputeForm.description) {
       toast({
@@ -429,35 +438,35 @@ const OrderDetail = () => {
       });
       return;
     }
-  
+
     try {
       setCreatingDispute(true);
       setUploadProgress(0);
-  
+
       const formData = new FormData();
       formData.append('orderId', orderId);
       formData.append('reason', disputeForm.reason);
       formData.append('description', disputeForm.description);
       formData.append('desiredResolution', disputeForm.desiredResolution);
-  
+
       // Add evidence files
       disputeForm.evidence.forEach((file, index) => {
         formData.append(`evidence`, file);
       });
-  
+
       const result = await disputeService.createDispute(formData, (progress) => {
         setUploadProgress(progress);
       });
-  
+
       if (result.status === 'error') {
         throw new Error(result.message);
       }
-  
+
       toast({
         title: "Dispute Raised Successfully",
         description: "Your dispute has been submitted and will be reviewed shortly",
       });
-  
+
       setShowDisputeModal(false);
       setDisputeForm({
         reason: '',
@@ -465,10 +474,10 @@ const OrderDetail = () => {
         desiredResolution: '',
         evidence: []
       });
-  
+
       // Refresh order details to show the new dispute
       fetchOrderDetails();
-  
+
     } catch (error: any) {
       console.error('Failed to create dispute:', error);
       toast({
@@ -481,7 +490,7 @@ const OrderDetail = () => {
       setUploadProgress(0);
     }
   };
-  
+
   const selectedReason = DISPUTE_REASONS.find(r => r.value === disputeForm.reason);
   const isProducer = user?.role === 'PRODUCER';
   const isBuyer = user?.role === 'BUYER';
@@ -567,7 +576,7 @@ const OrderDetail = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
+          <PageHeader
             title={`Order #${order.id.slice(-8)}`}
             description={`Placed on ${formatDate(order.orderDate)}`}
             action={
@@ -607,12 +616,12 @@ const OrderDetail = () => {
                           Payment: {order.paymentStatus}
                         </Badge>
                       </div>
-                      
+
                       {canUpdateStatus && (
                         <div className="flex gap-2">
                           {order.deliveryStatus === 'PENDING' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => updateOrderStatus('CONFIRMED')}
                               disabled={updatingStatus}
                             >
@@ -620,8 +629,8 @@ const OrderDetail = () => {
                             </Button>
                           )}
                           {order.deliveryStatus === 'CONFIRMED' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => updateOrderStatus('SHIPPED')}
                               disabled={updatingStatus}
                             >
@@ -629,8 +638,8 @@ const OrderDetail = () => {
                             </Button>
                           )}
                           {order.deliveryStatus === 'SHIPPED' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => updateOrderStatus('DELIVERED')}
                               disabled={updatingStatus}
                             >
@@ -684,23 +693,64 @@ const OrderDetail = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {order.items.map((item) => (
-                        <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                          <img 
-                            src={item.product.imageUrl || '/placeholder-product.jpg'} 
+                        <div key={item.id} className="flex items-start gap-4 p-4 border rounded-lg">
+                          <img
+                            src={item.product.imageUrl || '/placeholder-product.jpg'}
                             alt={item.product.name}
-                            className="w-16 h-16 object-cover rounded-lg"
+                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                           />
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <h4 className="font-semibold">{item.product.name}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Seller: {item.product.producer?.businessName || 'Unknown Seller'}
-                            </p>
-                            <div className="flex items-center gap-4 mt-1">
+
+                            {/* Show single producer or multi-producer info */}
+                            {!item.product.producers || item.product.producers.length <= 1 ? (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Seller: {item.product.producer?.businessName || 'Unknown Seller'}
+                              </p>
+                            ) : (
+                              <div className="space-y-2 mt-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    Shared Product
+                                  </Badge>
+                                </div>
+                                <div className="text-sm space-y-1">
+                                  <p className="font-medium text-muted-foreground">Producers:</p>
+                                  {item.product.producers.map((producer) => {
+                                    const isCurrentUser = user?.role === 'PRODUCER' &&
+                                      order.items.some(i => i.product.producer?.user?.email === user.email);
+                                    const isThisProducer = producer.businessName === item.product.producer?.businessName;
+
+                                    return (
+                                      <div key={producer.id} className="flex items-center gap-2 text-xs">
+                                        <span className={isThisProducer && isCurrentUser ? 'font-bold text-blue-600' : 'text-muted-foreground'}>
+                                          • {producer.businessName} ({producer.sharePercentage}%)
+                                          {producer.role && ` - ${producer.role}`}
+                                          {isThisProducer && isCurrentUser && ' - You'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-4 mt-2">
                               <span className="text-sm">Qty: {item.quantity}</span>
                               <span className="text-sm">Price: {formatPrice(item.product.price)}</span>
                             </div>
+
+                            {/* Show producer's earnings if available */}
+                            {item.producerShare !== undefined && user?.role === 'PRODUCER' && (
+                              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                                <p className="text-green-700">
+                                  <span className="font-medium">Your Earnings:</span> {formatPrice(item.producerShare)}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0">
                             <p className="font-semibold">{formatPrice(item.subtotal)}</p>
                           </div>
                         </div>
@@ -728,6 +778,38 @@ const OrderDetail = () => {
                         <span>{formatPrice(order.totalAmount + 50 + (order.totalAmount * 0.15))}</span>
                       </div>
                     </div>
+
+                    {/* Producer Earnings Summary */}
+                    {user?.role === 'PRODUCER' && order.producerShare !== undefined && order.isSharedProduct && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Your Earnings Summary
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Order Total:</span>
+                            <span className="text-blue-900 font-medium">{formatPrice(order.totalAmount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Your Share (before commission):</span>
+                            <span className="text-blue-900 font-medium">{formatPrice(order.producerShare / 0.9)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Platform Commission (10%):</span>
+                            <span className="text-red-600 font-medium">-{formatPrice((order.producerShare / 0.9) * 0.1)}</span>
+                          </div>
+                          <Separator className="my-2" />
+                          <div className="flex justify-between font-bold">
+                            <span className="text-blue-900">Your Net Earnings:</span>
+                            <span className="text-green-600 text-lg">{formatPrice(order.producerShare)}</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-3">
+                          This is a shared product. The order total is split among all producers based on their share percentages.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -877,9 +959,9 @@ const OrderDetail = () => {
                         <div className="text-xs bg-muted p-2 rounded break-all">
                           {order.blockchainTxHash}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="w-full"
                           onClick={() => window.open(getPolygonscanUrl(order.blockchainTxHash!), '_blank')}
                         >
@@ -898,133 +980,133 @@ const OrderDetail = () => {
 
                 {/* Contact Information */}
 
-<Card>
-  <CardHeader>
-    <CardTitle>Contact & Support</CardTitle>
-  </CardHeader>
-  <CardContent className="space-y-3">
-    {isProducer && order?.buyer ? (
-      <>
-        <div>
-          <p className="font-semibold">{order.buyer.user.name}</p>
-          <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
-          <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full"
-          onClick={handleSendMessage}
-          disabled={chatLoading}
-        >
-          {chatLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <MessageSquare className="h-4 w-4 mr-2" />
-          )}
-          Send Message
-        </Button>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contact & Support</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {isProducer && order?.buyer ? (
+                      <>
+                        <div>
+                          <p className="font-semibold">{order.buyer.user.name}</p>
+                          <p className="text-sm text-muted-foreground">{order.buyer.user.email}</p>
+                          <p className="text-sm text-muted-foreground">{order.buyer.user.phone}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleSendMessage}
+                          disabled={chatLoading}
+                        >
+                          {chatLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                          )}
+                          Send Message
+                        </Button>
 
-        {/* Show Dispute Chat if dispute exists */}
-        {order.dispute && (
-          <>
-            <Separator className="my-2" />
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
-              onClick={handleDisputeChat}
-              disabled={checkingDispute}
-            >
-              {checkingDispute ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <AlertCircle className="h-4 w-4 mr-2" />
-              )}
-              Dispute Chat ({order.dispute.status})
-            </Button>
-          </>
-        )}
-      </>
-    ) : order?.items[0]?.product.producer && (
-      <>
-        <div>
-          <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
-          <p className="text-sm text-muted-foreground">
-            Contact: {order.items[0].product.producer.user.name}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {order.items[0].product.producer.user.email}
-          </p>
-        </div>
-        
-        {/* Regular Contact Button - ALWAYS SHOW */}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full"
-          onClick={handleContactSeller}
-          disabled={chatLoading}
-        >
-          {chatLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Opening Chat...
-            </>
-          ) : (
-            <>
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Contact Seller
-            </>
-          )}
-        </Button>
-        
-        {/* SIMPLIFIED DISPUTE BUTTON LOGIC */}
-        <Separator className="my-2" />
-        
-        {/* Show Dispute Chat if dispute exists */}
-        {order.dispute ? (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
-            onClick={handleDisputeChat}
-            disabled={checkingDispute}
-          >
-            {checkingDispute ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <AlertCircle className="h-4 w-4 mr-2" />
-            )}
-            Dispute Chat ({order.dispute.status})
-          </Button>
-        ) : (
-          /* Show Raise Dispute button if no dispute exists */
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={handleOpenDisputeModal}
-            disabled={order.deliveryStatus === 'PENDING'}
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Raise Dispute
-            {order.deliveryStatus === 'PENDING' && (
-              <span className="ml-1 text-xs">(Available after confirmation)</span>
-            )}
-          </Button>
-        )}
-        
-        {/* Show info text if order is pending */}
-        {order.deliveryStatus === 'PENDING' && !order.dispute && (
-          <p className="text-xs text-muted-foreground text-center mt-1">
-            Disputes can be raised after order is confirmed
-          </p>
-        )}
-      </>
-    )}
-  </CardContent>
-</Card>
+                        {/* Show Dispute Chat if dispute exists */}
+                        {order.dispute && (
+                          <>
+                            <Separator className="my-2" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                              onClick={handleDisputeChat}
+                              disabled={checkingDispute}
+                            >
+                              {checkingDispute ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                              )}
+                              Dispute Chat ({order.dispute.status})
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    ) : order?.items[0]?.product.producer && (
+                      <>
+                        <div>
+                          <p className="font-semibold">{order.items[0].product.producer.businessName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Contact: {order.items[0].product.producer.user.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.items[0].product.producer.user.email}
+                          </p>
+                        </div>
+
+                        {/* Regular Contact Button - ALWAYS SHOW */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleContactSeller}
+                          disabled={chatLoading}
+                        >
+                          {chatLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Opening Chat...
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Contact Seller
+                            </>
+                          )}
+                        </Button>
+
+                        {/* SIMPLIFIED DISPUTE BUTTON LOGIC */}
+                        <Separator className="my-2" />
+
+                        {/* Show Dispute Chat if dispute exists */}
+                        {order.dispute ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                            onClick={handleDisputeChat}
+                            disabled={checkingDispute}
+                          >
+                            {checkingDispute ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 mr-2" />
+                            )}
+                            Dispute Chat ({order.dispute.status})
+                          </Button>
+                        ) : (
+                          /* Show Raise Dispute button if no dispute exists */
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={handleOpenDisputeModal}
+                            disabled={order.deliveryStatus === 'PENDING'}
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Raise Dispute
+                            {order.deliveryStatus === 'PENDING' && (
+                              <span className="ml-1 text-xs">(Available after confirmation)</span>
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Show info text if order is pending */}
+                        {order.deliveryStatus === 'PENDING' && !order.dispute && (
+                          <p className="text-xs text-muted-foreground text-center mt-1">
+                            Disputes can be raised after order is confirmed
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </main>
@@ -1166,7 +1248,7 @@ const OrderDetail = () => {
                     <span>{uploadProgress}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
