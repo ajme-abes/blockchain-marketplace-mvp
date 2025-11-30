@@ -1,0 +1,107 @@
+// Oromo translations - using English as base for now, update as needed
+import { en } from './en';
+
+export const orm = {
+    ...en,
+    // Override with Oromo translations
+
+    // Sidebar Navigation
+    'sidebar.navigation': 'Navigeeshinii',
+    'sidebar.dashboard': 'Gabatee',
+    'sidebar.profile': 'Piroofaayilii',
+    'sidebar.settings': 'Qindaʼina',
+    'sidebar.aboutUs': 'Waaʼee Keenya',
+    'sidebar.marketplace': 'Gabaa',
+    'sidebar.chats': 'Marii',
+    'sidebar.systemMonitor': 'Hordoffii Sirna',
+
+    // Sidebar - Producer
+    'sidebar.producer.title': 'Meeshaalee Daldala',
+    'sidebar.producer.myProducts': 'Oomisha Koo',
+    'sidebar.producer.orderManagement': 'Bulchiinsa Ajajaa',
+    'sidebar.producer.customerReviews': 'Gamaaggama Maamiltootaa',
+    'sidebar.producer.transactionHistory': 'Seenaa Daldalaa',
+    'sidebar.producer.salesAnalytics': 'Xiinxala Gurgurtaa',
+    'sidebar.producer.storeSettings': 'Qindaʼina Mana Daldalaa',
+    'sidebar.producer.myDisputes': 'Waldhabdee Koo',
+
+    // Sidebar - Buyer
+    'sidebar.buyer.title': 'Sochii Koo',
+    'sidebar.buyer.myOrders': 'Ajaja Koo',
+    'sidebar.buyer.purchaseHistory': 'Seenaa Bittaa',
+    'sidebar.buyer.myDisputes': 'Waldhabdee Koo',
+
+    // Sidebar - Admin
+    'sidebar.admin.title': 'To\'annoo Bulchaa',
+    'sidebar.admin.userManagement': 'Bulchiinsa Fayyadamtootaa',
+    'sidebar.admin.productManagement': 'Bulchiinsa Oomishaa',
+    'sidebar.admin.orderManagement': 'Bulchiinsa Ajajaa',
+    'sidebar.admin.producerPayouts': 'Kaffaltii Oomishtootaa',
+    'sidebar.admin.disputeManagement': 'Bulchiinsa Waldhabdee',
+    'sidebar.admin.systemAnalytics': 'Xiinxala Sirna',
+    'sidebar.admin.auditLogs': 'Galmee Sakattaa',
+    'sidebar.admin.systemSettings': 'Qindaʼina Sirna',
+
+    // Override with Oromo translations for producer dashboard
+    'producer.dashboard.title': 'Gabatee Oomishtootaa',
+    'producer.dashboard.subtitle': 'Oomisha keessan bulchaa fi raawwii daldala hordofaa',
+    'producer.dashboard.welcome': 'Baga nagaan dhufte',
+    'producer.dashboard.todayActivity': 'Har\'a daldala keessan irratti wanti mul\'atu kanaa dha.',
+    'producer.dashboard.loadingDashboard': 'Gabatee fe\'aa jira...',
+    'producer.dashboard.totalProducts': 'Oomisha Waliigalaa',
+    'producer.dashboard.activeListings': 'Tarreewwan sochii',
+    'producer.dashboard.pendingOrders': 'Ajaja Eegaa Jiru',
+    'producer.dashboard.awaitingProcessing': 'Adeemsa eegaa jira',
+    'producer.dashboard.totalEarnings': 'Galii Waliigalaa',
+    'producer.dashboard.allTimeRevenue': 'Galii yeroo hundaa',
+    'producer.dashboard.growth': 'Guddina',
+    'producer.dashboard.thisMonth': 'Ji\'a kana',
+    'producer.dashboard.recentOrders': 'Ajaja Dhiyoo',
+    'producer.dashboard.latestCustomerOrders': 'Ajaja maamiltootaa haaraa',
+    'producer.dashboard.noOrdersYet': 'Ajajni amma hin jiru',
+    'producer.dashboard.promoteProducts': 'Oomisha Keessan Beeksisaa',
+    'producer.dashboard.quickActions': 'Gocha Saffisaa',
+    'producer.dashboard.manageBusiness': 'Daldala keessan bulchaa',
+    'producer.dashboard.manageProducts': 'Oomisha Bulchaa',
+    'producer.dashboard.viewOrders': 'Ajaja Ilaali',
+    'producer.dashboard.viewAllOrders': 'Ajaja Hunda Ilaali',
+    'producer.dashboard.addProduct': 'Oomisha Dabali',
+    'producer.dashboard.analytics': 'Xiinxala',
+    'producer.dashboard.transactions': 'Daldalaa',
+    'producer.dashboard.bankAccounts': 'Akkaawuntii Baankii',
+    'producer.dashboard.moreItems': 'dabalataa',
+    'producer.dashboard.errorLoading': 'Daataa gabatee fe\'uun hin milkoofne',
+
+    // Login Page
+    'login.welcomeBack': 'Baga Nagaan Dhufte!',
+    'login.signInToAccount': 'Gara akkaawuntii EthioTrust keessanii seenaa',
+    'login.emailLabel': 'Iimeelii',
+    'login.passwordLabel': 'Jecha Icciitii',
+    'login.rememberMe': 'Na Yaadadhu',
+    'login.forgotPassword': 'Jecha Icciitii Irraanfatte?',
+    'login.signIn': 'Seeni',
+    'login.signingIn': 'Seenaa jira...',
+    'login.noAccount': 'Akkaawuntii hin qabdu?',
+    'login.joinNow': 'Amma makamaa',
+    'login.backToHome': 'Gara manaatti deebiʼi',
+    'login.success': 'Seenuun milkaaʼe! Baga nagaan dhufte! 🎉',
+    'login.failed': 'Seenuun hin milkoofne. Mee irra deebiʼii yaali.',
+
+    // Register Page
+    'register.createAccount': 'Akkaawuntii Uumaa',
+    'register.joinEthioTrust': 'Gabaa EthioTrust makamaa',
+    'register.fullName': 'Maqaa Guutuu',
+    'register.fullNamePlaceholder': 'Caaltuu Tasfaayee',
+    'register.phoneNumber': 'Lakkoofsa Bilbilaa',
+    'register.selectRole': 'Gahee Filadhu',
+    'register.buyer': 'Bitaa',
+    'register.producer': 'Oomishtuu',
+    'register.buyerDesc': 'Oomisha bituu barbaada',
+    'register.producerDesc': 'Oomisha gurguruu barbaada',
+    'register.createAccountButton': 'Akkaawuntii Uumaa',
+    'register.creating': 'Akkaawuntii uumaa jira...',
+    'register.hasAccount': 'Akkaawuntii qabduu?',
+    'register.signIn': 'Seeni',
+    'register.success': 'Akkaawuntiin milkaaʼinaan uumame! Baga nagaan dhufte! 🎉',
+    'register.failed': 'Galmaaʼuun hin milkoofne. Mee irra deebiʼii yaali.',
+};

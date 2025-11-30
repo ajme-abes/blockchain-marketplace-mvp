@@ -27,12 +27,12 @@ export const Footer = () => {
                   EthioTrust
                 </span>
                 <span className="text-sm text-amber-600 dark:text-amber-400 font-medium -mt-1">
-                  Trusted Ethiopian Marketplace
+                  {t('footer.brand.tagline')}
                 </span>
               </div>
             </div>
             <p className="text-lg text-gray-700 dark:text-gray-300 mb-6 leading-relaxed">
-              Empowering Ethiopian producers and buyers through transparent, 
+              Empowering Ethiopian producers and buyers through transparent,
               <span className="font-semibold text-amber-600 dark:text-amber-400"> blockchain-powered </span>
               commerce.
             </p>
@@ -56,32 +56,32 @@ export const Footer = () => {
             </h3>
             <ul className="space-y-4">
               <li>
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-all duration-300 hover:translate-x-1 inline-block"
                 >
                   Home
                 </Link>
               </li>
               <li>
-                <Link 
-                  to="/marketplace" 
+                <Link
+                  to="/marketplace"
                   className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-all duration-300 hover:translate-x-1 inline-block"
                 >
                   Marketplace
                 </Link>
               </li>
               <li>
-                <Link 
-                  to="/about" 
+                <Link
+                  to="/about"
                   className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-all duration-300 hover:translate-x-1 inline-block"
                 >
                   About Us
                 </Link>
               </li>
               <li>
-                <Link 
-                  to="/contact" 
+                <Link
+                  to="/contact"
                   className="text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-all duration-300 hover:translate-x-1 inline-block"
                 >
                   Contact
@@ -119,36 +119,36 @@ export const Footer = () => {
               Connect With Us
             </h3>
             <div className="flex gap-4 mb-6">
-              <a 
-                href="https://facebook.com/ethiotrust" 
-                target="_blank" 
+              <a
+                href="https://facebook.com/ethiotrust"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-lg transition-all duration-300 group"
                 aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-600" />
               </a>
-              <a 
-                href="https://instagram.com/ethiotrust" 
-                target="_blank" 
+              <a
+                href="https://instagram.com/ethiotrust"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-lg transition-all duration-300 group"
                 aria-label="Instagram"
               >
                 <Instagram className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-pink-600" />
               </a>
-              <a 
-                href="https://twitter.com/ethiotrust" 
-                target="_blank" 
+              <a
+                href="https://twitter.com/ethiotrust"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-lg transition-all duration-300 group"
                 aria-label="Twitter/X"
               >
                 <Twitter className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-400" />
               </a>
-              <a 
-                href="https://t.me/ethiotrust" 
-                target="_blank" 
+              <a
+                href="https://t.me/ethiotrust"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/50 hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-lg transition-all duration-300 group"
                 aria-label="Telegram"
@@ -156,7 +156,7 @@ export const Footer = () => {
                 <Send className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500" />
               </a>
             </div>
-            
+
             <div className="flex gap-3">
               <Toggle
                 pressed={theme === 'dark'}
@@ -184,11 +184,11 @@ export const Footer = () => {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             <div className="text-center lg:text-left">
               <p className="text-gray-600 dark:text-gray-400 font-medium">
-                © 2024 EthioTrust Marketplace. All rights reserved. 
+                © 2024 EthioTrust Marketplace. All rights reserved.
                 <span className="text-amber-600 dark:text-amber-400"> Powered by blockchain transparency.</span>
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <span>Made with</span>
               <Heart className="h-4 w-4 text-red-500 animate-pulse" />

@@ -444,18 +444,30 @@ class PayoutService {
                     where: { payoutId: payoutId }
                 });
 
+                console.log(`📋 Found ${payoutItems.length} payout order items to update`);
+
                 for (const item of payoutItems) {
-                    await tx.orderProducer.update({
-                        where: { id: item.orderProducerId },
-                        data: {
-                            payoutStatus: 'COMPLETED',
-                            paidAt: new Date(),
-                            payoutReference: payoutReference
-                        }
-                    });
+                    if (item.orderProducerId) {
+                        console.log(`🔄 Updating OrderProducer ${item.orderProducerId}...`);
+
+                        const updatedOrderProducer = await tx.orderProducer.update({
+                            where: { id: item.orderProducerId },
+                            data: {
+                                payoutStatus: 'COMPLETED',
+                                paidAt: new Date(),
+                                payoutReference: payoutReference
+                            }
+                        });
+
+                        console.log(`✅ Updated OrderProducer ${item.orderProducerId} status to COMPLETED`);
+                        console.log(`   Order ID: ${updatedOrderProducer.orderId}`);
+                        console.log(`   Producer ID: ${updatedOrderProducer.producerId}`);
+                    } else {
+                        console.log(`⚠️ PayoutOrderItem ${item.id} has no orderProducerId`);
+                    }
                 }
 
-                console.log(`✅ Updated ${payoutItems.length} order producer records`);
+                console.log(`✅ Completed updating ${payoutItems.length} OrderProducer records`);
 
                 return payout;
             });

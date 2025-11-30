@@ -38,20 +38,21 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSelector } from '@/components/layout/LanguageSelector';
 import { Moon, Sun, Globe } from 'lucide-react';
 
 export const AppSidebar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { language, toggleLanguage } = useLanguage();
+  const { t } = useLanguage();
 
   // Core links for ALL roles
   const coreLinks = [
-    { title: 'Dashboard', url: '/dashboard', icon: Home },
-    { title: 'Profile', url: '/profile', icon: User },
-    { title: 'Settings', url: '/settings', icon: Settings },
-    { title: 'About Us', url: '/about', icon: Info },
+    { title: 'sidebar.dashboard', url: '/dashboard', icon: Home },
+    { title: 'sidebar.profile', url: '/profile', icon: User },
+    { title: 'sidebar.settings', url: '/settings', icon: Settings },
+    { title: 'sidebar.aboutUs', url: '/about', icon: Info },
   ];
 
   // Role-specific additional common links
@@ -59,16 +60,16 @@ export const AppSidebar = () => {
     switch (role) {
       case 'BUYER':
         return [
-          { title: 'Marketplace', url: '/marketplace', icon: ShoppingBag },
-          { title: 'Chats', url: '/chats', icon: MessageSquare },
+          { title: 'sidebar.marketplace', url: '/marketplace', icon: ShoppingBag },
+          { title: 'sidebar.chats', url: '/chats', icon: MessageSquare },
         ];
       case 'PRODUCER':
         return [
-          { title: 'Chats', url: '/chats', icon: MessageSquare },
+          { title: 'sidebar.chats', url: '/chats', icon: MessageSquare },
         ];
       case 'ADMIN':
         return [
-          { title: 'System Monitor', url: '/admin/monitor', icon: Shield },
+          { title: 'sidebar.systemMonitor', url: '/admin/monitor', icon: Shield },
         ];
       default:
         return [];
@@ -76,30 +77,30 @@ export const AppSidebar = () => {
   };
 
   const producerLinks = [
-    { title: 'My Products', url: '/my-products', icon: Package },
-    { title: 'Order Management', url: '/producer/orders', icon: ShoppingCart },
-    { title: 'Customer Reviews', url: '/producer/reviews', icon: Star },
-    { title: 'Transaction History', url: '/producer/transactionhistory', icon: History },
-    { title: 'Sales Analytics', url: '/producer/analytics', icon: BarChart2 },
-    { title: 'Store Settings', url: '/producer/store-settings', icon: Settings },
-    { title: 'My Disputes', url: '/producer/disputes', icon: AlertTriangle },
+    { title: 'sidebar.producer.myProducts', url: '/my-products', icon: Package },
+    { title: 'sidebar.producer.orderManagement', url: '/producer/orders', icon: ShoppingCart },
+    { title: 'sidebar.producer.customerReviews', url: '/producer/reviews', icon: Star },
+    { title: 'sidebar.producer.transactionHistory', url: '/producer/transactionhistory', icon: History },
+    { title: 'sidebar.producer.salesAnalytics', url: '/producer/analytics', icon: BarChart2 },
+    { title: 'sidebar.producer.storeSettings', url: '/producer/store-settings', icon: Settings },
+    { title: 'sidebar.producer.myDisputes', url: '/producer/disputes', icon: AlertTriangle },
   ];
 
   const buyerLinks = [
-    { title: 'My Orders', url: '/my-orders', icon: ShoppingCart },
-    { title: 'Purchase History', url: '/buyer/transactions', icon: History },
-    { title: 'My Disputes', url: '/buyer/disputes', icon: AlertTriangle },
+    { title: 'sidebar.buyer.myOrders', url: '/my-orders', icon: ShoppingCart },
+    { title: 'sidebar.buyer.purchaseHistory', url: '/buyer/transactions', icon: History },
+    { title: 'sidebar.buyer.myDisputes', url: '/buyer/disputes', icon: AlertTriangle },
   ];
 
   const adminLinks = [
-    { title: 'User Management', url: '/admin/users', icon: Users },
-    { title: 'Product Management', url: '/admin/products', icon: Package },
-    { title: 'Order Management', url: '/admin/orders', icon: ShoppingCart },
-    { title: 'Producer Payouts', url: '/admin/payouts', icon: DollarSign },
-    { title: 'Dispute Management', url: '/admin/disputes', icon: Scale },
-    { title: 'System Analytics', url: '/admin/analytics', icon: TrendingUp },
-    { title: 'Audit Logs', url: '/admin/logs', icon: FileText },
-    { title: 'System Settings', url: '/admin/settings', icon: Settings },
+    { title: 'sidebar.admin.userManagement', url: '/admin/users', icon: Users },
+    { title: 'sidebar.admin.productManagement', url: '/admin/products', icon: Package },
+    { title: 'sidebar.admin.orderManagement', url: '/admin/orders', icon: ShoppingCart },
+    { title: 'sidebar.admin.producerPayouts', url: '/admin/payouts', icon: DollarSign },
+    { title: 'sidebar.admin.disputeManagement', url: '/admin/disputes', icon: Scale },
+    { title: 'sidebar.admin.systemAnalytics', url: '/admin/analytics', icon: TrendingUp },
+    { title: 'sidebar.admin.auditLogs', url: '/admin/logs', icon: FileText },
+    { title: 'sidebar.admin.systemSettings', url: '/admin/settings', icon: Settings },
   ];
 
   const commonLinks = [...coreLinks, ...getRoleSpecificLinks(user?.role || '')];
@@ -134,7 +135,7 @@ export const AppSidebar = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{t('sidebar.navigation')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {commonLinks.map((item) => (
@@ -146,7 +147,7 @@ export const AppSidebar = () => {
                   >
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span>{t(item.title)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -158,8 +159,8 @@ export const AppSidebar = () => {
         {roleLinks.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>
-              {user?.role === 'ADMIN' ? 'Admin Controls' :
-                user?.role === 'PRODUCER' ? 'Business Tools' : 'My Activity'}
+              {user?.role === 'ADMIN' ? t('sidebar.admin.title') :
+                user?.role === 'PRODUCER' ? t('sidebar.producer.title') : t('sidebar.buyer.title')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -172,7 +173,7 @@ export const AppSidebar = () => {
                     >
                       <Link to={item.url}>
                         <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <span>{t(item.title)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -193,15 +194,7 @@ export const AppSidebar = () => {
           >
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleLanguage}
-            className="flex-1 transition-smooth"
-          >
-            <Globe className="h-4 w-4" />
-            <span className="ml-1 text-xs">{language.toUpperCase()}</span>
-          </Button>
+          <LanguageSelector />
         </div>
         <Button
           variant="destructive"
@@ -210,7 +203,7 @@ export const AppSidebar = () => {
           className="w-full transition-smooth"
         >
           <LogOut className="h-4 w-4 mr-2" />
-          Logout
+          {t('auth.logout')}
         </Button>
       </SidebarFooter>
     </Sidebar>

@@ -29,6 +29,10 @@ interface Order {
   paymentStatus: string;
   deliveryStatus: string;
   orderDate: string;
+  payoutStatus?: string; // Producer's payout status (PENDING, COMPLETED, etc.)
+  paidAt?: string; // When producer received payout
+  payoutReference?: string; // Payout reference number
+  payoutScheduledFor?: string; // When payout is scheduled
   buyer: {
     user: {
       name: string;
@@ -63,7 +67,7 @@ const ProducerOrders = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'new' | 'shipping' | 'completed'>('new');
+  const [activeTab, setActiveTab] = useState<'new' | 'shipping' | 'shipped' | 'completed'>('new');
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,10 +109,15 @@ const ProducerOrders = () => {
     switch (activeTab) {
       case 'new':
         filtered = orders.filter(order =>
-          ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
+          order.deliveryStatus === 'PENDING'
         );
         break;
       case 'shipping':
+        filtered = orders.filter(order =>
+          order.deliveryStatus === 'CONFIRMED'
+        );
+        break;
+      case 'shipped':
         filtered = orders.filter(order =>
           order.deliveryStatus === 'SHIPPED'
         );
@@ -159,6 +168,40 @@ const ProducerOrders = () => {
     }
   };
 
+  const getPayoutStatusColor = (status?: string) => {
+    switch (status) {
+      case 'PENDING': return 'bg-amber-500/10 text-amber-700 border-amber-500/20';
+      case 'SCHEDULED': return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+      case 'PROCESSING': return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
+      case 'COMPLETED': return 'bg-green-500/10 text-green-700 border-green-500/20';
+      case 'FAILED': return 'bg-red-500/10 text-red-700 border-red-500/20';
+      default: return 'bg-amber-500/10 text-amber-700 border-amber-500/20'; // Default to pending
+    }
+  };
+
+  const getPayoutStatusLabel = (order: Order) => {
+    const status = order.payoutStatus || 'PENDING';
+
+    switch (status) {
+      case 'PENDING':
+        return order.payoutScheduledFor
+          ? `⏳ Due ${formatDate(order.payoutScheduledFor)}`
+          : '⏳ Pending';
+      case 'SCHEDULED':
+        return `📅 Scheduled`;
+      case 'PROCESSING':
+        return '⚙️ Processing';
+      case 'COMPLETED':
+        return order.paidAt
+          ? `✅ Paid ${formatDate(order.paidAt)}`
+          : '✅ Paid';
+      case 'FAILED':
+        return '❌ Failed';
+      default:
+        return '⏳ Pending';
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'PENDING': return <Package className="h-4 w-4" />;
@@ -196,11 +239,17 @@ const ProducerOrders = () => {
       key: 'new' as const,
       label: 'New Orders',
       icon: Package,
-      count: orders.filter(order => ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)).length
+      count: orders.filter(order => order.deliveryStatus === 'PENDING').length
     },
     {
       key: 'shipping' as const,
-      label: 'To Ship',
+      label: 'Ready to Ship',
+      icon: Truck,
+      count: orders.filter(order => order.deliveryStatus === 'CONFIRMED').length
+    },
+    {
+      key: 'shipped' as const,
+      label: 'Shipped',
       icon: Truck,
       count: orders.filter(order => order.deliveryStatus === 'SHIPPED').length
     },
@@ -281,10 +330,11 @@ const ProducerOrders = () => {
                       <TableHead>Buyer</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Qty</TableHead>
-                      <TableHead>Total</TableHead>
+                      <TableHead>Your Payout</TableHead>
                       <TableHead>Order Date</TableHead>
                       <TableHead>Payment</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Delivery</TableHead>
+                      <TableHead>Payout Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -344,6 +394,16 @@ const ProducerOrders = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          <Badge variant="outline" className={getPayoutStatusColor(order.payoutStatus)}>
+                            {getPayoutStatusLabel(order)}
+                          </Badge>
+                          {order.payoutReference && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Ref: {order.payoutReference}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
@@ -358,7 +418,7 @@ const ProducerOrders = () => {
                             </Button>
 
                             {/* Status Update Buttons */}
-                            {activeTab === 'new' && order.deliveryStatus === 'PENDING' && (
+                            {order.deliveryStatus === 'PENDING' && (
                               <Button
                                 size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'CONFIRMED')}
@@ -369,11 +429,11 @@ const ProducerOrders = () => {
                                 ) : (
                                   <Package className="h-3 w-3 mr-1" />
                                 )}
-                                Confirm
+                                Confirm Order
                               </Button>
                             )}
 
-                            {activeTab === 'new' && order.deliveryStatus === 'CONFIRMED' && (
+                            {order.deliveryStatus === 'CONFIRMED' && (
                               <Button
                                 size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'SHIPPED')}
@@ -384,11 +444,11 @@ const ProducerOrders = () => {
                                 ) : (
                                   <Truck className="h-3 w-3 mr-1" />
                                 )}
-                                Ship
+                                Mark as Shipped
                               </Button>
                             )}
 
-                            {activeTab === 'shipping' && (
+                            {order.deliveryStatus === 'SHIPPED' && (
                               <Button
                                 size="sm"
                                 onClick={() => updateOrderStatus(order.id, 'DELIVERED')}

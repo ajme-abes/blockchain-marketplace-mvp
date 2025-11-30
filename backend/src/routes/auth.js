@@ -5,6 +5,12 @@ const authService = require('../services/authService');
 const userService = require('../services/userService');
 const emailVerificationService = require('../services/emailVerificationService');
 const passwordResetService = require('../services/passwordResetService');
+const loginAttemptService = require('../services/loginAttemptService');
+const {
+  loginLimiter,
+  passwordResetLimiter,
+  emailVerificationLimiter
+} = require('../middleware/rateLimiter');
 // FIX: Check the correct path to database config
 let prisma;
 try {
@@ -24,8 +30,8 @@ try {
 
 const router = express.Router();
 
-// Login
-router.post('/login', async (req, res) => {
+// Login (with rate limiting)
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     // Check if prisma is available
     if (!prisma) {
@@ -52,6 +58,20 @@ router.post('/login', async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     console.log('🔧 Normalized login email:', { original: email, normalized: normalizedEmail });
 
+    // ✅ CHECK IF ACCOUNT IS LOCKED
+    const lockStatus = await loginAttemptService.isAccountLocked(normalizedEmail);
+    if (lockStatus.isLocked) {
+      console.log('🔒 Login blocked - account locked:', normalizedEmail);
+      return res.status(423).json({
+        error: `Account temporarily locked due to too many failed login attempts. Please try again in ${lockStatus.minutesRemaining} minutes.`,
+        code: 'ACCOUNT_LOCKED',
+        unlockAt: lockStatus.unlockAt,
+        minutesRemaining: lockStatus.minutesRemaining,
+        attempts: lockStatus.attempts,
+        maxAttempts: lockStatus.maxAttempts
+      });
+    }
+
     // Find user with related profiles (using normalized email)
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail }, // Query with normalized email
@@ -65,9 +85,15 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       console.log('❌ User not found for email:', normalizedEmail);
+
+      // Record failed attempt
+      const attemptInfo = await loginAttemptService.recordFailedAttempt(normalizedEmail, req.ip);
+
       return res.status(401).json({
         error: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS'
+        code: 'INVALID_CREDENTIALS',
+        attemptsLeft: attemptInfo.attemptsLeft,
+        maxAttempts: attemptInfo.maxAttempts
       });
     }
 
@@ -78,20 +104,30 @@ router.post('/login', async (req, res) => {
 
     if (!isValidPassword) {
       console.log('❌ Invalid password for user:', user.id);
+
+      // Record failed attempt
+      const attemptInfo = await loginAttemptService.recordFailedAttempt(normalizedEmail, req.ip);
+
       return res.status(401).json({
         error: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS'
+        code: 'INVALID_CREDENTIALS',
+        attemptsLeft: attemptInfo.attemptsLeft,
+        maxAttempts: attemptInfo.maxAttempts,
+        ...(attemptInfo.isLocked && {
+          accountLocked: true,
+          unlockAt: attemptInfo.unlockAt
+        })
       });
     }
 
     // ✅ NEW: CHECK EMAIL VERIFICATION STATUS
     if (!user.emailVerified) {
       console.log('❌ Login blocked - email not verified:', user.email);
-      
+
       // Check if verification token is expired
-      const isTokenExpired = user.verificationTokenExpires && 
-                            new Date() > user.verificationTokenExpires;
-      
+      const isTokenExpired = user.verificationTokenExpires &&
+        new Date() > user.verificationTokenExpires;
+
       return res.status(403).json({
         error: 'Please verify your email before logging in',
         code: 'EMAIL_NOT_VERIFIED',
@@ -108,10 +144,13 @@ router.post('/login', async (req, res) => {
     // ✅ User is verified, proceed with login
     console.log('✅ Login successful for verified user:', user.email);
 
+    // Clear failed login attempts
+    await loginAttemptService.clearFailedAttempts(normalizedEmail);
+
     // Generate token
     console.log('🔧 Generating token for verified user...');
     const token = authService.generateAccessToken(user);
-    
+
     console.log('✅ Login successful for user:', user.id);
 
     // Prepare user response
@@ -122,9 +161,9 @@ router.post('/login', async (req, res) => {
       role: user.role,
       phone: user.phone,
       address: user.address,
-      avatarUrl: user.avatarUrl, 
-      region: user.region,       
-      bio: user.bio,             
+      avatarUrl: user.avatarUrl,
+      region: user.region,
+      bio: user.bio,
       languagePreference: user.languagePreference,
       emailVerified: user.emailVerified, // ✅ Include verification status
       hasProducerProfile: !!user.producerProfile,
@@ -208,10 +247,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
     console.log('🔧 Logout requested for user:', req.user.id);
-    
+
     // Simple success response - client should delete the token locally
     // Since session system is disabled, we can't invalidate server-side sessions
-    res.json({ 
+    res.json({
       message: 'Logout successful. Please delete the token on the client side.',
       note: 'Full session-based logout will be enabled when session system is implemented'
     });
@@ -259,8 +298,8 @@ router.post('/verify-email', async (req, res) => {
   }
 });
 
-// Resend Verification Email Endpoint
-router.post('/resend-verification', authenticateToken, async (req, res) => {
+// Resend Verification Email Endpoint (with rate limiting)
+router.post('/resend-verification', authenticateToken, emailVerificationLimiter, async (req, res) => {
   try {
     const result = await emailVerificationService.resendVerificationEmail(req.user.id);
 
@@ -285,8 +324,8 @@ router.post('/resend-verification', authenticateToken, async (req, res) => {
   }
 });
 
-// Forgot Password Endpoint (Basic Implementation)
-router.post('/forgot-password', async (req, res) => {
+// Forgot Password Endpoint (with rate limiting)
+router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -323,8 +362,8 @@ router.post('/forgot-password', async (req, res) => {
     });
   }
 });
-// Reset Password Endpoint (Basic Implementation)
-router.post('/reset-password', async (req, res) => {
+// Reset Password Endpoint (with rate limiting)
+router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 
@@ -335,14 +374,7 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Validate password strength
-    if (password.length < 6) {
-      return res.status(400).json({
-        error: 'Password must be at least 6 characters long',
-        code: 'WEAK_PASSWORD'
-      });
-    }
-
+    // Password validation is now handled in passwordResetService
     const result = await passwordResetService.resetPassword(token, password);
 
     if (result.success) {
@@ -406,7 +438,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 
     // ✅ FIX: Use userService.validatePassword instead of authService
     const isCurrentPasswordValid = await userService.validatePassword(currentPassword, user.passwordHash);
-    
+
     console.log('🔧 Current password valid:', isCurrentPasswordValid);
 
     if (!isCurrentPasswordValid) {

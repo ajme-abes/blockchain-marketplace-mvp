@@ -364,6 +364,15 @@ class OrderService {
               }
             }
           },
+          // Include payout information for this producer
+          orderProducers: {
+            where: { producerId },
+            select: {
+              payoutStatus: true,
+              paidAt: true,
+              payoutReference: true
+            }
+          },
           statusHistory: {
             take: 1,
             orderBy: { createdAt: 'desc' },
@@ -397,11 +406,22 @@ class OrderService {
       const isSharedProduct = this.hasSharedProducts(order);
       const allProducers = this.getAllProducersForOrder(order, producerId);
 
+      // Get payout information for this producer
+      const orderProducer = order.orderProducers?.[0];
+      const payoutStatus = orderProducer?.payoutStatus || 'PENDING';
+      const paidAt = orderProducer?.paidAt;
+      const payoutReference = orderProducer?.payoutReference;
+
       return {
         ...this.formatOrderResponse(order),
         producerShare: producerShare,
         isSharedProduct: isSharedProduct,
         allProducers: allProducers,
+        // Add payout information
+        payoutStatus: payoutStatus,
+        paidAt: paidAt,
+        payoutReference: payoutReference,
+        payoutScheduledFor: this.getNextPayoutDate(), // Calculate next payout date
         items: order.orderItems.map(item => ({
           id: item.id,
           quantity: item.quantity,
@@ -860,6 +880,22 @@ class OrderService {
 
     // Apply 10% platform commission
     return producerItemShare * 0.9;
+  }
+
+  // Calculate next payout date (weekly payout on Fridays)
+  getNextPayoutDate() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 5 = Friday
+
+    // Calculate days until next Friday
+    let daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    if (daysUntilFriday === 0) daysUntilFriday = 7; // If today is Friday, next Friday
+
+    const nextFriday = new Date(today);
+    nextFriday.setDate(today.getDate() + daysUntilFriday);
+    nextFriday.setHours(0, 0, 0, 0);
+
+    return nextFriday.toISOString();
   }
 }
 
