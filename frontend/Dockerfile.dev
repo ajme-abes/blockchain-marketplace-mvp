@@ -1,8 +1,18 @@
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Copy static HTML file
-COPY index.html /usr/share/nginx/html/
+WORKDIR /app
 
-EXPOSE 80
+# Copy package files
+COPY package*.json ./
 
-CMD ["nginx", "-g", "daemon off;"]
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 8080
+
+# Start development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8080"]

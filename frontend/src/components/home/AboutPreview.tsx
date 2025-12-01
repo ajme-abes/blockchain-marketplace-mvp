@@ -1,10 +1,41 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, TrendingUp, Target, Heart } from 'lucide-react';
+import { Shield, Users, TrendingUp, Target } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import api from '@/services/api';
+
+interface AboutStats {
+  activeProducers: number;
+  totalTransactions: number;
+  satisfactionRate: number;
+  regionsServed: number;
+}
 
 export const AboutPreview = () => {
   const { t } = useLanguage();
+  const [stats, setStats] = useState<AboutStats>({
+    activeProducers: 500,
+    totalTransactions: 10000,
+    satisfactionRate: 98,
+    regionsServed: 50
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await api.getAboutStats();
+        if (response.status === 'success' && response.data) {
+          setStats(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching about stats:', error);
+        // Keep default values on error
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const features = [
     {
@@ -14,7 +45,7 @@ export const AboutPreview = () => {
     },
     {
       icon: Users,
-      title: "Direct Connection", 
+      title: "Direct Connection",
       description: "Connect directly with producers, eliminating middlemen"
     },
     {
@@ -66,23 +97,45 @@ export const AboutPreview = () => {
           ))}
         </div>
 
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
-          {[
-            { number: "500+", label: "Active Producers" },
-            { number: "10K+", label: "Transactions" },
-            { number: "98%", label: "Satisfaction" },
-            { number: "50+", label: "Regions" }
-          ].map((stat) => (
-            <div key={stat.label} className="text-center p-4 border border-border rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">
-                {stat.number}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {stat.label}
-              </div>
+        {/* Stats Section - Real Data */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div className="text-center p-4 border border-border rounded-lg hover:border-primary/50 transition-colors">
+            <div className="text-2xl font-bold text-primary mb-1">
+              {stats.activeProducers}+
             </div>
-          ))}
+            <div className="text-sm text-muted-foreground">
+              Active Producers
+            </div>
+          </div>
+
+          <div className="text-center p-4 border border-border rounded-lg hover:border-primary/50 transition-colors">
+            <div className="text-2xl font-bold text-primary mb-1">
+              {stats.totalTransactions >= 1000
+                ? `${Math.floor(stats.totalTransactions / 1000)}K+`
+                : `${stats.totalTransactions}+`}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Transactions
+            </div>
+          </div>
+
+          <div className="text-center p-4 border border-border rounded-lg hover:border-primary/50 transition-colors">
+            <div className="text-2xl font-bold text-primary mb-1">
+              {stats.satisfactionRate}%
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Satisfaction
+            </div>
+          </div>
+
+          <div className="text-center p-4 border border-border rounded-lg hover:border-primary/50 transition-colors">
+            <div className="text-2xl font-bold text-primary mb-1">
+              {stats.regionsServed}+
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Regions
+            </div>
+          </div>
         </div>
 
         {/* CTA Section */}

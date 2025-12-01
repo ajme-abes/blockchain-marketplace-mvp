@@ -181,7 +181,6 @@ export const Navbar = () => {
                     size="sm"
                     className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-amber-200 dark:hover:shadow-amber-800 transition-all duration-300 font-semibold"
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
                     {t('nav.register')}
                   </Button>
                 </Link>

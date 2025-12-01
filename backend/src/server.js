@@ -238,6 +238,9 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/producers', require('./routes/producer'));
+app.use('/api/testimonials', require('./routes/testimonials'));
+app.use('/api/stats', require('./routes/stats'));
+app.use('/api/contact', require('./routes/contact'));
 
 // ==================== UPLOAD / MULTER ERROR HANDLER ====================
 // Handle common multer / busboy errors so they don't bubble as 500s with obscure stack traces

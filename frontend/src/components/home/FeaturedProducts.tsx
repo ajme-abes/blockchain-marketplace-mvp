@@ -1,109 +1,312 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { ShieldCheck, Star, ShoppingCart, Eye } from 'lucide-react';
-import { mockProducts, categories } from '@/lib/mockData';
+import { ShieldCheck, Star, ShoppingCart, Eye, Loader2, AlertCircle, TrendingUp, Package } from 'lucide-react';
+import { categories } from '@/lib/mockData';
 import { useLanguage } from '@/contexts/LanguageContext';
+import api from '@/services/api';
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  quantityAvailable: number;
+  status: string;
+  imageUrl: string | null;
+  averageRating: number | null;
+  reviewCount: number;
+  producer: {
+    id: string;
+    businessName: string;
+    location: string;
+    verificationStatus: string;
+    user: {
+      name: string;
+    };
+  };
+}
 
 export const FeaturedProducts = () => {
   const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'listingDate' | 'price' | 'averageRating'>('listingDate');
 
-  const filteredProducts = selectedCategory
-    ? mockProducts.filter(p => p.category === selectedCategory)
-    : mockProducts.slice(0, 6);
+  useEffect(() => {
+    fetchProducts();
+  }, [selectedCategory, sortBy]);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('🔍 Fetching products with category:', selectedCategory);
+
+      const response = await api.getProducts({
+        category: selectedCategory || undefined,
+        limit: 6,
+        sortBy,
+        sortOrder: sortBy === 'price' ? 'asc' : 'desc',
+      });
+
+      console.log('📦 Products response:', response);
+
+      if (response.status === 'success' && response.data) {
+        setProducts(response.data.products || []);
+        console.log('✅ Products loaded:', response.data.products?.length || 0);
+      } else {
+        setError('Failed to load products');
+      }
+    } catch (err: any) {
+      console.error('❌ Error fetching products:', err);
+      setError(err.message || 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getImageUrl = (product: Product) => {
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    // Fallback image based on category
+    const fallbackImages: Record<string, string> = {
+      Coffee: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800',
+      Teff: 'https://images.unsplash.com/photo-1556910966-e0a0f6e74e8d?w=800',
+      Honey: 'https://images.unsplash.com/photo-1587049352846-4a222e784acc?w=800',
+      Sesame: 'https://images.unsplash.com/photo-1613068687893-5e85b4638b56?w=800',
+      Spices: 'https://images.unsplash.com/photo-1596040033229-a0b34e2c8cbd?w=800',
+      Vegetables: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=800',
+      Fruits: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800',
+      Grains: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=800',
+    };
+    return fallbackImages[product.category] || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800';
+  };
 
   return (
-    <section className="py-16">
+    <section className="py-16 bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-          {t('featured.title')}
-        </h2>
-        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Discover high-quality products directly from Ethiopian producers, verified on the blockchain
-        </p>
-
-        <div className="flex flex-wrap justify-center gap-2 mb-12">
-          <Button
-            variant={!selectedCategory ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedCategory(null)}
-          >
-            All
-          </Button>
-          {categories.map(cat => (
-            <Button
-              key={cat}
-              variant={selectedCategory === cat ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory(cat)}
-            >
-              {cat}
-            </Button>
-          ))}
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-4">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Featured Products</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            {t('featured.title')}
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Discover high-quality products directly from Ethiopian producers, verified on the blockchain
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map(product => (
-            <Card key={product.id} className="overflow-hidden border border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300">
-              {/* Product Image */}
-              <div className="aspect-[4/3] overflow-hidden">
-                <img
-                  src={product.images[0]}
-                  alt={product.name}
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-              </div>
-              
-              <CardContent className="p-4 space-y-3">
-                {/* Header with verification */}
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base mb-1 line-clamp-1">{product.name}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1">by {product.producerName}</p>
-                  </div>
-                  {product.verified && (
-                    <ShieldCheck className="h-4 w-4 text-primary flex-shrink-0 mt-1" />
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+          {/* Category Filter */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button
+              variant={!selectedCategory ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedCategory(null)}
+              className="transition-all"
+            >
+              All Products
+            </Button>
+            {categories.map(cat => (
+              <Button
+                key={cat}
+                variant={selectedCategory === cat ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(cat)}
+                className="transition-all"
+              >
+                {cat}
+              </Button>
+            ))}
+          </div>
+
+          {/* Sort Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-1.5 text-sm border rounded-md bg-background"
+            >
+              <option value="listingDate">Newest</option>
+              <option value="price">Price</option>
+              <option value="averageRating">Rating</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading products...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={fetchProducts} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && products.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Package className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-xl font-semibold mb-2">No products found</p>
+            <p className="text-muted-foreground mb-4">
+              {selectedCategory
+                ? `No products available in ${selectedCategory} category`
+                : 'No products available at the moment'}
+            </p>
+            {selectedCategory && (
+              <Button onClick={() => setSelectedCategory(null)} variant="outline">
+                View All Products
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Products Grid */}
+        {!loading && !error && products.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map(product => (
+              <Card
+                key={product.id}
+                className="group overflow-hidden border border-border/50 hover:border-primary/50 hover:shadow-xl transition-all duration-300"
+              >
+                {/* Product Image */}
+                <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+                  <img
+                    src={getImageUrl(product)}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800';
+                    }}
+                  />
+
+                  {/* Stock Badge */}
+                  {product.quantityAvailable < 10 && product.quantityAvailable > 0 && (
+                    <div className="absolute top-3 left-3">
+                      <Badge variant="destructive" className="text-xs">
+                        Only {product.quantityAvailable} left
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Out of Stock */}
+                  {product.quantityAvailable === 0 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Badge variant="destructive" className="text-sm">
+                        Out of Stock
+                      </Badge>
+                    </div>
                   )}
                 </div>
 
-                {/* Category and Rating */}
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs capitalize">
-                    {product.category}
-                  </Badge>
-                  <div className="flex items-center gap-1 text-xs">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium">{product.rating}</span>
+                <CardContent className="p-4 space-y-3">
+                  {/* Header with verification */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base mb-1 line-clamp-1 group-hover:text-primary transition-colors">
+                        {product.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        by {product.producer?.businessName || product.producer?.user?.name || 'Unknown'}
+                      </p>
+                    </div>
+                    {product.producer?.verificationStatus === 'VERIFIED' && (
+                      <div className="flex-shrink-0">
+                        <ShieldCheck className="h-5 w-5 text-primary" title="Verified Producer" />
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                {/* Price */}
-                <div className="text-lg font-bold text-primary">
-                  {product.price} {t('currency')}
-                  <span className="text-sm text-muted-foreground font-normal">/{product.unit}</span>
-                </div>
-              </CardContent>
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
+                    {product.description}
+                  </p>
 
-              <CardFooter className="p-4 pt-0 flex gap-2">
-                <Link to={`/products/${product.id}`} className="flex-1">
-                  <Button variant="default" size="sm" className="w-full text-sm h-9">
-                    <ShoppingCart className="h-3 w-3 mr-1" />
-                    {t('common.buyNow')}
-                  </Button>
-                </Link>
-                <Link to={`/products/${product.id}`}>
-                  <Button variant="outline" size="sm" className="h-9 px-3">
-                    <Eye className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                  {/* Category and Rating */}
+                  <div className="flex items-center justify-between pt-2">
+                    <Badge variant="secondary" className="text-xs capitalize">
+                      {product.category}
+                    </Badge>
+                    {product.averageRating && (
+                      <div className="flex items-center gap-1.5">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm font-semibold">{product.averageRating.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({product.reviewCount})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-2 pt-2 border-t">
+                    <span className="text-2xl font-bold text-primary">
+                      {product.price.toFixed(2)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {t('currency')}/unit
+                    </span>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="p-4 pt-0 flex gap-2">
+                  <Link to={`/products/${product.id}`} className="flex-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full"
+                      disabled={product.quantityAvailable === 0}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      {product.quantityAvailable === 0 ? 'Out of Stock' : t('common.buyNow')}
+                    </Button>
+                  </Link>
+                  <Link to={`/products/${product.id}`}>
+                    <Button variant="outline" size="sm" className="px-3">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* View All Button */}
+        {!loading && !error && products.length > 0 && (
+          <div className="text-center mt-12">
+            <Link to="/products">
+              <Button size="lg" variant="outline" className="group">
+                View All Products
+                <TrendingUp className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

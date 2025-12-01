@@ -63,6 +63,9 @@ import SystemAnalytics from "./pages/admin/SystemAnalytics";
 import SystemMonitor from "./pages/admin/SystemMonitor";
 import AuditLogs from "./pages/admin/AuditLogs";
 import SystemSettings from "./pages/admin/SystemSettings";
+import TestimonialManagement from "./pages/admin/TestimonialManagement";
+import ContactMessages from "./pages/admin/ContactMessages";
+import MyMessages from "./pages/common/MyMessages";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -176,6 +179,11 @@ const App = () => (
                         <Route path="/transaction/:transactionId" element={
                           <ProtectedRoute>
                             <TransactionDetail />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/my-messages" element={
+                          <ProtectedRoute>
+                            <MyMessages />
                           </ProtectedRoute>
                         } />
 
@@ -347,6 +355,18 @@ const App = () => (
                         <Route path="/admin/settings" element={
                           <RoleRoute allowedRoles={['admin']}>
                             <SystemSettings />
+                          </RoleRoute>
+                        } />
+
+                        <Route path="/admin/testimonials" element={
+                          <RoleRoute allowedRoles={['admin']}>
+                            <TestimonialManagement />
+                          </RoleRoute>
+                        } />
+
+                        <Route path="/admin/contact-messages" element={
+                          <RoleRoute allowedRoles={['admin']}>
+                            <ContactMessages />
                           </RoleRoute>
                         } />
 

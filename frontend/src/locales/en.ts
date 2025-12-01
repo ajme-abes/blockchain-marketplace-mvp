@@ -157,6 +157,8 @@ export const en = {
     'sidebar.admin.orderManagement': 'Order Management',
     'sidebar.admin.producerPayouts': 'Producer Payouts',
     'sidebar.admin.disputeManagement': 'Dispute Management',
+    'sidebar.admin.testimonials': 'Testimonials',
+    'sidebar.admin.contactMessages': 'Contact Messages',
     'sidebar.admin.systemAnalytics': 'System Analytics',
     'sidebar.admin.auditLogs': 'Audit Logs',
     'sidebar.admin.systemSettings': 'System Settings',

@@ -13,6 +13,7 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+docker-compose.yml
 
 # Logs
 logs
@@ -41,6 +42,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.env.docker
 
 # Docker
 docker-compose.override.yml
@@ -71,3 +73,4 @@ IMPLEMENTATION_CHECKLIST.md
 REGISTRATION_LOGIN_ANALYSIS.md
 TESTING_GUIDE.md
 USER_JOURNEY_AND_SECURITY_OVERVIEW.md
+USER_JOURNEY_OVERVIEW.md

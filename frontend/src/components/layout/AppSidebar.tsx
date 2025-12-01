@@ -20,6 +20,7 @@ import {
   FileText,
   TrendingUp,
   DollarSign,
+  Mail,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -98,6 +99,8 @@ export const AppSidebar = () => {
     { title: 'sidebar.admin.orderManagement', url: '/admin/orders', icon: ShoppingCart },
     { title: 'sidebar.admin.producerPayouts', url: '/admin/payouts', icon: DollarSign },
     { title: 'sidebar.admin.disputeManagement', url: '/admin/disputes', icon: Scale },
+    { title: 'sidebar.admin.testimonials', url: '/admin/testimonials', icon: MessageSquare },
+    { title: 'sidebar.admin.contactMessages', url: '/admin/contact-messages', icon: Mail },
     { title: 'sidebar.admin.systemAnalytics', url: '/admin/analytics', icon: TrendingUp },
     { title: 'sidebar.admin.auditLogs', url: '/admin/logs', icon: FileText },
     { title: 'sidebar.admin.systemSettings', url: '/admin/settings', icon: Settings },
@@ -196,6 +199,19 @@ export const AppSidebar = () => {
           </Button>
           <LanguageSelector />
         </div>
+        {/* Show My Messages only for Buyers and Producers, not Admin */}
+        {user?.role !== 'ADMIN' && (
+          <Link to="/my-messages" className="block">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full transition-smooth"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              My Messages
+            </Button>
+          </Link>
+        )}
         <Button
           variant="destructive"
           size="sm"
