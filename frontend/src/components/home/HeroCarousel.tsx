@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import heroImage1 from '@/assets/hero-carousel-1.jpg';
-import heroImage2 from '@/assets/hero-carousel-2.jpg';
-import heroImage3 from '@/assets/hero-carousel-3.jpg';
+import heroImage1 from '@/assets/hero-carousel-1.jpeg';
+import heroImage2 from '@/assets/hero-carousel-2.jpeg';
+import heroImage3 from '@/assets/hero-carousel-3.jpeg';
 
 const slides = [
   {
@@ -53,7 +53,7 @@ export const HeroCarousel = () => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState<{ [key: number]: boolean }>({});
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const { language, t } = useLanguage();
+  const { language, t } = useLanguage(); 
 
   const memoizedSlides = useMemo(() => slides, []);
 
