@@ -11,23 +11,43 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSelector } from '@/components/layout/LanguageSelector';
 import { toast } from 'sonner';
+import { useAuthErrors } from '@/hooks/useAuthErrors';
+import { AccountLockoutMessage } from '@/components/auth/AccountLockoutMessage';
+import { LoginAttemptsWarning } from '@/components/auth/LoginAttemptsWarning';
+import { RateLimitMessage } from '@/components/auth/RateLimitMessage';
+import { TwoFactorVerification } from '@/components/auth/TwoFactorVerification';
+import { authService } from '@/services/authService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [authErrorData, setAuthErrorData] = useState<any>(null);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [userId, setUserId] = useState<string>('');
   const { user, login, loading, error, clearError } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { handleAndShowError } = useAuthErrors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    setAuthErrorData(null);
 
     try {
-      await login(email, password);
+      const response = await login(email, password);
+
+      // Check if 2FA is required
+      if (response?.requires2FA) {
+        setRequires2FA(true);
+        setUserId(response.userId || '');
+        toast.info('Please enter your 2FA code');
+        return;
+      }
+
       toast.success(t('login.success'));
 
       // Redirect based on user role
@@ -39,17 +59,75 @@ const Login = () => {
         navigate('/dashboard');
       }
     } catch (error: any) {
-      toast.error(error?.message || t('login.failed'));
+      // Handle specific authentication errors
+      const errorResult = handleAndShowError(error);
+      setAuthErrorData(errorResult);
     }
+  };
+
+  const handle2FAVerify = async (token: string) => {
+    try {
+      const response = await authService.verify2FA(userId, token);
+
+      if (response.success) {
+        toast.success('2FA verification successful!');
+
+        // Complete login and redirect
+        if (user?.role === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else if (user?.role === 'PRODUCER') {
+          navigate('/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      }
+    } catch (error: any) {
+      throw new Error(error.message || 'Invalid 2FA code');
+    }
+  };
+
+  const handle2FACancel = () => {
+    setRequires2FA(false);
+    setUserId('');
+    setEmail('');
+    setPassword('');
+    toast.info('Login cancelled');
   };
 
   const handleInputChange = () => {
     if (error) clearError();
+    if (authErrorData) setAuthErrorData(null);
   };
 
   const handleForgotPassword = () => {
     navigate('/forgot-password');
   };
+
+  // Show 2FA verification if required
+  if (requires2FA) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-amber-50 to-green-50 dark:from-gray-900 dark:via-amber-900/20 dark:to-green-900/20 p-4">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <LanguageSelector />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleTheme}
+            className="border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50"
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <TwoFactorVerification
+          userId={userId}
+          onVerify={handle2FAVerify}
+          onCancel={handle2FACancel}
+          loading={loading}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-amber-50 to-green-50 dark:from-gray-900 dark:via-amber-900/20 dark:to-green-900/20 p-4">
@@ -83,7 +161,40 @@ const Login = () => {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {error && (
+          {/* Account Lockout Message */}
+          {authErrorData?.code === 'ACCOUNT_LOCKED' && (
+            <AccountLockoutMessage
+              unlockAt={authErrorData.data?.unlockAt}
+              minutesRemaining={authErrorData.data?.minutesRemaining || 30}
+              onUnlock={() => {
+                setAuthErrorData(null);
+                toast.info('Account unlocked. You can try logging in again.');
+              }}
+            />
+          )}
+
+          {/* Rate Limit Message */}
+          {authErrorData?.code === 'RATE_LIMIT_EXCEEDED' && (
+            <RateLimitMessage
+              retryAfter={authErrorData.data?.retryAfter || 300}
+              action="login"
+              onRetryAvailable={() => {
+                setAuthErrorData(null);
+                toast.info('You can try logging in again.');
+              }}
+            />
+          )}
+
+          {/* Login Attempts Warning */}
+          {authErrorData?.code === 'INVALID_CREDENTIALS' && authErrorData.data?.attemptsLeft && (
+            <LoginAttemptsWarning
+              attemptsLeft={authErrorData.data.attemptsLeft}
+              maxAttempts={authErrorData.data.maxAttempts || 5}
+            />
+          )}
+
+          {/* Generic Error Display */}
+          {error && !authErrorData && (
             <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center space-x-2 animate-pulse">
               <div className="w-2 h-2 bg-red-600 dark:bg-red-400 rounded-full"></div>
               <span>{error}</span>
@@ -168,7 +279,11 @@ const Login = () => {
             <Button
               type="submit"
               className="w-full h-10 text-sm font-semibold rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-amber-200 dark:hover:shadow-amber-800 transition-all duration-300 mt-2"
-              disabled={loading}
+              disabled={
+                loading ||
+                authErrorData?.code === 'ACCOUNT_LOCKED' ||
+                authErrorData?.code === 'RATE_LIMIT_EXCEEDED'
+              }
             >
               {loading ? (
                 <div className="flex items-center space-x-2">

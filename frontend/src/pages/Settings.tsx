@@ -14,6 +14,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { Save, Moon, Sun, Globe, Bell, Shield, LogOut } from 'lucide-react';
+import { TwoFactorManagement } from '@/components/auth/TwoFactorManagement';
 
 const Settings = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -211,38 +212,50 @@ const Settings = () => {
                   </CardTitle>
                   <CardDescription>{t('settings.security.desc')}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
+                  {/* Two-Factor Authentication */}
                   <div>
-                    <Label htmlFor="current-password">{t('settings.security.currentPassword')}</Label>
-                    <Input
-                      id="current-password"
-                      type="password"
-                      value={password.current}
-                      onChange={(e) => setPassword({ ...password, current: e.target.value })}
-                    />
+                    <h4 className="text-sm font-medium mb-3">Two-Factor Authentication</h4>
+                    <TwoFactorManagement />
                   </div>
-                  <div>
-                    <Label htmlFor="new-password">{t('settings.security.newPassword')}</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={password.new}
-                      onChange={(e) => setPassword({ ...password, new: e.target.value })}
-                    />
+
+                  <Separator />
+
+                  {/* Password Change */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Change Password</h4>
+                    <div>
+                      <Label htmlFor="current-password">{t('settings.security.currentPassword')}</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        value={password.current}
+                        onChange={(e) => setPassword({ ...password, current: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="new-password">{t('settings.security.newPassword')}</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={password.new}
+                        onChange={(e) => setPassword({ ...password, new: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirm-password">{t('settings.security.confirmPassword')}</Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        value={password.confirm}
+                        onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
+                      />
+                    </div>
+                    <Button onClick={handlePasswordChange}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {t('settings.security.updatePassword')}
+                    </Button>
                   </div>
-                  <div>
-                    <Label htmlFor="confirm-password">{t('settings.security.confirmPassword')}</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      value={password.confirm}
-                      onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
-                    />
-                  </div>
-                  <Button onClick={handlePasswordChange}>
-                    <Save className="h-4 w-4 mr-2" />
-                    {t('settings.security.updatePassword')}
-                  </Button>
                 </CardContent>
               </Card>
 
