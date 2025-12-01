@@ -14,11 +14,14 @@ export const categories = [
 export const regions = [
   'Addis Ababa',
   'Oromia',
+  'Oromia, Ethiopia',
   'Amhara',
   'Tigray',
   'SNNPR',
   'Sidama',
   'Harar',
+  'Mechara',
+  'dadar',
 ] as const;
 
 export interface Product {

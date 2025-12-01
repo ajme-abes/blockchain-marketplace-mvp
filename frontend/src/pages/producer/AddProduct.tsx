@@ -209,11 +209,15 @@ const AddProduct: React.FC = () => {
                       >
                         <option value="">Select Unit</option>
                         <option value="kg">Kilogram (kg)</option>
+                        <option value="quintal">Quintal (100 kg)</option>
                         <option value="g">Gram (g)</option>
+                        <option value="ton">Ton (1000 kg)</option>
                         <option value="piece">Piece</option>
                         <option value="bundle">Bundle</option>
-                        <option value="liter">Liter</option>
-                        <option value="dozen">Dozen</option>
+                        <option value="liter">Liter (L)</option>
+                        <option value="dozen">Dozen (12 pcs)</option>
+                        <option value="bag">Bag</option>
+                        <option value="box">Box</option>
                       </select>
                       {errors.unit && (
                         <p className="text-red-500 text-sm mt-1">{errors.unit.message}</p>

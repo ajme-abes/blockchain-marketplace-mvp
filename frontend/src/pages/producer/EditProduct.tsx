@@ -33,6 +33,8 @@ const EditProduct = () => {
     price: '',
     category: '',
     quantityAvailable: '', // ✅ Fixed: quantity → quantityAvailable
+    unit: '',
+    region: '',
   });
 
   const categories = [
@@ -60,7 +62,9 @@ const EditProduct = () => {
         description: productData.description || '',
         price: productData.price?.toString() || '',
         category: productData.category || '',
-        quantityAvailable: productData.quantityAvailable?.toString() || '0' // ✅ Fixed
+        quantityAvailable: productData.quantityAvailable?.toString() || '0', // ✅ Fixed
+        unit: productData.unit || 'unit',
+        region: productData.region || '',
       });
 
       if (productData.imageUrl) setImagePreview(productData.imageUrl);
@@ -118,6 +122,8 @@ const EditProduct = () => {
       formDataToSend.append('price', formData.price);
       formDataToSend.append('category', formData.category);
       formDataToSend.append('quantity', formData.quantityAvailable); // Backend expects 'quantity'
+      formDataToSend.append('unit', formData.unit || 'unit'); // Add unit field
+      formDataToSend.append('region', formData.region || ''); // Add region field
 
       // ✅ FIX: Use 'images' field name and send as array (even for single file)
       if (newImage) {
@@ -152,6 +158,18 @@ const EditProduct = () => {
       });
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - redirect to login
+        if (response.status === 401) {
+          toast({
+            title: "Session expired",
+            description: "Please log in again",
+            variant: "destructive"
+          });
+          localStorage.removeItem('authToken');
+          navigate('/login');
+          return;
+        }
+
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
@@ -318,16 +336,66 @@ const EditProduct = () => {
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="quantityAvailable">Available Quantity *</Label>
+                          <Input
+                            id="quantityAvailable"
+                            type="number"
+                            min="0"
+                            value={formData.quantityAvailable}
+                            onChange={(e) => handleInputChange('quantityAvailable', e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="unit">Unit *</Label>
+                          <Select
+                            value={formData.unit}
+                            onValueChange={(value) => handleInputChange('unit', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="kg">Kilogram (kg)</SelectItem>
+                              <SelectItem value="quintal">Quintal (100 kg)</SelectItem>
+                              <SelectItem value="g">Gram (g)</SelectItem>
+                              <SelectItem value="ton">Ton (1000 kg)</SelectItem>
+                              <SelectItem value="piece">Piece</SelectItem>
+                              <SelectItem value="bundle">Bundle</SelectItem>
+                              <SelectItem value="liter">Liter (L)</SelectItem>
+                              <SelectItem value="dozen">Dozen (12 pcs)</SelectItem>
+                              <SelectItem value="bag">Bag</SelectItem>
+                              <SelectItem value="box">Box</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
                       <div>
-                        <Label htmlFor="quantityAvailable">Available Quantity *</Label>
-                        <Input
-                          id="quantityAvailable"
-                          type="number"
-                          min="0"
-                          value={formData.quantityAvailable}
-                          onChange={(e) => handleInputChange('quantityAvailable', e.target.value)}
-                          required
-                        />
+                        <Label htmlFor="region">Region *</Label>
+                        <Select
+                          value={formData.region}
+                          onValueChange={(value) => handleInputChange('region', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="addis-ababa">Addis Ababa</SelectItem>
+                            <SelectItem value="oromia">Oromia</SelectItem>
+                            <SelectItem value="amhara">Amhara</SelectItem>
+                            <SelectItem value="snnpr">SNNPR</SelectItem>
+                            <SelectItem value="tigray">Tigray</SelectItem>
+                            <SelectItem value="afar">Afar</SelectItem>
+                            <SelectItem value="somali">Somali</SelectItem>
+                            <SelectItem value="benishangul-gumuz">Benishangul-Gumuz</SelectItem>
+                            <SelectItem value="gambela">Gambela</SelectItem>
+                            <SelectItem value="harari">Harari</SelectItem>
+                            <SelectItem value="diredawa">Dire Dawa</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="flex gap-3 pt-4">

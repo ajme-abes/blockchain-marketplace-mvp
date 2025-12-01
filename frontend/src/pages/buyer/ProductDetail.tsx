@@ -7,18 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ShieldCheck, 
-  Star, 
-  ExternalLink, 
-  MessageSquare, 
-  Phone, 
+import {
+  ShieldCheck,
+  Star,
+  ExternalLink,
+  MessageSquare,
+  Phone,
   Loader2,
   ChevronLeft,
   ChevronRight,
   ShoppingCart
 } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { useToast } from '@/hooks/use-toast';
@@ -90,11 +89,11 @@ interface ProductDetail {
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const { createProductChat, loading: chatLoading } = useChat();
-  const { addToCart } = useCart(); 
+  const { addToCart } = useCart();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('description');
@@ -106,22 +105,15 @@ const ProductDetail = () => {
 
   const loadProductDetail = async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       console.log('🔄 Loading product details:', id);
-      
+
       const response = await productService.getProductById(id);
       console.log('✅ Product detail response:', response);
 
-      if (response && response.id) {
-        setProduct(response);
-      } else if (response.data) {
-        setProduct(response.data);
-      } else {
-        console.warn('⚠️ Unexpected response structure:', response);
-        throw new Error('Invalid product data received');
-      }
+      setProduct(response as any);
     } catch (error: any) {
       console.error('❌ Failed to load product details:', error);
       toast({
@@ -135,19 +127,19 @@ const ProductDetail = () => {
   };
   const handleProductChat = async () => {
     if (!product?.id) return;
-  
+
     try {
       const chat = await createProductChat(product.id);
-      
+
       toast({
         title: "Chat opened!",
         description: "You can now message the producer",
       });
-  
+
       setTimeout(() => {
         navigate(`/chats?chat=${chat.id}`);
       }, 1000);
-      
+
     } catch (error: any) {
       console.error('Failed to create product chat:', error);
       toast({
@@ -160,17 +152,17 @@ const ProductDetail = () => {
   // Get all available images from the product
   const getAllImages = (product: ProductDetail): string[] => {
     const images: string[] = [];
-    
+
     // 1. Primary image URL
     if (product.imageUrl) {
       images.push(product.imageUrl);
     }
-    
+
     // 2. Images from images object
     if (product.images?.url) {
       images.push(product.images.url);
     }
-    
+
     // 3. Images from IPFS metadata
     if (product.ipfsMetadata && product.ipfsMetadata.length > 0) {
       product.ipfsMetadata.forEach(metadata => {
@@ -179,7 +171,7 @@ const ProductDetail = () => {
         }
       });
     }
-    
+
     // 4. Remove duplicates and return
     return [...new Set(images)].filter(url => url && url.trim() !== '');
   };
@@ -257,7 +249,7 @@ const ProductDetail = () => {
                   e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDYwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNGM0Y0RjYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Q0EwQUYiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIj5Qcm9kdWN0IEltYWdlPC90ZXh0Pjwvc3ZnPg==';
                 }}
               />
-              
+
               {/* Navigation Arrows for Multiple Images */}
               {hasMultipleImages && (
                 <>
@@ -277,7 +269,7 @@ const ProductDetail = () => {
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                  
+
                   {/* Image Counter */}
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-background/80 px-3 py-1 rounded-full text-sm">
                     {selectedImageIndex + 1} / {allImages.length}
@@ -292,9 +284,8 @@ const ProductDetail = () => {
                 {allImages.map((image, index) => (
                   <button
                     key={index}
-                    className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 ${
-                      index === selectedImageIndex ? 'border-primary' : 'border-transparent'
-                    }`}
+                    className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 ${index === selectedImageIndex ? 'border-primary' : 'border-transparent'
+                      }`}
                     onClick={() => setSelectedImageIndex(index)}
                   >
                     <img
@@ -358,8 +349,8 @@ const ProductDetail = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Producer</span>
-                  <Link 
-                    to={`/producers/${product.producer?.id}`} 
+                  <Link
+                    to={`/producers/${product.producer?.id}`}
                     className="text-primary hover:underline text-sm"
                   >
                     View Profile
@@ -397,78 +388,114 @@ const ProductDetail = () => {
               </Card>
             )}
 
-{/* Action Buttons */}
-<div className="flex gap-3 mb-4 flex-wrap">
-  {isAuthenticated && user?.role === 'BUYER' ? (
-    <>
-      <Button
-        variant="hero"
-        size="lg"
-        className="flex-1 min-w-[140px]"
-        onClick={() => navigate(`/checkout/${product.id}`)}
-        disabled={!product.stock || product.stock === 0}
-      >
-        {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Buy Now'}
-      </Button>
-      
-      <Button 
-        variant="outline" 
-        size="lg"
-        onClick={() => {
-          addToCart({
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-            image: getDisplayImage(product),
-            category: product.category,
-            region: product.region,
-            unit: product.unit,
-            stock: product.stock,
-            producerId: product.producer?.id || '',
-            producerName: getProducerName(product),
-          });
-        }}
-        disabled={!product.stock || product.stock === 0}
-        className="min-w-[140px]"
-      >
-        <ShoppingCart className="h-4 w-4 mr-2" />
-        Add to Cart
-      </Button>
-    </>
-  ) : !isAuthenticated ? (
-    <Link to="/login" className="flex-1">
-      <Button variant="hero" size="lg" className="w-full">
-        Login to Purchase
-      </Button>
-    </Link>
-  ) : null}
-  
-  {/* Contact buttons - show for all users */}
-  <Link to={`/contact/${product.producer?.id}`}>
-    <Button variant="outline" size="lg" className="min-w-[140px]">
-      <Phone className="h-4 w-4 mr-2" />
-      Contact
-    </Button>
-  </Link>
-  
-{isAuthenticated && (
-  <Button 
-    variant="outline" 
-    size="lg" 
-    className="min-w-[140px]"
-    onClick={handleProductChat}
-    disabled={chatLoading}
-  >
-    {chatLoading ? (
-      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-    ) : (
-      <MessageSquare className="h-4 w-4 mr-2" />
-    )}
-    Chat
-  </Button>
-)}
-</div>
+            {/* Action Buttons */}
+            <div className="flex gap-3 mb-4 flex-wrap">
+              {isAuthenticated && user?.role === 'BUYER' ? (
+                <>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="flex-1 min-w-[140px]"
+                    onClick={() => {
+                      if (!product.stock || product.stock === 0) {
+                        toast({
+                          title: "Out of stock",
+                          description: "This product is currently unavailable",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      // Add to cart and go to checkout
+                      addToCart({
+                        productId: product.id,
+                        name: product.name,
+                        price: product.price,
+                        quantity: 1,
+                        image: getDisplayImage(currentImage),
+                        category: product.category,
+                        region: product.region,
+                        unit: product.unit,
+                        stock: product.stock,
+                        producerId: product.producer?.id || '',
+                        producerName: getProducerName(product),
+                      });
+                      navigate('/checkout');
+                    }}
+                    disabled={!product.stock || product.stock === 0}
+                  >
+                    {!product.stock || product.stock === 0 ? 'Out of Stock' : 'Buy Now'}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => {
+                      if (!product.stock || product.stock === 0) {
+                        toast({
+                          title: "Out of stock",
+                          description: "This product is currently unavailable",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      addToCart({
+                        productId: product.id,
+                        name: product.name,
+                        price: product.price,
+                        quantity: 1,
+                        image: getDisplayImage(currentImage),
+                        category: product.category,
+                        region: product.region,
+                        unit: product.unit,
+                        stock: product.stock,
+                        producerId: product.producer?.id || '',
+                        producerName: getProducerName(product),
+                      });
+                      toast({
+                        title: "Added to cart",
+                        description: `${product.name} has been added to your cart`,
+                      });
+                    }}
+                    disabled={!product.stock || product.stock === 0}
+                    className="min-w-[140px]"
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                </>
+              ) : !isAuthenticated ? (
+                <Link to="/login" className="flex-1">
+                  <Button variant="hero" size="lg" className="w-full">
+                    Login to Purchase
+                  </Button>
+                </Link>
+              ) : null}
+
+              {/* Contact button - goes to producer profile */}
+              <Link to={`/producers/${product.producer?.id}`}>
+                <Button variant="outline" size="lg" className="min-w-[140px]">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Contact
+                </Button>
+              </Link>
+
+              {isAuthenticated && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[140px]"
+                  onClick={handleProductChat}
+                  disabled={chatLoading}
+                >
+                  {chatLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                  )}
+                  Chat
+                </Button>
+              )}
+            </div>
 
             <div className="text-sm text-muted-foreground">
               {product.stock} {product.unit} available in stock
@@ -491,7 +518,7 @@ const ProductDetail = () => {
             </TabsTrigger>
             <TabsTrigger value="delivery">Delivery Info</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="description" className="mt-4">
             <Card>
               <CardContent className="p-6">
@@ -501,76 +528,74 @@ const ProductDetail = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
-<TabsContent value="reviews" className="mt-4">
-<Card>
-  <CardContent className="p-6">
-    {product.reviewDetails && product.reviewDetails.reviews.length > 0 ? (
-      <div className="space-y-4">
-        {/* Rating Summary */}
-        <div className="flex items-center gap-6 mb-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold">{product.reviewDetails.average.toFixed(1)}</div>
-            <div className="flex items-center justify-center">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`h-4 w-4 ${
-                    star <= Math.round(product.reviewDetails.average)
-                      ? 'fill-accent text-accent'
-                      : 'text-muted-foreground'
-                  }`}
-                />
-              ))}
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">
-              {product.reviewDetails.total} reviews
-            </div>
-          </div>
-        </div>
-        
-        {/* Reviews List */}
-        <div className="space-y-4">
-          {product.reviewDetails.reviews.map((review) => (
-            <div key={review.id} className="border-b pb-4 last:border-b-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`h-3 w-3 ${
-                        star <= review.rating
-                          ? 'fill-accent text-accent'
-                          : 'text-muted-foreground'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="font-medium">{review.buyer.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(review.date).toLocaleDateString()}
-                </span>
-              </div>
-              {review.comment && (
-                <p className="text-sm text-muted-foreground">{review.comment}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    ) : (
-      <div className="text-center py-8">
-        <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">No reviews yet</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Be the first to review this product!
-        </p>
-      </div>
-    )}
-  </CardContent>
-</Card>
-</TabsContent>
-          
+
+          <TabsContent value="reviews" className="mt-4">
+            <Card>
+              <CardContent className="p-6">
+                {product.reviewDetails && product.reviewDetails.reviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Rating Summary */}
+                    <div className="flex items-center gap-6 mb-6">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold">{product.reviewDetails.average.toFixed(1)}</div>
+                        <div className="flex items-center justify-center">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-4 w-4 ${star <= Math.round(product.reviewDetails.average)
+                                ? 'fill-accent text-accent'
+                                : 'text-muted-foreground'
+                                }`}
+                            />
+                          ))}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {product.reviewDetails.total} reviews
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reviews List */}
+                    <div className="space-y-4">
+                      {product.reviewDetails.reviews.map((review) => (
+                        <div key={review.id} className="border-b pb-4 last:border-b-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-3 w-3 ${star <= review.rating
+                                    ? 'fill-accent text-accent'
+                                    : 'text-muted-foreground'
+                                    }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="font-medium">{review.buyer.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(review.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {review.comment && (
+                            <p className="text-sm text-muted-foreground">{review.comment}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No reviews yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Be the first to review this product!
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="delivery" className="mt-4">
             <Card>
               <CardContent className="p-6">

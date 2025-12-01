@@ -145,10 +145,13 @@ model Product {
   quantityAvailable Int
   description       String?
   imageUrl          String?
+  unit              String?       @default("unit") // kg, piece, liter, bundle, dozen, etc.
+  region            String?       // Product origin region
   status            ProductStatus @default(ACTIVE)
   listingDate       DateTime      @default(now())
   averageRating     Float?        @default(0)
   reviewCount       Int?          @default(0)
+  updatedAt         DateTime      @default(now()) @updatedAt
 
   // Relations
   producerId String

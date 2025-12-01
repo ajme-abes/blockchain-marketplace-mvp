@@ -7,11 +7,11 @@ class ProductService {
   // In backend/src/services/productService.js - UPDATE createProduct method
 
   async createProduct(productData) {
-    const { name, description, price, category, quantityAvailable, producerId, imageCids = [] } = productData;
+    const { name, description, price, category, quantityAvailable, producerId, imageCids = [], unit, region } = productData;
 
     console.log('🔧 Creating product with producerId:', producerId);
     console.log('🔧 Image CIDs received:', imageCids);
-    console.log('🔧 Product data:', { name, description, price, category, quantityAvailable });
+    console.log('🔧 Product data:', { name, description, price, category, quantityAvailable, unit, region });
 
     // First, find the producer profile for this user
     const producer = await prisma.producer.findUnique({
@@ -33,7 +33,7 @@ class ProductService {
       console.log('🖼️ No image CIDs provided, imageUrl will be null');
     }
 
-    // ✅ FIXED: Include ALL required fields including quantityAvailable
+    // ✅ FIXED: Include ALL required fields including quantityAvailable, unit, and region
     const createData = {
       name,
       description: description || '',
@@ -41,7 +41,9 @@ class ProductService {
       category,
       quantityAvailable: parseInt(quantityAvailable),
       producerId: producer.id,
-      imageUrl: primaryImageUrl, // ✅ This will be the actual image URL
+      imageUrl: primaryImageUrl,
+      unit: unit || 'unit',
+      region: region || producer.location || 'Local',
     };
 
     // Only add ipfsFiles connection if there are CIDs
@@ -355,15 +357,12 @@ class ProductService {
 
     return {
       ...baseProduct,
-      // Add fields needed for ProductDetail page
-      unit: 'unit', // You might want to add this to your Product model
-      region: product.producer?.location || 'Local',
-      verified: product.producer?.verificationStatus === 'VERIFIED',
+      // These are now included in baseProduct from formatProductResponse
+      stock: product.quantityAvailable,
+      popularity: product._count?.orderItems || 0,
       reviews: reviews.length,
       blockchainTxHash: null, // You can populate this from order data
       nameAmh: '', // Add if you have Amharic names
-      stock: product.quantityAvailable,
-      popularity: product._count?.orderItems || 0,
 
       // Detailed review data
       reviewDetails: {
@@ -471,13 +470,6 @@ class ProductService {
       primaryImageUrl = `https://gateway.pinata.cloud/ipfs/${firstFile.cid}`;
     }
 
-    console.log('🖼️ Formatting product image:', {
-      productId: product.id,
-      imageUrl: product.imageUrl,
-      ipfsFilesCount: product.ipfsFiles?.length || 0,
-      finalImageUrl: primaryImageUrl
-    });
-
     return {
       id: product.id,
       name: product.name,
@@ -485,7 +477,10 @@ class ProductService {
       price: product.price,
       category: product.category,
       quantityAvailable: product.quantityAvailable,
+      unit: product.unit || 'unit',
+      region: product.region || product.producer?.location || 'Local',
       status: product.status,
+      verified: product.producer?.verificationStatus === 'VERIFIED',
       // ✅ SIMPLE IMAGE STRUCTURE - frontend can use this directly
       imageUrl: primaryImageUrl,
       images: {
@@ -501,8 +496,10 @@ class ProductService {
         category: file.category,
         createdAt: file.createdAt
       })) || [],
+      rating: avgRating ? Math.round(avgRating * 10) / 10 : null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
       reviewCount: product.reviews ? product.reviews.length : 0,
+      producerName: product.producer?.businessName || product.producer?.user?.name || 'Local Farmer',
       producer: product.producer ? {
         id: product.producer.id,
         businessName: product.producer.businessName,

@@ -26,12 +26,12 @@ const upload = multer({
 // Get all products (Public)
 router.get('/', async (req, res) => {
   try {
-    const { 
-      category, 
-      search, 
-      minPrice, 
-      maxPrice, 
-      page = 1, 
+    const {
+      category,
+      search,
+      minPrice,
+      maxPrice,
+      page = 1,
       limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc'
@@ -70,11 +70,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     console.log('🔧 Fetching product details:', id);
 
     const product = await productService.getProductDetail(id);
-    
+
     if (!product) {
       return res.status(404).json({
         status: 'error',
@@ -168,27 +168,27 @@ router.post(
       // ✅ LINK IPFS RECORDS TO PRODUCT
       if (ipfsRecords.length > 0) {
         console.log('🔗 Linking IPFS files to product:', product.id);
-        
+
         // Update each IPFS record with the product ID
         await Promise.all(
           ipfsRecords.map(record =>
             prisma.iPFSMetadata.update({
               where: { id: record.id },
-              data: { 
+              data: {
                 product: { connect: { id: product.id } } // ✅ Use relation connection
               }
             })
           )
         );
-        
+
         // Verify the links were created
         const updatedRecords = await prisma.iPFSMetadata.findMany({
           where: { id: { in: ipfsRecords.map(r => r.id) } },
           select: { id: true, cid: true, productId: true }
         });
-        
+
         console.log('✅ IPFS records linked to product:', updatedRecords);
-        
+
         // Also verify the product has the IPFS files connected
         const productWithFiles = await prisma.product.findUnique({
           where: { id: product.id },
@@ -250,10 +250,10 @@ router.post(
 router.put('/:id', authenticateToken, checkUserStatus, upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, category, quantity } = req.body;
+    const { name, description, price, category, quantity, unit, region } = req.body;
 
     console.log('🔧 Updating product:', id);
-    console.log('🔧 Update data:', { name, description, price, category, quantity });
+    console.log('🔧 Update data:', { name, description, price, category, quantity, unit, region });
     console.log('🔧 Files received:', req.files?.length || 0);
 
     // Check if product exists
@@ -284,7 +284,7 @@ router.put('/:id', authenticateToken, checkUserStatus, upload.array('images', 5)
     // ✅ UPLOAD NEW IMAGES TO IPFS IF PROVIDED
     if (req.files && req.files.length > 0) {
       console.log('🔧 Uploading new images to IPFS...');
-      
+
       for (const file of req.files) {
         const uploadResult = await ipfsService.uploadFile(
           file.buffer,
@@ -311,7 +311,9 @@ router.put('/:id', authenticateToken, checkUserStatus, upload.array('images', 5)
     if (price) updateData.price = parseFloat(price);
     if (category) updateData.category = category;
     if (quantity !== undefined) updateData.quantity = parseInt(quantity);
-    
+    if (unit) updateData.unit = unit;
+    if (region) updateData.region = region;
+
     // ✅ SET IMAGE CID FOR SERVICE TO CREATE PROPER IMAGE URL
     if (imageCid) {
       updateData.imageCid = imageCid;
@@ -478,6 +480,114 @@ router.patch('/:id/status', authenticateToken, checkUserStatus, requireRole(['PR
 // Add this to routes/product.js for testing
 router.get('/test/status', (req, res) => {
   res.json({ message: 'Status endpoint is working!' });
+});
+
+// PUBLIC ROUTE - Get producer public profile
+router.get('/producer/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { prisma } = require('../config/database');
+
+    const producer = await prisma.producer.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            avatarUrl: true,
+            registrationDate: true
+          }
+        },
+        products: {
+          where: { status: 'ACTIVE' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            category: true,
+            imageUrl: true,
+            unit: true,
+            quantityAvailable: true,
+            status: true
+          },
+          orderBy: { listingDate: 'desc' }
+        }
+      }
+    });
+
+    if (!producer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Producer not found'
+      });
+    }
+
+    // Get all product IDs for this producer
+    const productIds = producer.products.map(p => p.id);
+
+    // Calculate real ratings from reviews
+    let averageRating = 0;
+    let totalReviews = 0;
+
+    if (productIds.length > 0) {
+      // Get all reviews for this producer's products
+      const reviews = await prisma.review.findMany({
+        where: {
+          productId: {
+            in: productIds
+          }
+        },
+        select: {
+          rating: true
+        }
+      });
+
+      totalReviews = reviews.length;
+
+      if (totalReviews > 0) {
+        const sumRatings = reviews.reduce((sum, review) => sum + review.rating, 0);
+        averageRating = Math.round((sumRatings / totalReviews) * 10) / 10; // Round to 1 decimal
+      }
+
+      console.log(`📊 Producer ${producer.businessName} stats:`, {
+        productIds: productIds.length,
+        totalReviews,
+        averageRating
+      });
+    }
+
+    // Calculate stats
+    const stats = {
+      totalProducts: producer.products.length,
+      activeProducts: producer.products.filter(p => p.status === 'ACTIVE').length,
+      averageRating: averageRating,
+      totalReviews: totalReviews
+    };
+
+    // Format products
+    const formattedProducts = producer.products.map(p => ({
+      ...p,
+      stock: p.quantityAvailable
+    }));
+
+    res.json({
+      status: 'success',
+      data: {
+        ...producer,
+        products: formattedProducts,
+        stats
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching producer profile:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch producer profile'
+    });
+  }
 });
 
 module.exports = router;

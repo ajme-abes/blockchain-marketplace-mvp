@@ -66,6 +66,7 @@ import SystemSettings from "./pages/admin/SystemSettings";
 import TestimonialManagement from "./pages/admin/TestimonialManagement";
 import ContactMessages from "./pages/admin/ContactMessages";
 import MyMessages from "./pages/common/MyMessages";
+import ProducerProfile from "./pages/common/ProducerProfile";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -134,6 +135,7 @@ const App = () => (
                         <Route path="/register" element={<Register />} />
                         <Route path="/marketplace" element={<Marketplace />} />
                         <Route path="/products/:id" element={<ProductDetail />} />
+                        <Route path="/producers/:id" element={<ProducerProfile />} />
                         <Route path="/about" element={<About />} />
                         <Route path="/contact" element={<Contact />} />
                         <Route path="/unauthorized" element={<Unauthorized />} />

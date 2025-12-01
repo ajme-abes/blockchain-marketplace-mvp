@@ -31,7 +31,7 @@ export interface Product {
   reviewCount: number;
   listingDate: string;
   updatedAt: string;
-  
+
   region?: string;
   unit?: string;
   verified?: boolean;
@@ -67,17 +67,16 @@ export interface CreateProductData {
 
 // Helper function to map backend data to frontend format
 const mapProductFromBackend = (backendProduct: any): Product => {
-  const region = backendProduct.producer?.location || 'Local';
-  const rating = backendProduct.averageRating || 0;
-  
+  // Backend now provides all these fields directly
   return {
     ...backendProduct,
-    region,
-    unit: 'unit',
-    verified: backendProduct.producer?.verificationStatus === 'VERIFIED',
-    rating,
-    stock: backendProduct.quantityAvailable,
-    quantityAvailable: backendProduct.quantityAvailable,
+    // Ensure these fields exist with fallbacks
+    unit: backendProduct.unit || 'unit',
+    region: backendProduct.region || 'Local',
+    verified: backendProduct.verified || false,
+    rating: backendProduct.rating || backendProduct.averageRating || 0,
+    stock: backendProduct.quantityAvailable || 0,
+    producerName: backendProduct.producerName || backendProduct.producer?.businessName || 'Local Farmer',
     images: backendProduct.images || {
       url: backendProduct.imageUrl,
       ipfsCid: backendProduct.imageUrl ? backendProduct.imageUrl.split('/').pop() : null,
@@ -90,7 +89,7 @@ export const productService = {
   // Get all products with optional filters - FIXED: uses api.request()
   async getProducts(filters?: ProductFilters): Promise<Product[]> {
     const queryParams = new URLSearchParams();
-    
+
     if (filters?.category) queryParams.append('category', filters.category);
     if (filters?.search) queryParams.append('search', filters.search);
     if (filters?.minPrice !== undefined) queryParams.append('minPrice', filters.minPrice.toString());
@@ -100,9 +99,9 @@ export const productService = {
 
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/products?${queryString}` : '/products';
-    
+
     console.log('🔄 Fetching products from:', endpoint);
-    
+
     try {
       const response = await api.request(endpoint);
       console.log('✅ Raw products response:', response);
@@ -110,7 +109,7 @@ export const productService = {
       // Handle different response structures
       if (response.data) {
         const backendData = response.data;
-        
+
         if (backendData.products && Array.isArray(backendData.products)) {
           return backendData.products.map(mapProductFromBackend);
         } else if (Array.isArray(backendData)) {
@@ -119,10 +118,10 @@ export const productService = {
       } else if (Array.isArray(response)) {
         return response.map(mapProductFromBackend);
       }
-      
+
       console.warn('⚠️ Unexpected response structure, returning empty array');
       return [];
-      
+
     } catch (error) {
       console.error('❌ Failed to fetch products:', error);
       throw error;
@@ -132,7 +131,7 @@ export const productService = {
   // Get product by ID - FIXED: uses api.request()
   async getProductById(id: string): Promise<ProductDetail> {
     console.log('🔄 Fetching product details for:', id);
-    
+
     try {
       const response = await api.request(`/products/${id}`);
       console.log('✅ Raw product detail response:', response);
@@ -141,9 +140,9 @@ export const productService = {
         const backendProduct = response.data;
         return mapProductFromBackend(backendProduct);
       }
-      
+
       throw new Error('Invalid product data received');
-      
+
     } catch (error) {
       console.error('❌ Failed to fetch product details:', error);
       throw error;
@@ -158,13 +157,13 @@ export const productService = {
   // Create new product (producer only) - FIXED: uses api.request()
   async createProduct(productData: CreateProductData): Promise<Product> {
     const formData = new FormData();
-    
+
     formData.append('name', productData.name);
     formData.append('description', productData.description);
     formData.append('price', productData.price.toString());
     formData.append('category', productData.category);
     formData.append('quantity', productData.quantity.toString());
-    
+
     productData.images.forEach((image) => {
       formData.append('images', image);
     });
@@ -179,20 +178,20 @@ export const productService = {
         },
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       console.log('✅ Product creation response:', data);
-      
+
       if (data.data) {
         return mapProductFromBackend(data.data);
       }
-      
+
       throw new Error('Invalid response after product creation');
-      
+
     } catch (error) {
       console.error('❌ Failed to create product:', error);
       throw error;
@@ -203,14 +202,14 @@ export const productService = {
   async getMyProducts(): Promise<Product[]> {
     try {
       const response = await api.request('/products/my/products');
-      
+
       if (response.data) {
         const backendData = response.data;
         return backendData.products?.map(mapProductFromBackend) || [];
       }
-      
+
       throw new Error('Invalid response structure for my products');
-      
+
     } catch (error) {
       console.error('❌ Failed to fetch my products:', error);
       throw error;
@@ -224,13 +223,13 @@ export const productService = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
-      
+
       if (response.data) {
         return mapProductFromBackend(response.data);
       }
-      
+
       throw new Error('Invalid response after status update');
-      
+
     } catch (error) {
       console.error('❌ Failed to update product status:', error);
       throw error;
@@ -240,13 +239,13 @@ export const productService = {
   // Update product - FIXED: uses api.request()
   async updateProduct(id: string, productData: Partial<CreateProductData>): Promise<Product> {
     const formData = new FormData();
-    
+
     if (productData.name) formData.append('name', productData.name);
     if (productData.description) formData.append('description', productData.description);
     if (productData.price) formData.append('price', productData.price.toString());
     if (productData.category) formData.append('category', productData.category);
     if (productData.quantity) formData.append('quantity', productData.quantity.toString());
-    
+
     if (productData.images) {
       productData.images.forEach((image) => {
         formData.append('images', image);
@@ -262,19 +261,19 @@ export const productService = {
         },
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.data) {
         return mapProductFromBackend(data.data);
       }
-      
+
       throw new Error('Invalid response after product update');
-      
+
     } catch (error) {
       console.error('❌ Failed to update product:', error);
       throw error;
