@@ -7,13 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  Download, 
-  Filter, 
-  Search, 
-  DollarSign, 
-  Calendar, 
-  Loader2, 
+import {
+  Download,
+  Filter,
+  Search,
+  DollarSign,
+  Calendar,
+  Loader2,
   ExternalLink,
   CheckCircle, // ADD THIS IMPORT
   Clock // ADD THIS IMPORT
@@ -41,7 +41,9 @@ const ProducerTransactionHistory = () => {
     try {
       setLoading(true);
       const response = await transactionService.getProducerTransactions();
-      setTransactions(response.transactions);
+
+      // Show all transactions - payout status will be displayed in the table
+      setTransactions(response.transactions || []);
       setStats(response.stats);
     } catch (error: any) {
       console.error('Failed to load transactions:', error);
@@ -58,7 +60,7 @@ const ProducerTransactionHistory = () => {
   const handleFilter = async () => {
     try {
       setLoading(true);
-  
+
       const filters: any = {};
       if (dateRange.start) {
         filters.startDate = new Date(dateRange.start + "T00:00:00Z").toISOString();
@@ -66,14 +68,14 @@ const ProducerTransactionHistory = () => {
       if (dateRange.end) {
         filters.endDate = new Date(dateRange.end + "T23:59:59Z").toISOString();
       }
-  
+
       const response = await transactionService.getProducerTransactions(filters);
-  
+
       // Correctly access nested data
       const resData = response.data.data; // <-- notice the double 'data'
       setTransactions(resData.transactions);
       setStats(resData.stats);
-  
+
     } catch (error: any) {
       console.error("Filter transactions error:", error);
       toast({
@@ -85,9 +87,9 @@ const ProducerTransactionHistory = () => {
       setLoading(false);
     }
   };
-  
-  
-  
+
+
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -109,7 +111,7 @@ const ProducerTransactionHistory = () => {
   const filteredTransactions = transactions.filter(transaction =>
     transaction.buyerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     transaction.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.items.some(item => 
+    transaction.items.some(item =>
       item.product.toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
@@ -138,9 +140,9 @@ const ProducerTransactionHistory = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Transaction History" 
-            description="View your sales history and revenue analytics"
+          <PageHeader
+            title="Transaction History"
+            description="View your sales history and payout status"
           />
 
           <main className="flex-1 p-6">
@@ -214,11 +216,11 @@ const ProducerTransactionHistory = () => {
                     <Button variant="outline" onClick={loadTransactions}>
                       Reset
                     </Button>
-                    <Button 
-                         variant="outline"
-                         onClick={() => exportToPDF(transactions, 'Transaction History', stats, 'PRODUCER')}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Export PDF
+                    <Button
+                      variant="outline"
+                      onClick={() => exportToPDF(transactions, 'Transaction History', stats, 'PRODUCER')}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export PDF
                     </Button>
                   </div>
                 </div>
@@ -240,14 +242,15 @@ const ProducerTransactionHistory = () => {
                       <TableHead>Products</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Payout</TableHead>
                       <TableHead>Blockchain</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}   className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/transaction/${transaction.id}`)} >
+                      <TableRow key={transaction.id} className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/transaction/${transaction.id}`)} >
                         <TableCell className="font-medium">{transaction.id}</TableCell>
                         <TableCell>{transaction.orderId}</TableCell>
                         <TableCell>{transaction.buyerName || 'Unknown Buyer'}</TableCell>
@@ -267,24 +270,47 @@ const ProducerTransactionHistory = () => {
                             {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
                           </Badge>
                         </TableCell>
-<TableCell>
-{transaction.blockchainStatus.verified ? (
-  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
-    <CheckCircle className="h-3 w-3 mr-1" />
-    Verified
-  </Badge>
-) : transaction.blockchainStatus.status === 'pending_verification' ? (
-  <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200">
-    <Clock className="h-3 w-3 mr-1" />
-    Pending
-  </Badge>
-) : (
-  <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-200">
-    <Clock className="h-3 w-3 mr-1" />
-    Awaiting
-  </Badge>
-)}
-</TableCell>
+                        <TableCell>
+                          {(transaction as any).payoutStatus === 'COMPLETED' ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Paid
+                            </Badge>
+                          ) : (transaction as any).payoutStatus === 'SCHEDULED' ? (
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Scheduled
+                            </Badge>
+                          ) : (transaction as any).payoutStatus === 'PROCESSING' ? (
+                            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Processing
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {transaction.blockchainStatus.verified ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Verified
+                            </Badge>
+                          ) : transaction.blockchainStatus.status === 'pending_verification' ? (
+                            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Awaiting
+                            </Badge>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -292,8 +318,8 @@ const ProducerTransactionHistory = () => {
 
                 {filteredTransactions.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
-                    {transactions.length === 0 
-                      ? "No sales transactions yet" 
+                    {transactions.length === 0
+                      ? "No sales transactions yet"
                       : "No transactions found for your search"
                     }
                   </div>

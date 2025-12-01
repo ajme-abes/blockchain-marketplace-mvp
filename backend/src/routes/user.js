@@ -2,6 +2,7 @@ const express = require('express');
 const userService = require('../services/userService');
 const { authenticateToken, checkUserStatus, } = require('../middleware/auth');
 const { prisma } = require('../config/database');
+const { registerLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 // Try to import authService with error handling
@@ -14,11 +15,11 @@ try {
   authService = null;
 }
 
-// Register new user (with authService check)
-router.post('/register', async (req, res) => {
+// Register new user (with rate limiting and authService check)
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     console.log('Registration request body:', req.body);
-    
+
     const { email, password, name, phone, role, address } = req.body;
 
     // Check if body exists
@@ -63,7 +64,7 @@ router.post('/register', async (req, res) => {
     // Check if authService is available
     if (!authService) {
       console.log('⚠️ authService not available, returning user without token');
-      
+
       const userResponse = {
         id: user.id,
         email: user.email,
@@ -118,8 +119,17 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.error('User registration error:', error);
-    
+
     // ✅ ENHANCED ERROR HANDLING
+    if (error.code === 'WEAK_PASSWORD') {
+      return res.status(400).json({
+        status: 'error',
+        message: error.message,
+        code: 'WEAK_PASSWORD',
+        details: error.details
+      });
+    }
+
     if (error.message === 'User already exists with this email address') {
       return res.status(409).json({
         status: 'error',
@@ -127,7 +137,7 @@ router.post('/register', async (req, res) => {
         code: 'EMAIL_EXISTS'
       });
     }
-    
+
     if (error.message === 'User already exists with this phone number') {
       return res.status(409).json({
         status: 'error',
@@ -135,7 +145,7 @@ router.post('/register', async (req, res) => {
         code: 'PHONE_EXISTS'
       });
     }
-    
+
     // Handle Prisma unique constraint errors (backup)
     if (error.code === 'P2002') {
       const field = error.meta?.target?.[0];
@@ -154,7 +164,7 @@ router.post('/register', async (req, res) => {
         });
       }
     }
-    
+
     res.status(500).json({
       status: 'error',
       message: 'Internal server error during registration',
@@ -167,7 +177,7 @@ router.post('/register', async (req, res) => {
 router.get('/:id', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Users can only access their own data unless they're ADMIN
     if (req.user.role !== 'ADMIN' && req.user.id !== id) {
       return res.status(403).json({
@@ -175,9 +185,9 @@ router.get('/:id', authenticateToken, checkUserStatus, async (req, res) => {
         message: 'Access denied. You can only access your own profile.'
       });
     }
-    
+
     const user = await userService.getUserById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         status: 'error',
@@ -218,7 +228,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     const { prisma } = require('../config/database');
-    
+
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -258,7 +268,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 
-router.put('/profile', authenticateToken,  checkUserStatus, async (req, res) => {
+router.put('/profile', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { name, phone, address, languagePreference, region, bio } = req.body;
     const userId = req.user.id;
@@ -283,7 +293,7 @@ router.put('/profile', authenticateToken,  checkUserStatus, async (req, res) => 
     if (bio) updateData.bio = bio;
 
     const { prisma } = require('../config/database');
-    
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,

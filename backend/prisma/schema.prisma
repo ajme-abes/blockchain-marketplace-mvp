@@ -46,6 +46,7 @@ model User {
   disputesResolved Dispute[]         @relation("UserDisputesResolved")
   disputeEvidences DisputeEvidence[]
   disputeMessages  DisputeMessage[]
+  blockchainIdentifiers BlockchainIdentifier[]
 
   @@index([email])
   @@index([role])
@@ -67,6 +68,10 @@ model Producer {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   products Product[]
   documents      ProducerDocument[]
+  orderProducers OrderProducer[]
+  producerPayouts ProducerPayout[]
+  bankAccounts ProducerBankAccount[]
+  productProducers ProductProducer[] // Multi-producer support
 
   @@index([verificationStatus])
   @@index([businessName])
@@ -90,6 +95,26 @@ model ProducerDocument {
   @@index([producerId])
   @@index([type]) // Changed from documentType to type
   @@map("producer_documents")
+}
+
+model ProducerBankAccount {
+  id              String   @id @default(uuid())
+  producerId      String
+  producer        Producer @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  bankName        String
+  accountNumber   String
+  accountName     String
+  branchName      String?
+  swiftCode       String?
+  accountType     String   @default("SAVINGS") // SAVINGS, CHECKING, BUSINESS
+  isPrimary       Boolean  @default(false)
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([producerId])
+  @@index([isPrimary])
+  @@map("producer_bank_accounts")
 }
 
 model Buyer {
@@ -126,6 +151,7 @@ model Product {
   orderItems OrderItem[]
   reviews    Review[]
   ipfsFiles  IPFSMetadata[]
+  productProducers ProductProducer[] // Multi-producer support
 
   @@index([name])
   @@index([category])
@@ -137,6 +163,22 @@ model Product {
   @@index([price, category])
   @@index([status, listingDate])
   @@map("products")
+}
+
+model ProductProducer {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  producerId      String
+  producer        Producer @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  sharePercentage Float    // Percentage share (e.g., 40.0 for 40%)
+  role            String?  // Optional role description (e.g., "Grower", "Processor")
+  createdAt       DateTime @default(now())
+  
+  @@unique([productId, producerId])
+  @@index([productId])
+  @@index([producerId])
+  @@map("product_producers")
 }
 
 model Order {
@@ -164,6 +206,7 @@ model Order {
   blockchainRecords    BlockchainRecord[]
   statusHistory        OrderStatusHistory[]
   paymentReferences    PaymentReference[]
+  orderProducers       OrderProducer[]
 
   dispute Dispute?
 
@@ -266,6 +309,84 @@ model BlockchainRecord {
   @@index([timestamp])
   @@index([status])
   @@map("blockchain_records")
+}
+
+model BlockchainIdentifier {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role              UserRole
+  blockchainId      String   @unique
+  createdAt         DateTime @default(now())
+  lastUsedAt        DateTime @updatedAt
+  usageCount        Int      @default(0)
+  
+  @@unique([userId, role])
+  @@index([blockchainId])
+  @@index([userId])
+  @@index([role])
+  @@map("blockchain_identifiers")
+}
+
+model OrderProducer {
+  id                    String              @id @default(uuid())
+  orderId               String
+  order                 Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  producerId            String
+  producer              Producer            @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  productIds            String[]            // Array of product IDs from this producer
+  subtotal              Float
+  marketplaceCommission Float               @default(0)
+  producerAmount        Float               @default(0) // Amount producer will receive (subtotal - commission)
+  payoutStatus          PayoutStatus        @default(PENDING)
+  paidAt                DateTime?
+  payoutReference       String?
+  createdAt             DateTime            @default(now())
+  payoutOrderItems      PayoutOrderItem[]
+  
+  @@unique([orderId, producerId])
+  @@index([orderId])
+  @@index([producerId])
+  @@index([payoutStatus])
+  @@map("order_producers")
+}
+
+model ProducerPayout {
+  id               String            @id @default(uuid())
+  producerId       String
+  producer         Producer          @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  amount           Float             // Total amount before commission
+  commission       Float             // Marketplace commission
+  netAmount        Float             // Amount producer receives
+  status           PayoutStatus      @default(PENDING)
+  payoutMethod     String?           // BANK_TRANSFER, MOBILE_MONEY, etc.
+  payoutReference  String?           // Bank transfer reference
+  scheduledFor     DateTime
+  paidAt           DateTime?
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  payoutOrderItems PayoutOrderItem[]
+  
+  @@index([producerId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([producerId, status])
+  @@map("producer_payouts")
+}
+
+model PayoutOrderItem {
+  id               String         @id @default(uuid())
+  payoutId         String
+  payout           ProducerPayout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  orderProducerId  String
+  orderProducer    OrderProducer  @relation(fields: [orderProducerId], references: [id], onDelete: Cascade)
+  amount           Float
+  createdAt        DateTime       @default(now())
+  
+  @@index([payoutId])
+  @@index([orderProducerId])
+  @@map("payout_order_items")
 }
 
 model Review {
@@ -416,11 +537,21 @@ enum PaymentMethod {
   MANUAL
 }
 
+enum PayoutStatus {
+  PENDING
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum NotificationType {
   ORDER_CREATED
   PAYMENT_CONFIRMED
   ORDER_SHIPPED
   DISPUTE_RAISED
+  REVIEW_RECEIVED
   GENERAL
   SECURITY
   SYSTEM

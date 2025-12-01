@@ -18,10 +18,10 @@ import { Save, Moon, Sun, Globe, Bell, Shield, LogOut } from 'lucide-react';
 const Settings = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { language, toggleLanguage } = useLanguage();
+  const { language, setLanguage, t, availableLanguages, getLanguageName, getLanguageFlag } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -45,15 +45,15 @@ const Settings = () => {
   const handlePasswordChange = () => {
     if (password.new !== password.confirm) {
       toast({
-        title: 'Error',
-        description: 'New passwords do not match.',
+        title: t('common.error'),
+        description: t('toast.passwordMismatch.desc'),
         variant: 'destructive',
       });
       return;
     }
     toast({
-      title: 'Password Updated',
-      description: 'Your password has been successfully changed.',
+      title: t('toast.passwordUpdated'),
+      description: t('toast.passwordUpdated.desc'),
     });
     setPassword({ current: '', new: '', confirm: '' });
   };
@@ -62,8 +62,8 @@ const Settings = () => {
     logout();
     navigate('/');
     toast({
-      title: 'Logged Out',
-      description: 'You have been successfully logged out.',
+      title: t('toast.loggedOut'),
+      description: t('toast.loggedOut.desc'),
     });
   };
 
@@ -72,7 +72,7 @@ const Settings = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader title="Settings" />
+          <PageHeader title={t('settings.title')} />
 
           <main className="flex-1 p-6">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -81,16 +81,16 @@ const Settings = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-                    Appearance
+                    {t('settings.appearance')}
                   </CardTitle>
-                  <CardDescription>Customize how EthioTrust looks</CardDescription>
+                  <CardDescription>{t('settings.appearance.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Dark Mode</p>
+                      <p className="font-medium">{t('settings.darkMode')}</p>
                       <p className="text-sm text-muted-foreground">
-                        Switch between light and dark theme
+                        {t('settings.darkMode.desc')}
                       </p>
                     </div>
                     <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme} />
@@ -103,21 +103,44 @@ const Settings = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Globe className="h-5 w-5" />
-                    Language
+                    {t('settings.language')}
                   </CardTitle>
-                  <CardDescription>Choose your preferred language</CardDescription>
+                  <CardDescription>{t('settings.language.desc')}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Language</p>
-                      <p className="text-sm text-muted-foreground">
-                        Currently: {language === 'en' ? 'English' : 'አማርኛ (Amharic)'}
-                      </p>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="font-medium mb-2">{t('settings.language.select')}</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {t('settings.language.current')}: {getLanguageFlag(language)} {getLanguageName(language)}
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {availableLanguages.map((lang) => (
+                        <Button
+                          key={lang}
+                          variant={language === lang ? 'default' : 'outline'}
+                          className="justify-start h-auto py-3"
+                          onClick={() => {
+                            setLanguage(lang);
+                            toast({
+                              title: t('toast.languageChanged'),
+                              description: t('toast.languageChanged.desc'),
+                            });
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">{getLanguageFlag(lang)}</span>
+                            <div className="text-left">
+                              <div className="font-medium">{getLanguageName(lang)}</div>
+                              <div className="text-xs opacity-70">
+                                {lang === 'en' && 'English'}
+                                {lang === 'amh' && 'አማርኛ'}
+                                {lang === 'orm' && 'Afaan Oromoo'}
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      ))}
                     </div>
-                    <Button variant="outline" onClick={toggleLanguage}>
-                      Switch to {language === 'en' ? 'አማርኛ' : 'English'}
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -127,16 +150,16 @@ const Settings = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Bell className="h-5 w-5" />
-                    Notifications
+                    {t('settings.notifications')}
                   </CardTitle>
-                  <CardDescription>Manage your notification preferences</CardDescription>
+                  <CardDescription>{t('settings.notifications.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Email Notifications</p>
+                      <p className="font-medium">{t('settings.notifications.email')}</p>
                       <p className="text-sm text-muted-foreground">
-                        Receive updates via email
+                        {t('settings.notifications.email.desc')}
                       </p>
                     </div>
                     <Switch
@@ -149,9 +172,9 @@ const Settings = () => {
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Push Notifications</p>
+                      <p className="font-medium">{t('settings.notifications.push')}</p>
                       <p className="text-sm text-muted-foreground">
-                        Receive push notifications in browser
+                        {t('settings.notifications.push.desc')}
                       </p>
                     </div>
                     <Switch
@@ -164,9 +187,9 @@ const Settings = () => {
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">SMS Notifications</p>
+                      <p className="font-medium">{t('settings.notifications.sms')}</p>
                       <p className="text-sm text-muted-foreground">
-                        Receive important updates via SMS
+                        {t('settings.notifications.sms.desc')}
                       </p>
                     </div>
                     <Switch
@@ -184,13 +207,13 @@ const Settings = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5" />
-                    Security
+                    {t('settings.security')}
                   </CardTitle>
-                  <CardDescription>Manage your password and security settings</CardDescription>
+                  <CardDescription>{t('settings.security.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="current-password">Current Password</Label>
+                    <Label htmlFor="current-password">{t('settings.security.currentPassword')}</Label>
                     <Input
                       id="current-password"
                       type="password"
@@ -199,7 +222,7 @@ const Settings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="new-password">New Password</Label>
+                    <Label htmlFor="new-password">{t('settings.security.newPassword')}</Label>
                     <Input
                       id="new-password"
                       type="password"
@@ -208,7 +231,7 @@ const Settings = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Label htmlFor="confirm-password">{t('settings.security.confirmPassword')}</Label>
                     <Input
                       id="confirm-password"
                       type="password"
@@ -218,7 +241,7 @@ const Settings = () => {
                   </div>
                   <Button onClick={handlePasswordChange}>
                     <Save className="h-4 w-4 mr-2" />
-                    Update Password
+                    {t('settings.security.updatePassword')}
                   </Button>
                 </CardContent>
               </Card>
@@ -226,13 +249,13 @@ const Settings = () => {
               {/* Account Actions */}
               <Card className="shadow-card border-destructive/50">
                 <CardHeader>
-                  <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                  <CardDescription>Irreversible account actions</CardDescription>
+                  <CardTitle className="text-destructive">{t('settings.dangerZone')}</CardTitle>
+                  <CardDescription>{t('settings.dangerZone.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button variant="destructive" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
-                    Log Out
+                    {t('auth.logout')}
                   </Button>
                 </CardContent>
               </Card>

@@ -6,8 +6,9 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2 } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { productService } from '@/services/productService';
@@ -40,9 +41,10 @@ interface RecentOrder {
 
 const ProducerDashboard = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     pendingOrders: 0,
@@ -59,49 +61,49 @@ const ProducerDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch producer orders and products in parallel
       const [ordersResponse, productsResponse] = await Promise.all([
         orderService.getProducerOrders(),
         orderService.getProducerProducts() // Use orderService since we moved the method
       ]);
-  
+
       console.log('🔧 Orders response:', ordersResponse);
       console.log('🔧 Products response:', productsResponse);
-  
+
       // Extract data based on your backend response structure
       const orders = ordersResponse?.orders || ordersResponse?.data?.orders || [];
       const products = productsResponse?.products || productsResponse?.data?.products || [];
-  
+
       console.log('🔧 Extracted orders:', orders);
       console.log('🔧 Extracted products:', products);
-  
+
       // Calculate stats
-      const pendingOrders = orders.filter(order => 
+      const pendingOrders = orders.filter(order =>
         ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
       ).length;
-  
+
       const totalEarnings = orders
         .filter(order => order.paymentStatus === 'CONFIRMED')
         .reduce((sum, order) => sum + order.totalAmount, 0);
-  
+
       const growthPercentage = orders.length > 0 ? 12 : 0;
-  
+
       setStats({
         totalProducts: products.length,
         pendingOrders,
         totalEarnings,
         growthPercentage
       });
-  
+
       // Get recent orders (last 5)
       setRecentOrders(orders.slice(0, 5));
-  
+
     } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
+        title: t('common.error'),
+        description: t('producer.dashboard.errorLoading'),
         variant: "destructive",
       });
     } finally {
@@ -132,33 +134,33 @@ const ProducerDashboard = () => {
   };
 
   const statCards = [
-    { 
-      title: 'Total Products', 
-      value: stats.totalProducts.toString(), 
-      icon: Package, 
+    {
+      title: t('producer.dashboard.totalProducts'),
+      value: stats.totalProducts.toString(),
+      icon: Package,
       color: 'text-blue-600',
-      description: 'Active listings'
+      description: t('producer.dashboard.activeListings')
     },
-    { 
-      title: 'Pending Orders', 
-      value: stats.pendingOrders.toString(), 
-      icon: ShoppingCart, 
+    {
+      title: t('producer.dashboard.pendingOrders'),
+      value: stats.pendingOrders.toString(),
+      icon: ShoppingCart,
       color: 'text-orange-600',
-      description: 'Awaiting processing'
+      description: t('producer.dashboard.awaitingProcessing')
     },
-    { 
-      title: 'Total Earnings', 
-      value: formatPrice(stats.totalEarnings), 
-      icon: DollarSign, 
+    {
+      title: t('producer.dashboard.totalEarnings'),
+      value: formatPrice(stats.totalEarnings),
+      icon: DollarSign,
       color: 'text-green-600',
-      description: 'All time revenue'
+      description: t('producer.dashboard.allTimeRevenue')
     },
-    { 
-      title: 'Growth', 
-      value: `${stats.growthPercentage}%`, 
-      icon: TrendingUp, 
+    {
+      title: t('producer.dashboard.growth'),
+      value: `${stats.growthPercentage}%`,
+      icon: TrendingUp,
       color: stats.growthPercentage >= 0 ? 'text-green-600' : 'text-red-600',
-      description: 'This month'
+      description: t('producer.dashboard.thisMonth')
     },
   ];
 
@@ -168,11 +170,11 @@ const ProducerDashboard = () => {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <div className="flex-1 flex flex-col">
-            <PageHeader title="Producer Dashboard" />
+            <PageHeader title={t('producer.dashboard.title')} />
             <main className="flex-1 p-6 flex items-center justify-center">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                <p>Loading dashboard...</p>
+                <p>{t('producer.dashboard.loadingDashboard')}</p>
               </div>
             </main>
           </div>
@@ -186,18 +188,18 @@ const ProducerDashboard = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Producer Dashboard" 
-            description="Manage your products and track business performance"
+          <PageHeader
+            title={t('producer.dashboard.title')}
+            description={t('producer.dashboard.subtitle')}
             action={
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => navigate('/producer/orders')}>
                   <Eye className="h-4 w-4 mr-2" />
-                  View All Orders
+                  {t('producer.dashboard.viewAllOrders')}
                 </Button>
                 <Button onClick={() => navigate('/producer/add-product')}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Product
+                  {t('producer.dashboard.addProduct')}
                 </Button>
               </div>
             }
@@ -207,10 +209,10 @@ const ProducerDashboard = () => {
             {/* Welcome Section */}
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Welcome back, {user?.name}!
+                {t('producer.dashboard.welcome')}, {user?.name}!
               </h2>
               <p className="text-muted-foreground text-lg">
-                Here's what's happening with your business today.
+                {t('producer.dashboard.todayActivity')}
               </p>
             </div>
 
@@ -237,11 +239,11 @@ const ProducerDashboard = () => {
               <Card className="shadow-card">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Recent Orders</CardTitle>
-                    <CardDescription>Latest customer orders</CardDescription>
+                    <CardTitle>{t('producer.dashboard.recentOrders')}</CardTitle>
+                    <CardDescription>{t('producer.dashboard.latestCustomerOrders')}</CardDescription>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => navigate('/producer/orders')}>
-                    View All
+                    {t('common.viewAll')}
                   </Button>
                 </CardHeader>
                 <CardContent>
@@ -253,7 +255,7 @@ const ProducerDashboard = () => {
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-sm">
                                 {order.items[0]?.product.name}
-                                {order.items.length > 1 && ` +${order.items.length - 1} more`}
+                                {order.items.length > 1 && ` +${order.items.length - 1} ${t('producer.dashboard.moreItems')}`}
                               </span>
                               <Badge variant="outline" className={getStatusColor(order.deliveryStatus)}>
                                 {order.deliveryStatus}
@@ -265,13 +267,13 @@ const ProducerDashboard = () => {
                           </div>
                           <div className="text-right">
                             <div className="font-semibold text-sm">{formatPrice(order.totalAmount)}</div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="h-6 text-xs"
                               onClick={() => navigate(`/orders/${order.id}`)}
                             >
-                              View
+                              {t('common.view')}
                             </Button>
                           </div>
                         </div>
@@ -280,9 +282,9 @@ const ProducerDashboard = () => {
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-4">No orders yet</p>
+                      <p className="text-muted-foreground mb-4">{t('producer.dashboard.noOrdersYet')}</p>
                       <Button onClick={() => navigate('/marketplace')}>
-                        Promote Your Products
+                        {t('producer.dashboard.promoteProducts')}
                       </Button>
                     </div>
                   )}
@@ -292,42 +294,50 @@ const ProducerDashboard = () => {
               {/* Quick Actions */}
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Manage your business</CardDescription>
+                  <CardTitle>{t('producer.dashboard.quickActions')}</CardTitle>
+                  <CardDescription>{t('producer.dashboard.manageBusiness')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/my-products')}
                     >
                       <Package className="h-6 w-6 mb-2" />
-                      <span>Manage Products</span>
+                      <span>{t('producer.dashboard.manageProducts')}</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/orders')}
                     >
                       <ShoppingCart className="h-6 w-6 mb-2" />
-                      <span>View Orders</span>
+                      <span>{t('producer.dashboard.viewOrders')}</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/analytics')}
                     >
                       <TrendingUp className="h-6 w-6 mb-2" />
-                      <span>Analytics</span>
+                      <span>{t('producer.dashboard.analytics')}</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-20 flex-col"
                       onClick={() => navigate('/producer/transactionhistory')}
                     >
                       <DollarSign className="h-6 w-6 mb-2" />
-                      <span>Transactions</span>
+                      <span>{t('producer.dashboard.transactions')}</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-20 flex-col"
+                      onClick={() => navigate('/producer/store-settings')}
+                    >
+                      <CreditCard className="h-6 w-6 mb-2" />
+                      <span>{t('producer.dashboard.bankAccounts')}</span>
                     </Button>
                   </div>
                 </CardContent>

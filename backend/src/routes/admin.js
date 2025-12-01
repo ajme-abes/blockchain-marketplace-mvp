@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken, requireRole, checkUserStatus  } = require('../middleware/auth');
+const { authenticateToken, requireRole, checkUserStatus } = require('../middleware/auth');
 const adminService = require('../services/adminService');
 const router = express.Router();
 
@@ -35,10 +35,10 @@ router.get('/dashboard/stats', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '' } = req.query;
-    
+
     const result = await adminService.getAllUsers(
-      parseInt(page), 
-      parseInt(limit), 
+      parseInt(page),
+      parseInt(limit),
       search
     );
 
@@ -79,8 +79,8 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
     // Update producer verification status
     const producer = await prisma.producer.update({
       where: { id: producerId },
-      data: { 
-        verificationStatus: status 
+      data: {
+        verificationStatus: status
       },
       include: {
         user: {
@@ -92,7 +92,7 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
     // 🆕 CREATE NOTIFICATION FOR PRODUCER
     const notificationService = require('../services/notificationService');
     let notificationMessage = '';
-    
+
     if (status === 'VERIFIED') {
       notificationMessage = 'Your producer account has been verified! You can now list products and start selling.';
     } else {
@@ -112,7 +112,7 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
         entity: 'PRODUCER',
         entityId: producerId,
         userId: adminId,
-        newValues: { 
+        newValues: {
           verificationStatus: status,
           ...(reason && { rejectionReason: reason })
         },
@@ -139,20 +139,20 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
 // ==================== ORDER MANAGEMENT ====================
 router.get('/orders', async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      paymentStatus, 
-      deliveryStatus 
+    const {
+      page = 1,
+      limit = 20,
+      paymentStatus,
+      deliveryStatus
     } = req.query;
-    
+
     const filters = {};
     if (paymentStatus) filters.paymentStatus = paymentStatus;
     if (deliveryStatus) filters.deliveryStatus = deliveryStatus;
 
     const result = await adminService.getAllOrders(
-      parseInt(page), 
-      parseInt(limit), 
+      parseInt(page),
+      parseInt(limit),
       filters
     );
 
@@ -306,7 +306,7 @@ router.get('/reviews', async (req, res) => {
 router.get('/analytics/payments', async (req, res) => {
   try {
     const { period = 'monthly' } = req.query; // monthly, weekly, daily
-    
+
     let paymentData;
     if (period === 'monthly') {
       paymentData = await adminService.getMonthlyRevenue(12);
@@ -450,7 +450,7 @@ router.get('/users/:id', async (req, res) => {
         _avg: { rating: true },
         _count: { id: true }
       });
-      
+
       producerRating = {
         rating: ratingData._avg.rating || 0,
         reviewCount: ratingData._count.id || 0
@@ -463,7 +463,7 @@ router.get('/users/:id', async (req, res) => {
     });
 
     const totalSpent = await prisma.order.aggregate({
-      where: { 
+      where: {
         buyerId: user.buyerProfile?.id,
         paymentStatus: 'CONFIRMED'
       },
@@ -475,7 +475,7 @@ router.get('/users/:id', async (req, res) => {
     });
 
     const totalSales = await prisma.order.aggregate({
-      where: { 
+      where: {
         orderItems: {
           some: {
             product: {
@@ -640,23 +640,23 @@ router.delete('/users/:id', async (req, res) => {
 router.get('/users-with-stats', async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '', role, status, verification } = req.query;
-    
+
     const skip = (page - 1) * limit;
-    
+
     // Build where clause with filters
     const whereClause = {};
-    
+
     if (search) {
       whereClause.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } }
       ];
     }
-    
+
     if (role && role !== 'all') {
       whereClause.role = role;
     }
-    
+
     if (status && status !== 'all') {
       whereClause.status = status;
     }
@@ -693,8 +693,8 @@ router.get('/users-with-stats', async (req, res) => {
       buyers: await prisma.user.count({ where: { role: 'BUYER' } }),
       producers: await prisma.user.count({ where: { role: 'PRODUCER' } }),
       admins: await prisma.user.count({ where: { role: 'ADMIN' } }),
-      pendingVerifications: await prisma.producer.count({ 
-        where: { verificationStatus: 'PENDING' } 
+      pendingVerifications: await prisma.producer.count({
+        where: { verificationStatus: 'PENDING' }
       }),
       suspended: await prisma.user.count({ where: { status: 'SUSPENDED' } })
     };
@@ -750,8 +750,8 @@ router.get('/producers/verification-queue', async (req, res) => {
   try {
     // Get producers with PENDING verification status
     const producers = await prisma.producer.findMany({
-      where: { 
-        verificationStatus: 'PENDING' 
+      where: {
+        verificationStatus: 'PENDING'
       },
       include: {
         user: {
@@ -831,7 +831,7 @@ router.get('/producers/verification-queue', async (req, res) => {
 router.get('/overview', async (req, res) => {
   try {
     const { range = 'today' } = req.query;
-    
+
     const result = await adminService.getEnhancedOverview(range);
 
     if (result.success) {
@@ -859,11 +859,11 @@ router.get('/overview', async (req, res) => {
 // Get all products with admin filters
 router.get('/products', async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      status, 
-      category, 
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      category,
       search = '',
       producerId,
       verificationStatus,
@@ -872,7 +872,7 @@ router.get('/products', async (req, res) => {
       sortBy = 'listingDate',
       sortOrder = 'desc'
     } = req.query;
-    
+
     const result = await adminService.getAdminProducts({
       page: parseInt(page),
       limit: parseInt(limit),
@@ -1103,10 +1103,10 @@ router.delete('/products/:productId', async (req, res) => {
         entity: 'PRODUCT',
         entityId: productId,
         userId: adminId,
-        oldValues: { 
+        oldValues: {
           name: product.name,
           price: product.price,
-          status: product.status 
+          status: product.status
         },
         ipAddress: req.ip,
         userAgent: req.get('User-Agent')
@@ -1128,7 +1128,7 @@ router.delete('/products/:productId', async (req, res) => {
 
   } catch (error) {
     console.error('Admin delete product error:', error);
-    
+
     res.status(500).json({
       status: 'error',
       message: 'Failed to delete product',
@@ -1172,10 +1172,10 @@ router.get('/products/pending-review', async (req, res) => {
 // Get all orders with admin filters
 router.get('/orders', async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      paymentStatus, 
+    const {
+      page = 1,
+      limit = 20,
+      paymentStatus,
       deliveryStatus,
       search = '',
       dateFrom,
@@ -1187,7 +1187,7 @@ router.get('/orders', async (req, res) => {
       sortBy = 'orderDate',
       sortOrder = 'desc'
     } = req.query;
-    
+
     const result = await adminService.getAdminOrders({
       page: parseInt(page),
       limit: parseInt(limit),
@@ -1228,7 +1228,7 @@ router.get('/orders', async (req, res) => {
 router.get('/orders/stats', async (req, res) => {
   try {
     const { period = 'monthly' } = req.query; // daily, weekly, monthly, yearly
-    
+
     const result = await adminService.getOrderStats(period);
 
     if (result.success) {
@@ -1394,7 +1394,7 @@ router.post('/orders/bulk-actions', async (req, res) => {
 router.get('/analytics/revenue', async (req, res) => {
   try {
     const { period = 'monthly', months = 12 } = req.query;
-    
+
     const result = await adminService.getRevenueAnalytics(period, parseInt(months));
 
     if (result.success) {
@@ -1477,5 +1477,257 @@ async function getPaymentSuccessRate() {
 
   return total > 0 ? (successful / total) * 100 : 0;
 }
+
+// ==================== PAYOUT SCHEDULING ====================
+
+// Schedule a payout
+router.put('/payouts/:payoutId/schedule', async (req, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { scheduledFor } = req.body;
+
+    if (!scheduledFor) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Schedule date is required'
+      });
+    }
+
+    const payout = await prisma.producerPayout.update({
+      where: { id: payoutId },
+      data: {
+        scheduledFor: new Date(scheduledFor),
+        status: 'SCHEDULED',
+        updatedAt: new Date()
+      },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Create notification for producer
+    await prisma.notification.create({
+      data: {
+        userId: payout.producer.user.id,
+        type: 'GENERAL',
+        message: `Your payout of ${payout.netAmount} ETB has been scheduled for ${new Date(scheduledFor).toLocaleDateString()}.`,
+        status: 'UNREAD'
+      }
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'SCHEDULE_PAYOUT',
+        entity: 'ProducerPayout',
+        entityId: payoutId,
+        userId: req.user.id,
+        newValues: {
+          scheduledFor: scheduledFor,
+          status: 'SCHEDULED',
+          producerName: payout.producer.user.name,
+          amount: payout.netAmount
+        }
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Payout scheduled successfully',
+      payout
+    });
+
+  } catch (error) {
+    console.error('Schedule payout error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to schedule payout',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ==================== BANK ACCOUNT MANAGEMENT ====================
+
+// Get producer bank accounts (for admin to view)
+router.get('/producer/:producerId/bank-accounts', async (req, res) => {
+  try {
+    const { producerId } = req.params;
+
+    const accounts = await prisma.producerBankAccount.findMany({
+      where: { producerId },
+      orderBy: [
+        { isPrimary: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    });
+
+    res.json({
+      status: 'success',
+      accounts
+    });
+
+  } catch (error) {
+    console.error('Get producer bank accounts error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get bank accounts',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Verify producer bank account
+router.put('/bank-accounts/:accountId/verify', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+
+    const account = await prisma.producerBankAccount.update({
+      where: { id: accountId },
+      data: {
+        isVerified: true,
+        updatedAt: new Date()
+      },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Create notification for producer
+    await prisma.notification.create({
+      data: {
+        userId: account.producer.user.id,
+        type: 'GENERAL',
+        message: `Your ${account.bankName} account has been verified and is ready for payouts.`,
+        status: 'UNREAD'
+      }
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'VERIFY_BANK_ACCOUNT',
+        entity: 'ProducerBankAccount',
+        entityId: accountId,
+        userId: req.user.id,
+        newValues: {
+          isVerified: true,
+          bankName: account.bankName,
+          producerName: account.producer.user.name
+        }
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Bank account verified successfully',
+      account
+    });
+
+  } catch (error) {
+    console.error('Verify bank account error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to verify bank account',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Reject producer bank account
+router.put('/bank-accounts/:accountId/reject', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Rejection reason is required'
+      });
+    }
+
+    const account = await prisma.producerBankAccount.update({
+      where: { id: accountId },
+      data: {
+        isVerified: false,
+        updatedAt: new Date()
+      },
+      include: {
+        producer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Create notification for producer
+    await prisma.notification.create({
+      data: {
+        userId: account.producer.user.id,
+        type: 'GENERAL',
+        message: `Your ${account.bankName} account verification was rejected. Reason: ${reason}`,
+        status: 'UNREAD'
+      }
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'REJECT_BANK_ACCOUNT',
+        entity: 'ProducerBankAccount',
+        entityId: accountId,
+        userId: req.user.id,
+        newValues: {
+          isVerified: false,
+          reason: reason,
+          bankName: account.bankName,
+          producerName: account.producer.user.name
+        }
+      }
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Bank account rejected',
+      account
+    });
+
+  } catch (error) {
+    console.error('Reject bank account error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to reject bank account',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
 module.exports = router;

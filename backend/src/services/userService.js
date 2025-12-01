@@ -1,6 +1,7 @@
 // backend/src/services/userService.js
 const { prisma } = require('../config/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
+const { validatePassword } = require('../utils/passwordValidator');
 
 class UserService {
   // In backend/src/services/userService.js - UPDATE createUser method
@@ -8,16 +9,27 @@ class UserService {
   async createUser(userData) {
     try {
       console.log('🔧 createUser called with:', { ...userData, password: '[HIDDEN]' });
-      
+
       const { email, password, name, phone, role, address } = userData;
-      
+
+      // ✅ VALIDATE PASSWORD STRENGTH
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        console.log('❌ Weak password rejected:', passwordValidation.message);
+        const error = new Error(passwordValidation.message);
+        error.code = 'WEAK_PASSWORD';
+        error.details = passwordValidation;
+        throw error;
+      }
+      console.log('✅ Password validation passed:', passwordValidation.strength);
+
       // ✅ FIX: Normalize email to lowercase for consistency
       const normalizedEmail = email.toLowerCase().trim();
       console.log('🔧 Normalized email:', { original: email, normalized: normalizedEmail });
-      
+
       // ✅ ENHANCED VALIDATION: Check for duplicate email (case-insensitive)
       console.log('🔧 Checking for existing users...');
-      
+
       // Check if email already exists (case-insensitive)
       const existingEmailUser = await prisma.user.findFirst({
         where: {
@@ -27,33 +39,33 @@ class UserService {
           }
         }
       });
-      
+
       if (existingEmailUser) {
         console.log('❌ Email already exists:', normalizedEmail);
         throw new Error('EMAIL_EXISTS');
       }
-      
+
       // Check if phone already exists (if phone provided)
       if (phone) {
         const existingPhoneUser = await prisma.user.findUnique({
           where: { phone }
         });
-        
+
         if (existingPhoneUser) {
           console.log('❌ Phone number already exists:', phone);
           throw new Error('PHONE_EXISTS');
         }
       }
-      
+
       // Use the new password utility
       const passwordHash = await hashPassword(password);
-      
+
       console.log('🔧 Starting database transaction...');
-      
+
       // Create user transaction
       const user = await prisma.$transaction(async (tx) => {
         console.log('🔧 Inside transaction - creating user...');
-        
+
         // ✅ FIX: Store normalized email in database
         const newUser = await tx.user.create({
           data: {
@@ -65,9 +77,9 @@ class UserService {
             address
           }
         });
-  
+
         console.log('🔧 User created:', newUser.id);
-  
+
         // Create role-specific profile
         if (role === 'PRODUCER') {
           console.log('🔧 Creating producer profile...');
@@ -88,19 +100,19 @@ class UserService {
             }
           });
         }
-  
+
         return newUser;
       });
-      
+
       console.log('✅ Transaction completed successfully');
-      
+
       // Email verification integration
       let emailResult;
       try {
         console.log('🔧 Loading email verification service...');
         const emailVerificationService = require('./emailVerificationService');
         console.log('✅ Email verification service loaded');
-        
+
         console.log('🔧 Sending verification email...');
         emailResult = await emailVerificationService.sendVerificationEmail(user);
         console.log('🔧 Email service result:', emailResult);
@@ -112,7 +124,7 @@ class UserService {
           note: 'Email service not available'
         };
       }
-      
+
       // Return user without password (return original email for display)
       const response = {
         id: user.id,
@@ -125,17 +137,17 @@ class UserService {
         emailVerified: false,
         verificationEmailSent: emailResult ? emailResult.success : false
       };
-  
+
       // Add note if email failed
       if (emailResult && !emailResult.success) {
         response.note = emailResult.error || 'Verification email not sent';
       }
-  
+
       return response;
-  
+
     } catch (error) {
       console.error('❌ createUser error:', error);
-      
+
       // Handle specific errors
       if (error.message === 'EMAIL_EXISTS') {
         throw new Error('User already exists with this email address');
@@ -143,7 +155,7 @@ class UserService {
       if (error.message === 'PHONE_EXISTS') {
         throw new Error('User already exists with this phone number');
       }
-      
+
       throw error;
     }
   }
@@ -151,10 +163,10 @@ class UserService {
   async createUserWithProfile(userData) {
     try {
       console.log('🔧 createUserWithProfile called with:', { ...userData, password: '[HIDDEN]' });
-      
+
       const { email, password, name, phone, role, address, businessName, location } = userData;
       const normalizedEmail = email.toLowerCase().trim();
-    
+
       // ✅ Check for existing user with normalized email
       const existingEmailUser = await prisma.user.findFirst({
         where: {
@@ -164,20 +176,20 @@ class UserService {
           }
         }
       });
-      
+
       if (existingEmailUser) {
         console.log('❌ Email already exists:', normalizedEmail);
         throw new Error('EMAIL_EXISTS');
       }
-      
-      
+
+
       const passwordHash = await hashPassword(password);
-      
+
       console.log('🔧 Starting database transaction for profile creation...');
-      
+
       const user = await prisma.$transaction(async (tx) => {
         console.log('🔧 Inside profile transaction - creating user...');
-        
+
         // ✅ FIX: Store normalized email
         const newUser = await tx.user.create({
           data: {
@@ -215,16 +227,16 @@ class UserService {
 
         return newUser;
       });
-      
+
       console.log('✅ Profile transaction completed successfully');
-      
+
       // Email verification integration
       let emailResult;
       try {
         console.log('🔧 Loading email verification service for profile creation...');
         const emailVerificationService = require('./emailVerificationService');
         console.log('✅ Email verification service loaded');
-        
+
         console.log('🔧 Sending verification email...');
         emailResult = await emailVerificationService.sendVerificationEmail(user);
         console.log('🔧 Email service result:', emailResult);
@@ -235,7 +247,7 @@ class UserService {
           error: emailError.message
         };
       }
-      
+
       // Return user with profile information
       const response = {
         id: user.id,
@@ -263,13 +275,13 @@ class UserService {
       throw error;
     }
   }
-  
+
   async findUserByEmail(email) {
     try {
       // ✅ FIX: Normalize email for querying
       const normalizedEmail = email.toLowerCase().trim();
       console.log('🔧 findUserByEmail called for:', { original: email, normalized: normalizedEmail });
-      
+
       return await prisma.user.findUnique({
         where: { email: normalizedEmail }, // Query with normalized email
         select: {
@@ -302,7 +314,7 @@ class UserService {
       throw error;
     }
   }
-  
+
   // In your backend userService - UPDATE getUserById
   async getUserById(id) {
     try {
@@ -335,13 +347,13 @@ class UserService {
           }
         }
       });
-  
+
       console.log('🔧 getUserById result:', {
         id: user?.id,
         hasAvatar: !!user?.avatarUrl,
         avatarUrl: user?.avatarUrl
       });
-  
+
       return user;
     } catch (error) {
       console.error('Error in getUserById:', error);
@@ -362,7 +374,7 @@ class UserService {
     try {
       // ✅ FIX: Normalize email for authentication
       const normalizedEmail = email.toLowerCase().trim();
-      
+
       return await prisma.user.findUnique({
         where: { email: normalizedEmail }, // Query with normalized email
         include: {
@@ -375,21 +387,21 @@ class UserService {
       throw error;
     }
   }
-async hashPassword(password) {
-  try {
-    const bcrypt = require('bcryptjs');
-    const saltRounds = 12;
-    return await bcrypt.hash(password, saltRounds);
-  } catch (error) {
-    console.error('❌ Password hashing error:', error);
-    throw error;
+  async hashPassword(password) {
+    try {
+      const bcrypt = require('bcryptjs');
+      const saltRounds = 12;
+      return await bcrypt.hash(password, saltRounds);
+    } catch (error) {
+      console.error('❌ Password hashing error:', error);
+      throw error;
+    }
   }
-}
 
   async updateUserProfile(userId, updateData) {
     try {
       const { name, phone, address, languagePreference } = updateData;
-      
+
       return await prisma.user.update({
         where: { id: userId },
         data: {

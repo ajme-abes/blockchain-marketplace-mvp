@@ -3,79 +3,80 @@ const { prisma } = require('../config/database');
 const { DeliveryStatus } = require('@prisma/client');
 
 class OrderService {
-async createOrder(orderData, userId) { // Add userId parameter
-  const { items, shippingAddress, totalAmount } = orderData;
-  // Get buyer ID from user ID
-  const buyer = await prisma.buyer.findUnique({
-    where: { userId: userId }
-  });
-  
-  if (!buyer) {
-    throw new Error('Buyer profile not found');
-  }
-  
-  const buyerId = buyer.id;
+  async createOrder(orderData, userId) { // Add userId parameter
+    const { items, shippingAddress, totalAmount } = orderData;
+    // Get buyer ID from user ID
+    const buyer = await prisma.buyer.findUnique({
+      where: { userId: userId }
+    });
 
-  console.log('🔧 Creating order for buyer:', buyerId);
-  console.log('🔧 Order items:', items);
-
-  // Start transaction to ensure data consistency
-  const order = await prisma.$transaction(async (tx) => {
-    // 1. Verify all products exist and have sufficient quantity
-    for (const item of items) {
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
-        select: { id: true, name: true, quantityAvailable: true, price: true }
-      });
-
-      if (!product) {
-        throw new Error(`Product not found: ${item.productId}`);
-      }
-
-      if (product.quantityAvailable < item.quantity) {
-        throw new Error(`Insufficient quantity for ${product.name}. Available: ${product.quantityAvailable}, Requested: ${item.quantity}`);
-      }
+    if (!buyer) {
+      throw new Error('Buyer profile not found');
     }
 
-    // 2. Create the order
-    const newOrder = await tx.order.create({
-      data: {
-        buyerId,
-        totalAmount,
-        shippingAddress: shippingAddress || {},
-        orderItems: {
-          create: items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.price * item.quantity
-          }))
+    const buyerId = buyer.id;
+
+    console.log('🔧 Creating order for buyer:', buyerId);
+    console.log('🔧 Order items:', items);
+
+    // Start transaction to ensure data consistency
+    const order = await prisma.$transaction(async (tx) => {
+      // 1. Verify all products exist and have sufficient quantity
+      for (const item of items) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { id: true, name: true, quantityAvailable: true, price: true }
+        });
+
+        if (!product) {
+          throw new Error(`Product not found: ${item.productId}`);
         }
-      },
-      include: {
-        buyer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true
-              }
-            }
+
+        if (product.quantityAvailable < item.quantity) {
+          throw new Error(`Insufficient quantity for ${product.name}. Available: ${product.quantityAvailable}, Requested: ${item.quantity}`);
+        }
+      }
+
+      // 2. Create the order
+      const newOrder = await tx.order.create({
+        data: {
+          buyerId,
+          totalAmount,
+          shippingAddress: shippingAddress || {},
+          orderItems: {
+            create: items.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.price * item.quantity
+            }))
           }
         },
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                producer: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        email: true
+        include: {
+          buyer: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true
+                }
+              }
+            }
+          },
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  producer: {
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true
+                        }
                       }
                     }
                   }
@@ -84,37 +85,51 @@ async createOrder(orderData, userId) { // Add userId parameter
             }
           }
         }
-      }
-    });
+      });
 
-    // 3. Create initial status history record - FIXED
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId: newOrder.id,
-        fromStatus: 'PENDING',
-        toStatus: 'PENDING',
-        changedById: userId, // Use the authenticated user's ID
-        reason: 'Order created'
-      }
-    });
-
-    // 4. Update product quantities
-    for (const item of items) {
-      await tx.product.update({
-        where: { id: item.productId },
+      // 3. Create initial status history record - FIXED
+      await tx.orderStatusHistory.create({
         data: {
-          quantityAvailable: {
-            decrement: item.quantity
-          }
+          orderId: newOrder.id,
+          fromStatus: 'PENDING',
+          toStatus: 'PENDING',
+          changedById: userId, // Use the authenticated user's ID
+          reason: 'Order created'
         }
       });
+
+      // 4. Update product quantities
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            quantityAvailable: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+
+      return newOrder;
+    });
+
+    // 5. ✅ NEW: Calculate producer splits and create OrderProducer records
+    try {
+      const payoutService = require('./payoutService');
+      const splitResult = await payoutService.calculateProducerSplits(order.id, order.orderItems);
+
+      if (splitResult.success) {
+        console.log(`✅ Producer splits calculated: ${splitResult.producers.length} producers, ${splitResult.totalCommission} ETB commission`);
+      } else {
+        console.error('⚠️ Failed to calculate producer splits:', splitResult.error);
+      }
+    } catch (splitError) {
+      console.error('⚠️ Error calculating producer splits:', splitError);
+      // Don't fail order creation if split calculation fails
     }
 
-    return newOrder;
-  });
-
-  return this.formatOrderResponse(order);
-}
+    return this.formatOrderResponse(order);
+  }
 
   async getOrderById(id) {
     const order = await prisma.order.findUnique({
@@ -143,6 +158,23 @@ async createOrder(orderData, userId) { // Add userId parameter
                         id: true,
                         name: true,
                         email: true
+                      }
+                    }
+                  }
+                },
+                // Include multi-producer information
+                productProducers: {
+                  include: {
+                    producer: {
+                      select: {
+                        id: true,
+                        businessName: true,
+                        user: {
+                          select: {
+                            name: true,
+                            email: true
+                          }
+                        }
                       }
                     }
                   }
@@ -310,9 +342,35 @@ async createOrder(orderData, userId) { // Add userId parameter
                         }
                       }
                     }
+                  },
+                  // Include multi-producer information
+                  productProducers: {
+                    include: {
+                      producer: {
+                        select: {
+                          id: true,
+                          businessName: true,
+                          user: {
+                            select: {
+                              name: true,
+                              email: true
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
+            }
+          },
+          // Include payout information for this producer
+          orderProducers: {
+            where: { producerId },
+            select: {
+              payoutStatus: true,
+              paidAt: true,
+              payoutReference: true
             }
           },
           statusHistory: {
@@ -342,7 +400,47 @@ async createOrder(orderData, userId) { // Add userId parameter
       })
     ]);
 
-    const formattedOrders = orders.map(order => this.formatOrderResponse(order));
+    // Calculate producer shares and format response
+    const formattedOrders = orders.map(order => {
+      const producerShare = this.calculateProducerShare(order, producerId);
+      const isSharedProduct = this.hasSharedProducts(order);
+      const allProducers = this.getAllProducersForOrder(order, producerId);
+
+      // Get payout information for this producer
+      const orderProducer = order.orderProducers?.[0];
+      const payoutStatus = orderProducer?.payoutStatus || 'PENDING';
+      const paidAt = orderProducer?.paidAt;
+      const payoutReference = orderProducer?.payoutReference;
+
+      return {
+        ...this.formatOrderResponse(order),
+        producerShare: producerShare,
+        isSharedProduct: isSharedProduct,
+        allProducers: allProducers,
+        // Add payout information
+        payoutStatus: payoutStatus,
+        paidAt: paidAt,
+        payoutReference: payoutReference,
+        payoutScheduledFor: this.getNextPayoutDate(), // Calculate next payout date
+        items: order.orderItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+          producerShare: this.calculateItemProducerShare(item, producerId),
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            price: item.price,
+            producer: item.product.producer ? {
+              id: item.product.producer.id,
+              businessName: item.product.producer.businessName,
+              user: item.product.producer.user
+            } : null,
+            producers: this.formatProductProducers(item.product)
+          }
+        }))
+      };
+    });
 
     return {
       orders: formattedOrders,
@@ -560,68 +658,68 @@ async createOrder(orderData, userId) { // Add userId parameter
   }
 
   // Add to your existing orderService.js
-async validateOrderForDispute(orderId, userId) {
-  try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        buyer: {
-          include: {
-            user: true
-          }
-        },
-        orderItems: {
-          include: {
-            product: {
-              include: {
-                producer: {
-                  include: {
-                    user: true
+  async validateOrderForDispute(orderId, userId) {
+    try {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          buyer: {
+            include: {
+              user: true
+            }
+          },
+          orderItems: {
+            include: {
+              product: {
+                include: {
+                  producer: {
+                    include: {
+                      user: true
+                    }
                   }
                 }
               }
             }
           }
         }
+      });
+
+      if (!order) {
+        return { valid: false, error: 'Order not found' };
       }
-    });
 
-    if (!order) {
-      return { valid: false, error: 'Order not found' };
+      // Check if user is involved in the order
+      const isBuyer = order.buyer.userId === userId;
+      const isProducer = order.orderItems.some(item =>
+        item.product.producer.userId === userId
+      );
+
+      if (!isBuyer && !isProducer) {
+        return { valid: false, error: 'You are not authorized to raise a dispute for this order' };
+      }
+
+      // Check if order is in a state that allows disputes
+      const allowedStatuses = ['CONFIRMED', 'SHIPPED', 'DELIVERED'];
+      if (!allowedStatuses.includes(order.deliveryStatus)) {
+        return { valid: false, error: 'Disputes can only be raised for confirmed, shipped, or delivered orders' };
+      }
+
+      // Check if dispute already exists
+      const existingDispute = await prisma.dispute.findUnique({
+        where: { orderId }
+      });
+
+      if (existingDispute) {
+        return { valid: false, error: 'A dispute already exists for this order' };
+      }
+
+      return { valid: true, order };
+
+    } catch (error) {
+      console.error('Validate order for dispute error:', error);
+      return { valid: false, error: error.message };
     }
-
-    // Check if user is involved in the order
-    const isBuyer = order.buyer.userId === userId;
-    const isProducer = order.orderItems.some(item => 
-      item.product.producer.userId === userId
-    );
-
-    if (!isBuyer && !isProducer) {
-      return { valid: false, error: 'You are not authorized to raise a dispute for this order' };
-    }
-
-    // Check if order is in a state that allows disputes
-    const allowedStatuses = ['CONFIRMED', 'SHIPPED', 'DELIVERED'];
-    if (!allowedStatuses.includes(order.deliveryStatus)) {
-      return { valid: false, error: 'Disputes can only be raised for confirmed, shipped, or delivered orders' };
-    }
-
-    // Check if dispute already exists
-    const existingDispute = await prisma.dispute.findUnique({
-      where: { orderId }
-    });
-
-    if (existingDispute) {
-      return { valid: false, error: 'A dispute already exists for this order' };
-    }
-
-    return { valid: true, order };
-
-  } catch (error) {
-    console.error('Validate order for dispute error:', error);
-    return { valid: false, error: error.message };
   }
-}
 
   // Helper function to map string status to Prisma enum
   mapStatusToEnum(status) {
@@ -631,7 +729,7 @@ async validateOrderForDispute(orderId, userId) {
       throw new Error(`Invalid delivery status: ${status}`);
     }
 
-    return DeliveryStatus[upper]; 
+    return DeliveryStatus[upper];
   }
 
   formatOrderResponse(order) {
@@ -657,7 +755,9 @@ async validateOrderForDispute(orderId, userId) {
             id: item.product.producer.id,
             businessName: item.product.producer.businessName,
             user: item.product.producer.user
-          } : null
+          } : null,
+          // Add producers array for multi-producer support
+          producers: this.formatProductProducers(item.product)
         },
         quantity: item.quantity,
         subtotal: item.subtotal
@@ -673,6 +773,129 @@ async validateOrderForDispute(orderId, userId) {
       createdAt: order.orderDate,
       updatedAt: order.updatedAt
     };
+  }
+
+  // Format producers array for frontend
+  formatProductProducers(product) {
+    // If product has multiple producers, use productProducers
+    if (product.productProducers && product.productProducers.length > 0) {
+      return product.productProducers.map(pp => ({
+        id: pp.producer.id,
+        businessName: pp.producer.businessName,
+        sharePercentage: pp.sharePercentage,
+        role: pp.role
+      }));
+    }
+
+    // Otherwise, return single producer (backward compatibility)
+    if (product.producer) {
+      return [{
+        id: product.producer.id,
+        businessName: product.producer.businessName,
+        sharePercentage: 100 // Single producer gets 100%
+      }];
+    }
+
+    return [];
+  }
+
+  // Calculate producer's share from an order
+  calculateProducerShare(order, producerId) {
+    let totalShare = 0;
+
+    for (const item of order.orderItems) {
+      const itemTotal = item.subtotal;
+      const producerPercentage = this.getProducerPercentage(item.product, producerId);
+      const producerItemShare = itemTotal * (producerPercentage / 100);
+
+      // Apply 10% platform commission
+      const netShare = producerItemShare * 0.9;
+      totalShare += netShare;
+    }
+
+    return totalShare;
+  }
+
+  // Get producer's percentage for a product
+  getProducerPercentage(product, producerId) {
+    // Check if product has multiple producers
+    if (product.productProducers && product.productProducers.length > 0) {
+      const producerEntry = product.productProducers.find(
+        pp => pp.producerId === producerId
+      );
+      return producerEntry ? producerEntry.sharePercentage : 0;
+    }
+
+    // Single producer gets 100%
+    if (product.producerId === producerId) {
+      return 100;
+    }
+
+    return 0;
+  }
+
+  // Check if order has shared products
+  hasSharedProducts(order) {
+    return order.orderItems.some(item =>
+      item.product.productProducers &&
+      item.product.productProducers.length > 1
+    );
+  }
+
+  // Get all producers for an order
+  getAllProducersForOrder(order, currentProducerId) {
+    const producersMap = new Map();
+
+    for (const item of order.orderItems) {
+      const product = item.product;
+
+      if (product.productProducers && product.productProducers.length > 0) {
+        // Multi-producer product
+        for (const pp of product.productProducers) {
+          if (!producersMap.has(pp.producerId)) {
+            const itemTotal = item.subtotal;
+            const producerShare = itemTotal * (pp.sharePercentage / 100);
+            const netShare = producerShare * 0.9; // After 10% commission
+
+            producersMap.set(pp.producerId, {
+              id: pp.producerId,
+              businessName: pp.producer.businessName,
+              sharePercentage: pp.sharePercentage,
+              shareAmount: netShare,
+              role: pp.role
+            });
+          }
+        }
+      }
+    }
+
+    return Array.from(producersMap.values());
+  }
+
+  // Calculate producer's share for a single item
+  calculateItemProducerShare(item, producerId) {
+    const itemTotal = item.subtotal;
+    const producerPercentage = this.getProducerPercentage(item.product, producerId);
+    const producerItemShare = itemTotal * (producerPercentage / 100);
+
+    // Apply 10% platform commission
+    return producerItemShare * 0.9;
+  }
+
+  // Calculate next payout date (weekly payout on Fridays)
+  getNextPayoutDate() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 5 = Friday
+
+    // Calculate days until next Friday
+    let daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    if (daysUntilFriday === 0) daysUntilFriday = 7; // If today is Friday, next Friday
+
+    const nextFriday = new Date(today);
+    nextFriday.setDate(today.getDate() + daysUntilFriday);
+    nextFriday.setHours(0, 0, 0, 0);
+
+    return nextFriday.toISOString();
   }
 }
 

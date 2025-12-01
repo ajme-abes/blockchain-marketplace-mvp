@@ -90,9 +90,9 @@ router.post('/record-transaction', async (req, res) => {
 router.get('/transaction/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
     const result = await blockchainService.getTransaction(orderId);
-    
+
     if (result.success) {
       res.json({
         status: 'success',
@@ -118,24 +118,47 @@ router.get('/transaction/:orderId', async (req, res) => {
 router.get('/verify/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
+    console.log('🔍 Verifying transaction for order:', orderId);
+
     const verification = await blockchainService.verifyTransaction(orderId);
-    
+
+    console.log('✅ Verification result:', verification);
+
+    // Handle mock/disconnected blockchain
+    if (verification.isMock) {
+      return res.json({
+        status: 'success',
+        data: {
+          verified: false,
+          transaction: null,
+          message: 'Blockchain service is not connected. Transaction recording is in progress.',
+          isMock: true
+        }
+      });
+    }
+
     res.json({
       status: 'success',
       data: {
         verified: verification.exists,
-        transaction: verification.exists ? verification : null,
-        message: verification.exists 
-          ? 'Transaction verified on blockchain' 
-          : 'Transaction not found on blockchain'
+        transaction: verification.exists ? {
+          orderId: verification.orderId,
+          txHash: verification.txHash,
+          timestamp: verification.timestamp,
+          isVerified: verification.isVerified
+        } : null,
+        message: verification.exists
+          ? 'Transaction verified on Polygon blockchain'
+          : verification.error || 'Transaction not found on blockchain. It may still be processing.'
       }
     });
   } catch (error) {
+    console.error('❌ Blockchain verification error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to verify transaction',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Verification service temporarily unavailable'
     });
   }
 });
@@ -144,7 +167,7 @@ router.get('/verify/:orderId', async (req, res) => {
 router.get('/user/:address/transactions', async (req, res) => {
   try {
     const { address } = req.params;
-    
+
     // Validate Ethereum address
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
     if (!ethAddressRegex.test(address)) {
@@ -153,9 +176,9 @@ router.get('/user/:address/transactions', async (req, res) => {
         message: 'Invalid Ethereum address format'
       });
     }
-    
+
     const result = await blockchainService.getUserTransactions(address);
-    
+
     if (result.success) {
       res.json({
         status: 'success',
@@ -181,7 +204,7 @@ router.get('/user/:address/transactions', async (req, res) => {
 router.get('/producer/:address/transactions', async (req, res) => {
   try {
     const { address } = req.params;
-    
+
     // Validate Ethereum address
     const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
     if (!ethAddressRegex.test(address)) {
@@ -190,9 +213,9 @@ router.get('/producer/:address/transactions', async (req, res) => {
         message: 'Invalid Ethereum address format'
       });
     }
-    
+
     const result = await blockchainService.getProducerTransactions(address);
-    
+
     if (result.success) {
       res.json({
         status: 'success',
@@ -218,7 +241,7 @@ router.get('/producer/:address/transactions', async (req, res) => {
 router.get('/stats/count', async (req, res) => {
   try {
     const result = await blockchainService.getTransactionCount();
-    
+
     res.json({
       status: 'success',
       data: result
@@ -237,7 +260,7 @@ router.get('/contract/owner', async (req, res) => {
   try {
     const isOwner = await blockchainService.isContractOwner();
     const status = await blockchainService.getBlockchainStatus();
-    
+
     res.json({
       status: 'success',
       data: {
@@ -258,15 +281,15 @@ router.get('/contract/owner', async (req, res) => {
 // TEST ROUTES - Updated for new contract
 router.post('/test/record-mock', async (req, res) => {
   try {
-    const { 
-      orderId, 
-      paymentReference, 
-      amountETB, 
-      buyer, 
-      producer, 
-      txHash 
+    const {
+      orderId,
+      paymentReference,
+      amountETB,
+      buyer,
+      producer,
+      txHash
     } = req.body;
-    
+
     const result = await blockchainService.recordTransaction({
       orderId: orderId || 'test-order-' + Date.now(),
       paymentReference: paymentReference || 'test-ref-' + Math.random().toString(36).substring(7),
@@ -293,7 +316,7 @@ router.get('/test/verify/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     const result = await blockchainService.verifyTransaction(orderId);
-    
+
     res.json({
       status: 'success',
       data: result
@@ -311,7 +334,7 @@ router.get('/test/user/:address/transactions', async (req, res) => {
   try {
     const { address } = req.params;
     const result = await blockchainService.getUserTransactions(address);
-    
+
     res.json({
       status: 'success',
       data: result
@@ -329,7 +352,7 @@ router.get('/test/producer/:address/transactions', async (req, res) => {
   try {
     const { address } = req.params;
     const result = await blockchainService.getProducerTransactions(address);
-    
+
     res.json({
       status: 'success',
       data: result
@@ -381,7 +404,7 @@ router.post('/order/:orderId/record', async (req, res) => {
 router.get('/order/:orderId/blockchain-status', async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       select: {

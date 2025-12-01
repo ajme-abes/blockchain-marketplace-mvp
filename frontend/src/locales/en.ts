@@ -1,0 +1,231 @@
+export const en = {
+    // Navigation
+    'nav.home': 'Home',
+    'nav.marketplace': 'Marketplace',
+    'nav.contact': 'Contact',
+    'nav.about': 'About',
+    'nav.login': 'Login',
+    'nav.register': 'Register',
+    'nav.dashboard': 'Dashboard',
+    'nav.profile': 'Profile',
+    'nav.settings': 'Settings',
+    'nav.logout': 'Logout',
+    'nav.notifications': 'Notifications',
+    'nav.cart': 'Cart',
+    'nav.viewAllNotifications': 'View all notifications',
+    'nav.markAllAsRead': 'Mark all as read',
+
+    // Hero Section
+    'hero.title': 'Empowering Ethiopian Producers & Buyers',
+    'hero.subtitle': 'Transparent, fair, and blockchain-powered marketplace connecting you directly with local producers',
+    'hero.cta': 'Explore Marketplace',
+
+    // Common
+    'common.buyNow': 'Buy Now',
+    'common.learnMore': 'Learn More',
+    'common.save': 'Save',
+    'common.cancel': 'Cancel',
+    'common.delete': 'Delete',
+    'common.edit': 'Edit',
+    'common.view': 'View',
+    'common.search': 'Search',
+    'common.filter': 'Filter',
+    'common.loading': 'Loading...',
+    'common.error': 'Error',
+    'common.success': 'Success',
+    'common.submit': 'Submit',
+    'common.close': 'Close',
+    'common.back': 'Back',
+    'common.next': 'Next',
+    'common.previous': 'Previous',
+    'common.viewAll': 'View All',
+
+    // Currency
+    'currency': 'ETB',
+    'currency.symbol': 'Br',
+
+    // Featured Products
+    'featured.title': 'Featured Products',
+    'featured.viewAll': 'View All Products',
+
+    // Testimonials
+    'testimonials.title': 'What People Say',
+
+    // About
+    'about.title': 'About EthioTrust',
+    'about.description': 'EthioTrust is a blockchain-powered marketplace connecting Ethiopian producers with buyers.',
+
+    // Footer
+    'footer.quickLinks': 'Quick Links',
+    'footer.paymentPartners': 'Payment Partners',
+    'footer.newsletter': 'Newsletter',
+    'footer.copyright': '© 2024 EthioTrust. All rights reserved.',
+
+    // Settings
+    'settings.title': 'Settings',
+    'settings.appearance': 'Appearance',
+    'settings.appearance.desc': 'Customize how EthioTrust looks',
+    'settings.darkMode': 'Dark Mode',
+    'settings.darkMode.desc': 'Switch between light and dark theme',
+    'settings.language': 'Language',
+    'settings.language.desc': 'Choose your preferred language',
+    'settings.language.current': 'Currently',
+    'settings.language.select': 'Select Language',
+    'settings.notifications': 'Notifications',
+    'settings.notifications.desc': 'Manage your notification preferences',
+    'settings.notifications.email': 'Email Notifications',
+    'settings.notifications.email.desc': 'Receive updates via email',
+    'settings.notifications.push': 'Push Notifications',
+    'settings.notifications.push.desc': 'Receive push notifications in browser',
+    'settings.notifications.sms': 'SMS Notifications',
+    'settings.notifications.sms.desc': 'Receive important updates via SMS',
+    'settings.security': 'Security',
+    'settings.security.desc': 'Manage your password and security settings',
+    'settings.security.currentPassword': 'Current Password',
+    'settings.security.newPassword': 'New Password',
+    'settings.security.confirmPassword': 'Confirm New Password',
+    'settings.security.updatePassword': 'Update Password',
+    'settings.dangerZone': 'Danger Zone',
+    'settings.dangerZone.desc': 'Irreversible account actions',
+
+    // Languages
+    'language.english': 'English',
+    'language.amharic': 'Amharic',
+    'language.oromo': 'Oromo',
+
+    // Auth
+    'auth.login': 'Login',
+    'auth.register': 'Register',
+    'auth.logout': 'Logout',
+    'auth.email': 'Email',
+    'auth.password': 'Password',
+    'auth.forgotPassword': 'Forgot Password?',
+    'auth.rememberMe': 'Remember Me',
+    'auth.noAccount': "Don't have an account?",
+    'auth.hasAccount': 'Already have an account?',
+
+    // Toast Messages
+    'toast.passwordUpdated': 'Password Updated',
+    'toast.passwordUpdated.desc': 'Your password has been successfully changed.',
+    'toast.passwordMismatch': 'Passwords do not match',
+    'toast.passwordMismatch.desc': 'New passwords do not match.',
+    'toast.loggedOut': 'Logged Out',
+    'toast.loggedOut.desc': 'You have been successfully logged out.',
+    'toast.languageChanged': 'Language Changed',
+    'toast.languageChanged.desc': 'Your language preference has been updated.',
+
+    // Products
+    'product.addToCart': 'Add to Cart',
+    'product.outOfStock': 'Out of Stock',
+    'product.inStock': 'In Stock',
+
+    // Notifications
+    'notification.newOrder': 'New order received',
+    'notification.payment': 'Payment received',
+    'notification.review': 'Product review',
+
+    // Sidebar Navigation
+    'sidebar.navigation': 'Navigation',
+    'sidebar.dashboard': 'Dashboard',
+    'sidebar.profile': 'Profile',
+    'sidebar.settings': 'Settings',
+    'sidebar.aboutUs': 'About Us',
+    'sidebar.marketplace': 'Marketplace',
+    'sidebar.chats': 'Chats',
+    'sidebar.systemMonitor': 'System Monitor',
+
+    // Sidebar - Producer
+    'sidebar.producer.title': 'Business Tools',
+    'sidebar.producer.myProducts': 'My Products',
+    'sidebar.producer.orderManagement': 'Order Management',
+    'sidebar.producer.customerReviews': 'Customer Reviews',
+    'sidebar.producer.transactionHistory': 'Transaction History',
+    'sidebar.producer.salesAnalytics': 'Sales Analytics',
+    'sidebar.producer.storeSettings': 'Store Settings',
+    'sidebar.producer.myDisputes': 'My Disputes',
+
+    // Sidebar - Buyer
+    'sidebar.buyer.title': 'My Activity',
+    'sidebar.buyer.myOrders': 'My Orders',
+    'sidebar.buyer.purchaseHistory': 'Purchase History',
+    'sidebar.buyer.myDisputes': 'My Disputes',
+
+    // Sidebar - Admin
+    'sidebar.admin.title': 'Admin Controls',
+    'sidebar.admin.userManagement': 'User Management',
+    'sidebar.admin.productManagement': 'Product Management',
+    'sidebar.admin.orderManagement': 'Order Management',
+    'sidebar.admin.producerPayouts': 'Producer Payouts',
+    'sidebar.admin.disputeManagement': 'Dispute Management',
+    'sidebar.admin.systemAnalytics': 'System Analytics',
+    'sidebar.admin.auditLogs': 'Audit Logs',
+    'sidebar.admin.systemSettings': 'System Settings',
+
+    // Producer Dashboard
+    'producer.dashboard.title': 'Producer Dashboard',
+    'producer.dashboard.subtitle': 'Manage your products and track business performance',
+    'producer.dashboard.welcome': 'Welcome back',
+    'producer.dashboard.todayActivity': "Here's what's happening with your business today.",
+    'producer.dashboard.loadingDashboard': 'Loading dashboard...',
+    'producer.dashboard.totalProducts': 'Total Products',
+    'producer.dashboard.activeListings': 'Active listings',
+    'producer.dashboard.pendingOrders': 'Pending Orders',
+    'producer.dashboard.awaitingProcessing': 'Awaiting processing',
+    'producer.dashboard.totalEarnings': 'Total Earnings',
+    'producer.dashboard.allTimeRevenue': 'All time revenue',
+    'producer.dashboard.growth': 'Growth',
+    'producer.dashboard.thisMonth': 'This month',
+    'producer.dashboard.recentOrders': 'Recent Orders',
+    'producer.dashboard.latestCustomerOrders': 'Latest customer orders',
+    'producer.dashboard.noOrdersYet': 'No orders yet',
+    'producer.dashboard.promoteProducts': 'Promote Your Products',
+    'producer.dashboard.quickActions': 'Quick Actions',
+    'producer.dashboard.manageBusiness': 'Manage your business',
+    'producer.dashboard.manageProducts': 'Manage Products',
+    'producer.dashboard.viewOrders': 'View Orders',
+    'producer.dashboard.viewAllOrders': 'View All Orders',
+    'producer.dashboard.addProduct': 'Add Product',
+    'producer.dashboard.analytics': 'Analytics',
+    'producer.dashboard.transactions': 'Transactions',
+    'producer.dashboard.bankAccounts': 'Bank Accounts',
+    'producer.dashboard.moreItems': 'more',
+    'producer.dashboard.errorLoading': 'Failed to load dashboard data',
+
+    // Login Page
+    'login.welcomeBack': 'Welcome Back!',
+    'login.signInToAccount': 'Sign in to your EthioTrust account',
+    'login.emailLabel': 'Email',
+    'login.emailPlaceholder': 'you@example.com',
+    'login.passwordLabel': 'Password',
+    'login.passwordPlaceholder': '••••••••',
+    'login.rememberMe': 'Remember me',
+    'login.forgotPassword': 'Forgot password?',
+    'login.signIn': 'Sign In',
+    'login.signingIn': 'Signing in...',
+    'login.noAccount': "Don't have an account?",
+    'login.joinNow': 'Join now',
+    'login.backToHome': 'Back to home',
+    'login.success': 'Login successful! Welcome back! 🎉',
+    'login.failed': 'Login failed. Please try again.',
+
+    // Register Page
+    'register.createAccount': 'Create Account',
+    'register.joinEthioTrust': 'Join EthioTrust marketplace',
+    'register.fullName': 'Full Name',
+    'register.fullNamePlaceholder': 'John Doe',
+    'register.phoneNumber': 'Phone Number',
+    'register.phoneNumberPlaceholder': '+251 912 345 678',
+    'register.selectRole': 'Select Role',
+    'register.buyer': 'Buyer',
+    'register.producer': 'Producer',
+    'register.buyerDesc': 'I want to buy products',
+    'register.producerDesc': 'I want to sell products',
+    'register.createAccountButton': 'Create Account',
+    'register.creating': 'Creating account...',
+    'register.hasAccount': 'Already have an account?',
+    'register.signIn': 'Sign in',
+    'register.success': 'Account created successfully! Welcome! 🎉',
+    'register.failed': 'Registration failed. Please try again.',
+};
+
+export type TranslationKeys = keyof typeof en;

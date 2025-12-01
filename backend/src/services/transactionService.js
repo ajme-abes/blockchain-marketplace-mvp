@@ -61,7 +61,7 @@ class TransactionService {
         orders.map(async (order) => {
           // Get blockchain status using the same logic as OrderDetail
           const blockchainStatus = await this.getTransactionBlockchainStatus(order.id);
-  
+
           return {
             id: `TXN-${order.id.slice(-8)}`,
             orderId: order.id,
@@ -84,7 +84,7 @@ class TransactionService {
           };
         })
       );
-  
+
 
       // Calculate statistics
       const stats = {
@@ -115,9 +115,9 @@ class TransactionService {
   async getBlockchainTransactionDetails(orderId) {
     try {
       console.log('🔗 Fetching blockchain details for order:', orderId);
-      
+
       const blockchainService = require('./blockchainService');
-      
+
       // Get order with blockchain records
       const order = await prisma.order.findUnique({
         where: { id: orderId },
@@ -128,25 +128,25 @@ class TransactionService {
           }
         }
       });
-  
+
       if (!order || !order.blockchainRecords.length) {
         return {
           success: false,
           error: 'No blockchain record found'
         };
       }
-  
+
       const blockchainRecord = order.blockchainRecords[0];
-      
+
       // Verify the transaction on blockchain
       const verification = await blockchainService.verifyTransaction(blockchainRecord.txHash);
-      
+
       return {
         success: true,
         blockchainRecord,
         verification
       };
-  
+
     } catch (error) {
       console.error('Get blockchain details error:', error);
       return {
@@ -158,7 +158,7 @@ class TransactionService {
   async getTransactionBlockchainStatus(orderId) {
     try {
       console.log('🔗 Checking blockchain status for order:', orderId);
-      
+
       const order = await prisma.order.findUnique({
         where: { id: orderId },
         select: {
@@ -167,14 +167,14 @@ class TransactionService {
           paymentStatus: true
         }
       });
-  
+
       if (!order) {
         return {
           verified: false,
           status: 'order_not_found'
         };
       }
-  
+
       // Use the same logic as OrderDetail
       if (order.blockchainTxHash && order.blockchainRecorded) {
         return {
@@ -196,7 +196,7 @@ class TransactionService {
           message: 'Awaiting payment confirmation'
         };
       }
-  
+
     } catch (error) {
       console.error('Get blockchain status error:', error);
       return {
@@ -206,7 +206,7 @@ class TransactionService {
       };
     }
   }
-  
+
 
   // Get producer sales history
   async getProducerTransactions(producerId, filters = {}) {
@@ -286,15 +286,23 @@ class TransactionService {
       // Format sales transactions
       const transactions = await Promise.all(
         orders.map(async (order) => {
-          const producerItems = order.orderItems.filter(item => 
+          const producerItems = order.orderItems.filter(item =>
             productIds.includes(item.productId)
           );
-          
+
           const totalAmount = producerItems.reduce((sum, item) => sum + item.subtotal, 0);
-          
+
           // Get blockchain status using the same logic as OrderDetail
           const blockchainStatus = await this.getTransactionBlockchainStatus(order.id);
-  
+
+          // Get payout status from OrderProducer
+          const orderProducer = await prisma.orderProducer.findFirst({
+            where: {
+              orderId: order.id,
+              producerId: producerId
+            }
+          });
+
           return {
             id: `TXN-${order.id.slice(-8)}`,
             orderId: order.id,
@@ -313,16 +321,20 @@ class TransactionService {
             blockchainTxHash: order.blockchainTxHash,
             blockchainRecorded: order.blockchainRecorded,
             blockchainStatus: blockchainStatus,
-            confirmedAt: order.paymentConfirmations[0]?.confirmedAt
+            confirmedAt: order.paymentConfirmations[0]?.confirmedAt,
+            // Add payout information
+            payoutStatus: orderProducer?.payoutStatus || 'PENDING',
+            paidAt: orderProducer?.paidAt,
+            payoutReference: orderProducer?.payoutReference
           };
         })
       );
-  
+
       // Calculate sales statistics
       const confirmedOrders = orders.filter(o => o.paymentStatus === 'CONFIRMED');
       const stats = {
         totalRevenue: confirmedOrders.reduce((sum, order) => {
-          const producerItems = order.orderItems.filter(item => 
+          const producerItems = order.orderItems.filter(item =>
             productIds.includes(item.productId)
           );
           return sum + producerItems.reduce((itemSum, item) => itemSum + item.subtotal, 0);
@@ -371,7 +383,7 @@ class TransactionService {
       // Calculate date range based on period
       const now = new Date();
       let startDate;
-      
+
       switch (period) {
         case 'week':
           startDate = new Date(now.setDate(now.getDate() - 7));
@@ -416,7 +428,7 @@ class TransactionService {
       orders.forEach(order => {
         const date = new Date(order.orderDate);
         let key;
-        
+
         switch (period) {
           case 'week':
             key = date.toISOString().split('T')[0]; // Daily for week
@@ -432,7 +444,7 @@ class TransactionService {
         }
 
         const orderRevenue = order.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-        
+
         if (!revenueData[key]) {
           revenueData[key] = 0;
         }

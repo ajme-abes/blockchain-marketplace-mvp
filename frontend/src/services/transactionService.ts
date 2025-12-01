@@ -25,8 +25,11 @@ export interface Transaction {
   paymentMethod?: string;
   blockchainTxHash?: string;
   blockchainRecorded?: boolean;
-  blockchainStatus: BlockchainStatus; // ADD THIS
+  blockchainStatus: BlockchainStatus;
   confirmedAt?: string;
+  payoutStatus?: string;
+  paidAt?: string;
+  payoutReference?: string;
 }
 
 export interface TransactionStats {

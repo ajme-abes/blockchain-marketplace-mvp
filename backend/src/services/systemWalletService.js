@@ -1,41 +1,83 @@
 // backend/src/services/systemWalletService.js
 const { ethers } = require('ethers');
+const { prisma } = require('../config/database');
 
 class SystemWalletService {
   constructor() {
     // Store user identifiers (user IDs mapped to blockchain identifiers)
     this.userIdentifiers = new Map();
-    
+
     console.log('✅ System Wallet Service initialized for user identifiers');
   }
 
   /**
    * Get user identifier for blockchain - uses actual user IDs
+   * Now stores in database for persistence and reverse lookup
    * Example: "35883486-e6aa-46c8-b765-7e5a11e456f4" → "buyer_35883486e6aa46c8b7657e5a11e456f4"
    */
-  getUserWalletAddress(userId, role = 'BUYER') {
+  async getUserWalletAddress(userId, role = 'BUYER') {
     if (!userId) {
       console.error('❌ User ID is required for generating identifier');
       return this.getFallbackIdentifier(role);
     }
 
-    // Create a unique key for this user+role combination
-    const identifierKey = `${role.toUpperCase()}_${userId}`;
-    
-    // Return cached identifier or generate new one
-    if (!this.userIdentifiers.has(identifierKey)) {
-      const identifier = this.generateUserIdentifier(userId, role);
-      this.userIdentifiers.set(identifierKey, identifier);
-      
-      console.log('🔑 Generated new user identifier:', {
+    try {
+      // Check if identifier exists in database
+      let identifier = await prisma.blockchainIdentifier.findUnique({
+        where: {
+          userId_role: {
+            userId: userId,
+            role: role
+          }
+        }
+      });
+
+      if (identifier) {
+        // Update usage count and last used time
+        await prisma.blockchainIdentifier.update({
+          where: { id: identifier.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date()
+          }
+        });
+
+        console.log('✅ Retrieved existing blockchain identifier:', {
+          userId,
+          role,
+          blockchainId: identifier.blockchainId,
+          usageCount: identifier.usageCount + 1
+        });
+
+        return identifier.blockchainId;
+      }
+
+      // Generate new identifier
+      const blockchainId = this.generateUserIdentifier(userId, role);
+
+      // Store in database
+      identifier = await prisma.blockchainIdentifier.create({
+        data: {
+          userId: userId,
+          role: role,
+          blockchainId: blockchainId,
+          usageCount: 1
+        }
+      });
+
+      console.log('🔑 Generated and stored new blockchain identifier:', {
         userId,
         role,
-        identifier,
-        identifierKey
+        blockchainId: identifier.blockchainId
       });
+
+      return identifier.blockchainId;
+
+    } catch (error) {
+      console.error('❌ Error getting blockchain identifier:', error);
+      // Fallback to in-memory generation
+      return this.generateUserIdentifier(userId, role);
     }
-    
-    return this.userIdentifiers.get(identifierKey);
   }
 
   /**
@@ -45,18 +87,18 @@ class SystemWalletService {
     try {
       // Remove dashes from UUID for cleaner identifier
       const cleanUserId = userId.replace(/-/g, '');
-      
+
       // Create role-specific identifier
       // Format: "role_cleanedUserId"
       const identifier = `${role.toLowerCase()}_${cleanUserId}`;
-      
+
       // Validate it's not too long (blockchain gas optimization)
       if (identifier.length > 64) {
         console.warn('⚠️ User identifier might be too long:', identifier);
       }
-      
+
       return identifier;
-      
+
     } catch (error) {
       console.error('❌ Error generating user identifier:', error);
       return this.getFallbackIdentifier(role);
@@ -73,17 +115,53 @@ class SystemWalletService {
   }
 
   /**
-   * Get buyer identifier (convenience method) - THIS IS THE MISSING METHOD!
+   * Get buyer identifier (convenience method)
    */
-  getBuyerIdentifier(buyerUserId) {
-    return this.getUserWalletAddress(buyerUserId, 'BUYER');
+  async getBuyerIdentifier(buyerUserId) {
+    return await this.getUserWalletAddress(buyerUserId, 'BUYER');
   }
 
   /**
    * Get producer identifier (convenience method)
    */
-  getProducerIdentifier(producerUserId) {
-    return this.getUserWalletAddress(producerUserId, 'PRODUCER');
+  async getProducerIdentifier(producerUserId) {
+    return await this.getUserWalletAddress(producerUserId, 'PRODUCER');
+  }
+
+  /**
+   * Reverse lookup: Find user by blockchain identifier
+   */
+  async getUserByBlockchainId(blockchainId) {
+    try {
+      const identifier = await prisma.blockchainIdentifier.findUnique({
+        where: { blockchainId: blockchainId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          }
+        }
+      });
+
+      if (!identifier) {
+        return null;
+      }
+
+      return {
+        user: identifier.user,
+        role: identifier.role,
+        usageCount: identifier.usageCount,
+        createdAt: identifier.createdAt,
+        lastUsedAt: identifier.lastUsedAt
+      };
+    } catch (error) {
+      console.error('❌ Error in reverse lookup:', error);
+      return null;
+    }
   }
 
   /**
