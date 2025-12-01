@@ -6,6 +6,8 @@ const userService = require('../services/userService');
 const emailVerificationService = require('../services/emailVerificationService');
 const passwordResetService = require('../services/passwordResetService');
 const loginAttemptService = require('../services/loginAttemptService');
+const sessionService = require('../services/sessionService');
+const twoFactorService = require('../services/twoFactorService');
 const {
   loginLimiter,
   passwordResetLimiter,
@@ -147,9 +149,13 @@ router.post('/login', loginLimiter, async (req, res) => {
     // Clear failed login attempts
     await loginAttemptService.clearFailedAttempts(normalizedEmail);
 
-    // Generate token
-    console.log('🔧 Generating token for verified user...');
-    const token = authService.generateAccessToken(user);
+    // Create session with access and refresh tokens
+    console.log('🔧 Creating session for verified user...');
+    const sessionData = await sessionService.createSession(
+      user.id,
+      req.ip,
+      req.headers['user-agent']
+    );
 
     console.log('✅ Login successful for user:', user.id);
 
@@ -173,7 +179,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.json({
       message: 'Login successful',
       user: userResponse,
-      token: token
+      token: sessionData.accessToken,
+      refreshToken: sessionData.refreshToken,
+      expiresAt: sessionData.expiresAt
     });
 
   } catch (error) {
@@ -243,16 +251,24 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-// Logout - SIMPLE VERSION (session system disabled)
+// Logout - Invalidate session
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
     console.log('🔧 Logout requested for user:', req.user.id);
 
-    // Simple success response - client should delete the token locally
-    // Since session system is disabled, we can't invalidate server-side sessions
+    const { refreshToken } = req.body;
+
+    if (refreshToken) {
+      // Invalidate specific session by refresh token
+      await sessionService.invalidateSessionByRefreshToken(refreshToken);
+      console.log('✅ Session invalidated successfully');
+    } else {
+      console.log('⚠️ No refresh token provided, client-side logout only');
+    }
+
     res.json({
-      message: 'Logout successful. Please delete the token on the client side.',
-      note: 'Full session-based logout will be enabled when session system is implemented'
+      message: 'Logout successful',
+      success: true
     });
 
   } catch (error) {
@@ -479,23 +495,326 @@ router.post('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
-// Refresh token - DISABLED (session system disabled)
+// Refresh token - Get new access token
 router.post('/refresh', async (req, res) => {
   try {
-    console.log('🔧 Refresh token requested (disabled)');
+    console.log('🔧 Refresh token requested');
 
-    res.status(501).json({
-      error: 'Token refresh not available',
-      code: 'REFRESH_DISABLED',
-      message: 'Token refresh system is temporarily disabled. Please login again to get a new token.',
-      note: 'This feature will be enabled when session management is implemented'
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        error: 'Refresh token is required',
+        code: 'MISSING_REFRESH_TOKEN'
+      });
+    }
+
+    const result = await sessionService.refreshAccessToken(refreshToken);
+
+    if (!result.success) {
+      return res.status(401).json({
+        error: result.error || 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
+
+    res.json({
+      message: 'Token refreshed successfully',
+      accessToken: result.accessToken,
+      user: result.user
     });
 
   } catch (error) {
     console.error('❌ Refresh token error:', error);
     res.status(500).json({
       error: 'Token refresh failed',
-      code: 'REFRESH_FAILED'
+      code: 'REFRESH_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get user's active sessions
+router.get('/sessions', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Fetching sessions for user:', req.user.id);
+
+    const sessions = await sessionService.getUserSessions(req.user.id);
+
+    res.json({
+      message: 'Sessions retrieved successfully',
+      sessions,
+      count: sessions.length
+    });
+
+  } catch (error) {
+    console.error('❌ Get sessions error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve sessions',
+      code: 'GET_SESSIONS_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Revoke a specific session
+router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    console.log('🔧 Revoking session:', sessionId);
+
+    // Verify session belongs to user
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { userId: true }
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        error: 'Session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+    if (session.userId !== req.user.id) {
+      return res.status(403).json({
+        error: 'Access denied',
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    await sessionService.invalidateSession(sessionId);
+
+    res.json({
+      message: 'Session revoked successfully',
+      success: true
+    });
+
+  } catch (error) {
+    console.error('❌ Revoke session error:', error);
+    res.status(500).json({
+      error: 'Failed to revoke session',
+      code: 'REVOKE_SESSION_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Revoke all sessions (logout from all devices)
+router.post('/sessions/revoke-all', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Revoking all sessions for user:', req.user.id);
+
+    const result = await sessionService.invalidateAllUserSessions(req.user.id);
+
+    res.json({
+      message: 'All sessions revoked successfully',
+      success: true,
+      count: result.count
+    });
+
+  } catch (error) {
+    console.error('❌ Revoke all sessions error:', error);
+    res.status(500).json({
+      error: 'Failed to revoke all sessions',
+      code: 'REVOKE_ALL_SESSIONS_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ========== 2FA ENDPOINTS ==========
+
+// Setup 2FA - Generate secret and QR code
+router.post('/2fa/setup', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 2FA setup requested for user:', req.user.id);
+
+    // Check if 2FA is already enabled
+    const is2FAEnabled = await twoFactorService.is2FAEnabled(req.user.id);
+    if (is2FAEnabled) {
+      return res.status(400).json({
+        error: '2FA is already enabled',
+        code: '2FA_ALREADY_ENABLED'
+      });
+    }
+
+    // Generate secret
+    const { secret, otpauthUrl } = await twoFactorService.generateSecret(req.user.id);
+
+    // Generate QR code
+    const qrCode = await twoFactorService.generateQRCode(otpauthUrl);
+
+    res.json({
+      message: '2FA setup initiated',
+      secret,
+      qrCode,
+      otpauthUrl
+    });
+
+  } catch (error) {
+    console.error('❌ 2FA setup error:', error);
+    res.status(500).json({
+      error: 'Failed to setup 2FA',
+      code: '2FA_SETUP_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Enable 2FA - Verify token and enable
+router.post('/2fa/enable', authenticateToken, async (req, res) => {
+  try {
+    const { secret, token } = req.body;
+
+    if (!secret || !token) {
+      return res.status(400).json({
+        error: 'Secret and token are required',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const result = await twoFactorService.enable2FA(req.user.id, secret, token);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error,
+        code: '2FA_ENABLE_FAILED'
+      });
+    }
+
+    res.json({
+      message: '2FA enabled successfully',
+      backupCodes: result.backupCodes,
+      success: true
+    });
+
+  } catch (error) {
+    console.error('❌ 2FA enable error:', error);
+    res.status(500).json({
+      error: 'Failed to enable 2FA',
+      code: '2FA_ENABLE_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Disable 2FA
+router.post('/2fa/disable', authenticateToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        error: 'Password is required',
+        code: 'MISSING_PASSWORD'
+      });
+    }
+
+    const result = await twoFactorService.disable2FA(req.user.id, password);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error,
+        code: '2FA_DISABLE_FAILED'
+      });
+    }
+
+    res.json({
+      message: result.message,
+      success: true
+    });
+
+  } catch (error) {
+    console.error('❌ 2FA disable error:', error);
+    res.status(500).json({
+      error: 'Failed to disable 2FA',
+      code: '2FA_DISABLE_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Verify 2FA token during login
+router.post('/2fa/verify', async (req, res) => {
+  try {
+    const { userId, token } = req.body;
+
+    if (!userId || !token) {
+      return res.status(400).json({
+        error: 'User ID and token are required',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const result = await twoFactorService.verify2FALogin(userId, token);
+
+    if (!result.success) {
+      return res.status(401).json({
+        error: result.error,
+        code: '2FA_VERIFICATION_FAILED'
+      });
+    }
+
+    res.json({
+      message: '2FA verified successfully',
+      success: true,
+      method: result.method,
+      remainingBackupCodes: result.remainingBackupCodes
+    });
+
+  } catch (error) {
+    console.error('❌ 2FA verification error:', error);
+    res.status(500).json({
+      error: 'Failed to verify 2FA',
+      code: '2FA_VERIFICATION_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Regenerate backup codes
+router.post('/2fa/backup-codes/regenerate', authenticateToken, async (req, res) => {
+  try {
+    const result = await twoFactorService.regenerateBackupCodes(req.user.id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error,
+        code: 'BACKUP_CODES_REGENERATE_FAILED'
+      });
+    }
+
+    res.json({
+      message: 'Backup codes regenerated successfully',
+      backupCodes: result.backupCodes,
+      success: true
+    });
+
+  } catch (error) {
+    console.error('❌ Backup codes regeneration error:', error);
+    res.status(500).json({
+      error: 'Failed to regenerate backup codes',
+      code: 'BACKUP_CODES_REGENERATE_FAILED',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Check 2FA status
+router.get('/2fa/status', authenticateToken, async (req, res) => {
+  try {
+    const isEnabled = await twoFactorService.is2FAEnabled(req.user.id);
+
+    res.json({
+      enabled: isEnabled
+    });
+
+  } catch (error) {
+    console.error('❌ 2FA status check error:', error);
+    res.status(500).json({
+      error: 'Failed to check 2FA status',
+      code: '2FA_STATUS_CHECK_FAILED'
     });
   }
 });

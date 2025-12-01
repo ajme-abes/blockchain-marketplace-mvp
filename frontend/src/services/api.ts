@@ -1,4 +1,4 @@
-// src/services/api.ts - FIXED VERSION
+// src/services/api.ts - ENHANCED ERROR HANDLING
 const API_BASE_URL = 'http://localhost:5000/api';
 
 export interface ApiResponse<T = any> {
@@ -25,6 +25,29 @@ class ApiService {
   removeToken(): void {
     this.token = null;
     localStorage.removeItem('authToken');
+  }
+
+  /**
+   * Parse Retry-After header value to seconds
+   */
+  private parseRetryAfter(retryAfterHeader: string | null): number | undefined {
+    if (!retryAfterHeader) return undefined;
+
+    // If it's a number, it's seconds
+    const seconds = parseInt(retryAfterHeader, 10);
+    if (!isNaN(seconds)) {
+      return seconds;
+    }
+
+    // If it's a date, calculate seconds from now
+    try {
+      const retryDate = new Date(retryAfterHeader);
+      const now = new Date();
+      const diffMs = retryDate.getTime() - now.getTime();
+      return Math.max(0, Math.ceil(diffMs / 1000));
+    } catch {
+      return undefined;
+    }
   }
 
   // FIXED: Properly handle both 'data' and 'body' properties
@@ -69,15 +92,34 @@ class ApiService {
         const errorText = await response.text();
         console.error('🔧 API Error Response:', errorText);
 
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        let errorData: any = {};
         try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
+          errorData = JSON.parse(errorText);
         } catch {
-          // If not JSON, use the text as is
+          // If not JSON, create error object
+          errorData = {
+            message: `HTTP ${response.status}: ${response.statusText}`,
+            code: 'HTTP_ERROR'
+          };
         }
 
-        throw new Error(errorMessage);
+        // Enhanced error handling for authentication errors
+        const authError = {
+          code: errorData.code || 'HTTP_ERROR',
+          message: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+          details: errorData.details || errorData,
+          // Preserve rate limiting headers
+          retryAfter: this.parseRetryAfter(response.headers.get('Retry-After')),
+          // Preserve authentication error details
+          attemptsLeft: errorData.attemptsLeft,
+          maxAttempts: errorData.maxAttempts,
+          unlockAt: errorData.unlockAt,
+          minutesRemaining: errorData.minutesRemaining,
+          // HTTP status for additional context
+          status: response.status
+        };
+
+        throw authError;
       }
 
       const text = await response.text();
