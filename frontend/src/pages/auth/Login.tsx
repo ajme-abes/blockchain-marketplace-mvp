@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Mail, Lock,  Eye, EyeOff, Key, Moon, Sun } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Key, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -52,11 +52,9 @@ const Login = () => {
 
       // Redirect based on user role
       if (user?.role === 'ADMIN') {
-        navigate('/admin/dashboard');
-      } else if (user?.role === 'PRODUCER') {
-        navigate('/dashboard');
+        navigate('/admin'); // Admin dashboard route
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard'); // Dashboard component handles buyer/producer routing
       }
     } catch (error: any) {
       // Handle specific authentication errors
@@ -74,11 +72,9 @@ const Login = () => {
 
         // Complete login and redirect
         if (user?.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else if (user?.role === 'PRODUCER') {
-          navigate('/dashboard');
+          navigate('/admin'); // Admin dashboard route
         } else {
-          navigate('/dashboard');
+          navigate('/dashboard'); // Dashboard component handles buyer/producer routing
         }
       }
     } catch (error: any) {

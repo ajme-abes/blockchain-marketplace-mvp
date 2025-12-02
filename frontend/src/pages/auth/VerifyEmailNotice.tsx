@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Mail, CheckCircle, ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { authService } from '@/services/authService';
 
 const VerifyEmailNotice = () => {
   const location = useLocation();
@@ -30,13 +31,15 @@ const VerifyEmailNotice = () => {
   const fromLogin = location.state?.fromLogin;
   const canResend = location.state?.canResend ?? true;
   const loginUser = location.state?.user;
+  const emailFailed = location.state?.emailFailed;
+  const verificationUrl = location.state?.verificationUrl;
 
   useEffect(() => {
     // Get email from various sources
     const locationEmail = location.state?.email;
     const authEmail = user?.email;
     const loginEmail = loginUser?.email;
-    
+
     setEmail(locationEmail || loginEmail || authEmail || 'your email');
   }, [location.state, user, loginUser]);
 
@@ -56,25 +59,13 @@ const VerifyEmailNotice = () => {
 
     try {
       setIsResending(true);
-      
-      // Call your backend resend endpoint
-      const response = await fetch('/api/email-verification/resend', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: email.trim() })
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        setResendCount(prev => prev + 1);
-        setCooldown(60); // 60 second cooldown
-        toast.success('Verification email sent! Please check your inbox.');
-      } else {
-        throw new Error(result.error || 'Failed to resend verification email');
-      }
+
+      // Use the auth service instead of direct fetch
+      await authService.resendVerificationEmail();
+
+      setResendCount(prev => prev + 1);
+      setCooldown(60); // 60 second cooldown
+      toast.success('Verification email sent! Please check your inbox.');
     } catch (error: any) {
       toast.error(error?.message || 'Failed to resend verification email');
     } finally {
@@ -109,9 +100,8 @@ const VerifyEmailNotice = () => {
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl">
         <CardHeader className="text-center space-y-4 pb-4">
           <div className="flex justify-center">
-            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg ${
-              fromLogin ? 'bg-amber-500' : 'bg-gradient-to-br from-amber-400 to-orange-500'
-            }`}>
+            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg ${fromLogin ? 'bg-amber-500' : 'bg-gradient-to-br from-amber-400 to-orange-500'
+              }`}>
               <Mail className="h-7 w-7 text-white" />
             </div>
           </div>
@@ -124,7 +114,7 @@ const VerifyEmailNotice = () => {
             </CardDescription>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Warning for login block */}
           {fromLogin && (
@@ -141,18 +131,58 @@ const VerifyEmailNotice = () => {
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl">
-              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                  Verification Email Sent
+          {/* Email Service Failure Warning */}
+          {emailFailed && (
+            <div className="flex items-start space-x-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl">
+              <div className="w-2 h-2 bg-red-600 rounded-full mt-2 flex-shrink-0"></div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                  Email Service Not Available
                 </p>
-                <p className="text-xs text-blue-700 dark:text-blue-400">
-                  We've sent a verification link to <strong>{email}</strong>
+                <p className="text-xs text-red-700 dark:text-red-400">
+                  The email service is not configured. You can verify manually using the link below.
                 </p>
+                {verificationUrl && (
+                  <div className="mt-2">
+                    <p className="text-xs text-red-700 dark:text-red-400 mb-1">Manual verification link:</p>
+                    <a
+                      href={verificationUrl}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+                    >
+                      {verificationUrl}
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
+          )}
+
+          <div className="space-y-4">
+            {!emailFailed ? (
+              <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl">
+                <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                    Verification Email Sent
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    We've sent a verification link to <strong>{email}</strong>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl">
+                <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                    Email Verification Required
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400">
+                    Please use the manual verification link above or contact support.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Steps */}
             <div className="space-y-3">
@@ -164,7 +194,7 @@ const VerifyEmailNotice = () => {
                   Check your email inbox
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
                   <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">2</span>
@@ -173,7 +203,7 @@ const VerifyEmailNotice = () => {
                   Click the verification link
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
                   <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">3</span>
@@ -196,10 +226,12 @@ const VerifyEmailNotice = () => {
           <div className="space-y-3">
             <Button
               onClick={handleResendVerification}
-              disabled={isResending || cooldown > 0 || !canResend || !validEmail}
+              disabled={isResending || cooldown > 0 || !canResend || !validEmail || emailFailed}
               className="w-full h-10 text-sm font-semibold rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {!canResend ? (
+              {emailFailed ? (
+                'Email service not available'
+              ) : !canResend ? (
                 'Verification email sent recently'
               ) : isResending ? (
                 <div className="flex items-center space-x-2">
@@ -225,7 +257,7 @@ const VerifyEmailNotice = () => {
                 <ArrowLeft className="h-3 w-3 mr-1" />
                 {fromLogin ? 'Back to Login' : 'Back to Register'}
               </Button>
-              
+
               <Button
                 variant="outline"
                 onClick={handleGoHome}
@@ -251,8 +283,8 @@ const VerifyEmailNotice = () => {
           <div className="text-center pt-2">
             <p className="text-xs text-gray-500 dark:text-gray-500">
               Need help?{' '}
-              <Link 
-                to="/contact" 
+              <Link
+                to="/contact"
                 className="text-amber-600 dark:text-amber-400 font-semibold hover:text-amber-700 dark:hover:text-amber-300 transition-colors hover:underline"
               >
                 Contact Support

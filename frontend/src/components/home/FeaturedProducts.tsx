@@ -19,6 +19,7 @@ interface Product {
   imageUrl: string | null;
   averageRating: number | null;
   reviewCount: number;
+  unit?: string; // Added unit field (kg, quintal, piece, etc.)
   producer: {
     id: string;
     businessName: string;
@@ -268,7 +269,7 @@ export const FeaturedProducts = () => {
                       {product.price.toFixed(2)}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {t('currency')}/unit
+                      {t('currency')}/{product.unit || 'unit'}
                     </span>
                   </div>
                 </CardContent>

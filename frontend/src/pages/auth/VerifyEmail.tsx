@@ -16,7 +16,7 @@ const VerifyEmail = () => {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    
+
     if (!token) {
       setStatus('error');
       setMessage('Invalid verification link');
@@ -25,14 +25,18 @@ const VerifyEmail = () => {
 
     const verifyToken = async () => {
       try {
-        await verifyEmail(token);
+        console.log('🔧 Starting email verification with token:', token);
+        const result = await verifyEmail(token);
+        console.log('✅ Verification result:', result);
+
         setStatus('success');
         setMessage('Email verified successfully! You can now login.');
         toast.success('Email verified successfully!');
       } catch (error: any) {
+        console.error('❌ Verification error:', error);
         setStatus('error');
-        setMessage(error.message || 'Verification failed');
-        toast.error('Email verification failed');
+        setMessage(error.message || error.error || 'Verification failed. The link may be invalid or expired.');
+        toast.error(error.message || 'Email verification failed');
       }
     };
 
@@ -48,10 +52,9 @@ const VerifyEmail = () => {
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl">
         <CardHeader className="text-center space-y-4 pb-4">
           <div className="flex justify-center">
-            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg ${
-              status === 'loading' ? 'bg-gray-400' :
-              status === 'success' ? 'bg-green-500' : 'bg-red-500'
-            }`}>
+            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg ${status === 'loading' ? 'bg-gray-400' :
+                status === 'success' ? 'bg-green-500' : 'bg-red-500'
+              }`}>
               {status === 'loading' && <Loader className="h-7 w-7 text-white animate-spin" />}
               {status === 'success' && <CheckCircle className="h-7 w-7 text-white" />}
               {status === 'error' && <XCircle className="h-7 w-7 text-white" />}
@@ -68,7 +71,7 @@ const VerifyEmail = () => {
             </CardDescription>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {status === 'success' && (
             <Button
@@ -78,7 +81,7 @@ const VerifyEmail = () => {
               Continue to Login
             </Button>
           )}
-          
+
           {status === 'error' && (
             <div className="space-y-3">
               <Button
@@ -98,8 +101,8 @@ const VerifyEmail = () => {
           )}
 
           <div className="text-center">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="inline-flex items-center text-xs text-gray-500 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
             >
               ← Return home
