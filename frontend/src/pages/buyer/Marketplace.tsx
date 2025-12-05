@@ -26,7 +26,6 @@ const Marketplace = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -112,9 +111,6 @@ const Marketplace = () => {
 
       // Category filter
       if (selectedCategory && product.category !== selectedCategory) return false;
-
-      // Region filter
-      if (selectedRegion && product.region !== selectedRegion) return false;
 
       // Price range filter
       if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
@@ -241,22 +237,6 @@ const Marketplace = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Region</label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={selectedRegion || ''}
-                      onChange={(e) => setSelectedRegion(e.target.value || null)}
-                    >
-                      <option value="">All Regions</option>
-                      {regions.map((reg) => (
-                        <option key={reg} value={reg}>
-                          {reg}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="text-sm font-medium mb-2 block">
                       Price Range: {priceRange[0]} - {priceRange[1]} ETB
                     </label>
@@ -275,7 +255,6 @@ const Marketplace = () => {
                     className="w-full"
                     onClick={() => {
                       setSelectedCategory(null);
-                      setSelectedRegion(null);
                       setPriceRange([0, maxPrice]);
                       setSearchQuery('');
                     }}
@@ -312,14 +291,13 @@ const Marketplace = () => {
                   <option value="name">Name: A-Z</option>
                 </select>
 
-                {(searchQuery || selectedCategory || selectedRegion || priceRange[1] < maxPrice) && (
+                {(searchQuery || selectedCategory || priceRange[1] < maxPrice) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedCategory(null);
-                      setSelectedRegion(null);
                       setPriceRange([0, maxPrice]);
                     }}
                     className="text-xs"
@@ -336,13 +314,12 @@ const Marketplace = () => {
                 <p className="text-muted-foreground text-lg mb-4">
                   {products.length === 0 ? 'No products available yet' : 'No products match your filters'}
                 </p>
-                {(searchQuery || selectedCategory || selectedRegion) && (
+                {(searchQuery || selectedCategory) && (
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedCategory(null);
-                      setSelectedRegion(null);
                       setPriceRange([0, maxPrice]);
                     }}
                   >

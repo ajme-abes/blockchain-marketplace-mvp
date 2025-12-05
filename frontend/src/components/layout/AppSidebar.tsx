@@ -35,8 +35,11 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChat } from '@/contexts/ChatContext';
+import { useDispute } from '@/contexts/DisputeContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSelector } from '@/components/layout/LanguageSelector';
@@ -44,6 +47,8 @@ import { Moon, Sun, Globe } from 'lucide-react';
 
 export const AppSidebar = () => {
   const { user, logout } = useAuth();
+  const { unreadCount } = useChat();
+  const { activeDisputeCount } = useDispute();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
@@ -148,9 +153,16 @@ export const AppSidebar = () => {
                     isActive={isActive(item.url)}
                     className="transition-smooth"
                   >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{t(item.title)}</span>
+                    <Link to={item.url} className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{t(item.title)}</span>
+                      </div>
+                      {item.url === '/chats' && unreadCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-5 flex items-center justify-center p-1 text-xs">
+                          {unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -174,9 +186,16 @@ export const AppSidebar = () => {
                       isActive={isActive(item.url)}
                       className="transition-smooth"
                     >
-                      <Link to={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{t(item.title)}</span>
+                      <Link to={item.url} className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4" />
+                          <span>{t(item.title)}</span>
+                        </div>
+                        {(item.url === '/buyer/disputes' || item.url === '/producer/disputes' || item.url === '/admin/disputes') && activeDisputeCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto h-5 min-w-5 flex items-center justify-center p-1 text-xs">
+                            {activeDisputeCount}
+                          </Badge>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -205,10 +224,15 @@ export const AppSidebar = () => {
             <Button
               variant="outline"
               size="sm"
-              className="w-full transition-smooth"
+              className="w-full transition-smooth relative"
             >
               <Mail className="h-4 w-4 mr-2" />
               My Messages
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-1 text-xs">
+                  {unreadCount}
+                </Badge>
+              )}
             </Button>
           </Link>
         )}
