@@ -108,7 +108,7 @@ class DisputeService {
       console.log('✅ [FRONTEND] Backend response:', disputeResponse);
 
       const dispute = disputeResponse.data || disputeResponse;
-      
+
       if (!dispute || !dispute.id) {
         throw new Error('Failed to create dispute - no dispute ID returned');
       }
@@ -148,7 +148,8 @@ class DisputeService {
       console.log('🔄 [FRONTEND] Sending FormData to backend...');
 
       // Use fetch directly for FormData to avoid apiService issues
-      const response = await fetch(`http://localhost:5000/api/disputes/${disputeId}/evidence`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_URL}/disputes/${disputeId}/evidence`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -372,17 +373,17 @@ class DisputeService {
   ) {
     try {
       console.log('🔄 [FRONTEND] Resolving dispute:', disputeId);
-  
+
       const response = await apiService.request(`/disputes/${disputeId}/resolve`, {
         method: 'PATCH',
         data: {
           resolution
         },
       });
-  
+
       console.log('✅ [FRONTEND] Dispute resolved successfully');
       return response;
-  
+
     } catch (error: any) {
       console.error('❌ Resolve dispute error:', error);
       return {
