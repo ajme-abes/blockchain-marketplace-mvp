@@ -97,13 +97,19 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: function (origin, callback) {
+    // Get allowed origins from environment variable or use defaults
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+      : [];
+
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:8080',
       'http://localhost:8081',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
-      'http://127.0.0.1:8081'
+      'http://127.0.0.1:8081',
+      ...envOrigins // Add production origins from environment
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -112,6 +118,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.warn(`CORS blocked origin: ${origin}. Allowed origins:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
