@@ -327,6 +327,14 @@ const startServer = async () => {
     jobService.startJobs();
     console.log('✅ Background jobs initialized');
 
+    // Auto-create admin from environment variables
+    try {
+      const { autoCreateAdmin } = require('./utils/autoCreateAdmin');
+      await autoCreateAdmin();
+    } catch (error) {
+      console.warn('⚠️  Auto-create admin skipped:', error.message);
+    }
+
     // ✅ FIX: Use server.listen instead of app.listen
     server.listen(PORT, () => {
       console.log('\n' + '='.repeat(60));
