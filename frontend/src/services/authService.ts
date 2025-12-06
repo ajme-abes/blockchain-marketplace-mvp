@@ -139,9 +139,9 @@ export const authService = {
     }
   },
 
-  async resendVerificationEmail(): Promise<void> {
+  async resendVerificationEmail(email?: string): Promise<void> {
     try {
-      return await api.resendVerificationEmail();
+      return await api.resendVerificationEmail(email);
     } catch (error: any) {
       handleAuthError(error);
     }

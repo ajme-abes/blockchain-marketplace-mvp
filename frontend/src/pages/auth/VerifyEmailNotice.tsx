@@ -60,8 +60,8 @@ const VerifyEmailNotice = () => {
     try {
       setIsResending(true);
 
-      // Use the auth service instead of direct fetch
-      await authService.resendVerificationEmail();
+      // Pass the email to the resend endpoint (no authentication required)
+      await authService.resendVerificationEmail(email);
 
       setResendCount(prev => prev + 1);
       setCooldown(60); // 60 second cooldown

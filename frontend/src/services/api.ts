@@ -168,9 +168,10 @@ class ApiService {
     });
   }
 
-  async resendVerificationEmail(): Promise<any> {
+  async resendVerificationEmail(email?: string): Promise<any> {
     return this.request('/email-verification/resend', {
       method: 'POST',
+      data: email ? { email } : {},
     });
   }
 
