@@ -83,7 +83,7 @@ const SystemMonitor = () => {
       const token = localStorage.getItem('authToken');
 
       // Fetch system health
-      const healthResponse = await fetch('http://localhost:5000/api/admin/system/health', {
+      const healthResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/system/health', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -92,7 +92,7 @@ const SystemMonitor = () => {
       });
 
       // Fetch alerts from dashboard stats
-      const alertsResponse = await fetch('http://localhost:5000/api/admin/dashboard/stats', {
+      const alertsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/dashboard/stats', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

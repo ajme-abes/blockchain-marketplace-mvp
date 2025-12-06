@@ -37,7 +37,7 @@ const Products = () => {
       setLoading(true);
       console.log('🔄 Loading products from backend...');
       
-      const response = await fetch('http://localhost:5000/api/products/my/products', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/my/products', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ const Products = () => {
       console.log('🔄 Updating product status:', productId, status);
       
       // Call the actual product service with correct status values
-      const response = await fetch(`http://localhost:5000/api/products/${productId}/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/${productId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,

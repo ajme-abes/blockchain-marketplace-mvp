@@ -170,7 +170,7 @@ export const productService = {
 
     try {
       // For FormData, we need to use fetch directly since your api.request uses JSON
-      const response = await fetch('http://localhost:5000/api/products', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products', {
         method: 'POST',
         body: formData,
         headers: {
@@ -253,7 +253,7 @@ export const productService = {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/${id}`, {
         method: 'PUT',
         body: formData,
         headers: {

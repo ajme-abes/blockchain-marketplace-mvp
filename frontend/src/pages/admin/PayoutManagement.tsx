@@ -129,7 +129,7 @@ const PayoutManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/admin/payouts/${selectedPayout.id}/schedule`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/payouts/${selectedPayout.id}/schedule`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -271,7 +271,7 @@ const PayoutManagement = () => {
         try {
             setLoadingBankAccounts(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/admin/producer/${producerId}/bank-accounts`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producer/${producerId}/bank-accounts`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -293,7 +293,7 @@ const PayoutManagement = () => {
         try {
             console.log('🏦 Loading payout bank accounts for producer:', producerId);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/admin/producer/${producerId}/bank-accounts`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producer/${producerId}/bank-accounts`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -337,7 +337,7 @@ const PayoutManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/admin/bank-accounts/${accountId}/verify`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/bank-accounts/${accountId}/verify`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -380,7 +380,7 @@ const PayoutManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/admin/bank-accounts/${selectedBankAccount.id}/reject`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/bank-accounts/${selectedBankAccount.id}/reject`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

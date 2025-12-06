@@ -189,7 +189,7 @@ const ProductManagement = () => {
         params.append('verificationStatus', verificationFilter);
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/products?${params}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -235,7 +235,7 @@ const ProductManagement = () => {
       setStatsLoading(true);
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch('http://localhost:5000/api/admin/products/stats', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/stats', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -289,7 +289,7 @@ const ProductManagement = () => {
           break;
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/products/${productId}/${endpoint}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/${productId}/${endpoint}`, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -334,7 +334,7 @@ const ProductManagement = () => {
     try {
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch('http://localhost:5000/api/admin/products/bulk-actions', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/bulk-actions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

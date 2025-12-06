@@ -148,7 +148,7 @@ const EditProduct = () => {
       }
 
       // Use direct fetch to handle FormData properly
-      const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/${id}`, {
         method: 'PUT',
         body: formDataToSend,
         headers: {

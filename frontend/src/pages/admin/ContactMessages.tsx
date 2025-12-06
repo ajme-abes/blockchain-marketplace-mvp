@@ -39,7 +39,7 @@ export default function ContactMessages() {
             const token = localStorage.getItem('authToken');
 
             const filterParam = filter !== 'all' ? `?status=${filter.toUpperCase()}` : '';
-            const response = await fetch(`http://localhost:5000/api/contact${filterParam}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact${filterParam}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -62,7 +62,7 @@ export default function ContactMessages() {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/contact/${id}/status`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact/${id}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -91,7 +91,7 @@ export default function ContactMessages() {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/contact/${id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`

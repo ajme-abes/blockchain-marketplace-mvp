@@ -35,7 +35,7 @@ export default function TestimonialManagement() {
             setLoading(true);
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch('http://localhost:5000/api/testimonials', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -58,7 +58,7 @@ export default function TestimonialManagement() {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/testimonials/${id}/approve`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials/${id}/approve`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -82,7 +82,7 @@ export default function TestimonialManagement() {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/testimonials/${id}/reject`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials/${id}/reject`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -108,7 +108,7 @@ export default function TestimonialManagement() {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/testimonials/${id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`

@@ -110,7 +110,7 @@ const UserDetail = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -174,7 +174,7 @@ const UserDetail = () => {
           break;
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/users/${user.id}/${endpoint}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${user.id}/${endpoint}`, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,

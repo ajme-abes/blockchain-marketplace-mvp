@@ -109,7 +109,7 @@ const VerificationQueue = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/admin/producers/verification-queue', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/verification-queue', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -140,7 +140,7 @@ const VerificationQueue = () => {
   const handleVerificationAction = async (action: string, producerId: string, reason?: string) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/admin/producers/${producerId}/verify`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/${producerId}/verify`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

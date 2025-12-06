@@ -35,7 +35,7 @@ export default function MyMessages() {
             setLoading(true);
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch('http://localhost:5000/api/contact/my-messages', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact/my-messages', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }

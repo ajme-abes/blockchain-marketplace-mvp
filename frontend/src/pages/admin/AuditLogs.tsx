@@ -152,7 +152,7 @@ const AuditLogs = () => {
 
       // For now, we'll use mock data since the audit logs endpoint might not be ready
       // Replace this URL with your actual audit logs endpoint when available
-      const response = await fetch(`http://localhost:5000/api/admin/audit-logs?${params}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/audit-logs?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
