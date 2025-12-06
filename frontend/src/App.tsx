@@ -70,9 +70,9 @@ import MyMessages from "./pages/common/MyMessages";
 import ProducerProfile from "./pages/common/ProducerProfile";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -89,9 +89,9 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 
 // Proper RoleRoute component
 const RoleRoute = ({ allowedRoles, children }: { allowedRoles: string[]; children: ReactNode }) => {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
