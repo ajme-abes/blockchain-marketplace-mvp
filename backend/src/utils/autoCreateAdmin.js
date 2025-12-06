@@ -54,7 +54,7 @@ async function autoCreateAdmin() {
                 phone: adminPhone,
                 role: 'ADMIN',
                 emailVerified: true, // Auto-verify admin
-                isActive: true
+                status: 'ACTIVE' // Use status field instead of isActive
             }
         });
 
