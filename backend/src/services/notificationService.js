@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const nodemailer = require('nodemailer');
+const resendEmailService = require('./resendEmailService');
 
 class NotificationService {
   constructor() {
@@ -7,19 +8,27 @@ class NotificationService {
     this.initEmailTransporter();
   }
 
-  // === ADD THIS NEW METHOD RIGHT HERE ===
+  // === UPDATED METHOD TO USE RESEND ===
   async sendEmail(emailData) {
     try {
       const { to, subject, html, text } = emailData;
 
+      // Try Resend first (preferred for production)
+      if (process.env.RESEND_API_KEY) {
+        console.log('🔧 Using Resend for email...');
+        return await resendEmailService.sendEmail({ to, subject, html, text });
+      }
+
+      // Fallback to nodemailer (Gmail/SMTP)
       if (!this.isEmailConfigured) {
         return {
           success: false,
           error: 'Email not configured',
-          note: 'Set EMAIL_USER and EMAIL_PASSWORD in .env'
+          note: 'Set RESEND_API_KEY or EMAIL_USER/EMAIL_PASSWORD in .env'
         };
       }
 
+      console.log('🔧 Using nodemailer for email...');
       const mailOptions = {
         from: process.env.EMAIL_FROM || `"Blockchain Marketplace" <${process.env.EMAIL_USER}>`,
         to: to,

@@ -41,6 +41,7 @@
     "nodemailer": "^7.0.9",
     "prisma": "^6.19.0",
     "qrcode": "^1.5.4",
+    "resend": "^6.5.2",
     "socket.io": "^4.8.1",
     "speakeasy": "^2.0.0",
     "uuid": "^13.0.0",
