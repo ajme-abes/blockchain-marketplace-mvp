@@ -2,7 +2,7 @@ const express = require('express');
 const userService = require('../services/userService');
 const { authenticateToken, checkUserStatus, } = require('../middleware/auth');
 const { prisma } = require('../config/database');
-const { registerLimiter } = require('../middleware/rateLimiter');
+const { combinedRegisterLimiter } = require('../middleware/emailRateLimiter');
 const router = express.Router();
 
 // Try to import authService with error handling
@@ -15,8 +15,8 @@ try {
   authService = null;
 }
 
-// Register new user (with rate limiting and authService check)
-router.post('/register', registerLimiter, async (req, res) => {
+// Register new user (with email-based rate limiting and authService check)
+router.post('/register', combinedRegisterLimiter, async (req, res) => {
   try {
     console.log('Registration request body:', req.body);
 
