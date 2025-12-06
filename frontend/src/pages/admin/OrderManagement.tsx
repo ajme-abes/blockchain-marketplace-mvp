@@ -302,7 +302,7 @@ const OrderManagement = () => {
       setStatsLoading(true);
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/orders/stats?period=monthly', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/orders/stats?period=monthly`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -399,7 +399,7 @@ const OrderManagement = () => {
     try {
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/orders/bulk-actions', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/orders/bulk-actions`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,

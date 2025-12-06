@@ -35,7 +35,7 @@ export default function TestimonialManagement() {
             setLoading(true);
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/testimonials`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }

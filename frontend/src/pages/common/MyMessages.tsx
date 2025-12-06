@@ -35,7 +35,7 @@ export default function MyMessages() {
             setLoading(true);
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact/my-messages', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/contact/my-messages`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -56,10 +56,10 @@ export default function MyMessages() {
 
     const getStatusBadge = (status: string) => {
         const config = {
-            UNREAD: { icon: Clock, label: 'Pending', variant: 'secondary' as const },
-            READ: { icon: Mail, label: 'Read', variant: 'default' as const },
+            UNREAD: { icon: Clock, label: 'Pending', variant: 'secondary' as const, className: '' },
+            READ: { icon: Mail, label: 'Read', variant: 'default' as const, className: '' },
             RESPONDED: { icon: CheckCircle, label: 'Responded', variant: 'default' as const, className: 'bg-green-500 text-white' },
-            ARCHIVED: { icon: Archive, label: 'Archived', variant: 'secondary' as const }
+            ARCHIVED: { icon: Archive, label: 'Archived', variant: 'secondary' as const, className: '' }
         };
 
         const { icon: Icon, label, variant, className } = config[status as keyof typeof config] || config.UNREAD;

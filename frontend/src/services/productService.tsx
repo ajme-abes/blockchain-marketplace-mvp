@@ -170,7 +170,7 @@ export const productService = {
 
     try {
       // For FormData, we need to use fetch directly since your api.request uses JSON
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -203,8 +203,9 @@ export const productService = {
     try {
       const response = await api.request('/products/my/products');
 
-      if (response.data) {
-        const backendData = response.data;
+      const typedResponse = response as { data?: { products?: unknown[] } };
+      if (typedResponse.data) {
+        const backendData = typedResponse.data;
         return backendData.products?.map(mapProductFromBackend) || [];
       }
 
@@ -224,8 +225,9 @@ export const productService = {
         body: JSON.stringify({ status }),
       });
 
-      if (response.data) {
-        return mapProductFromBackend(response.data);
+      const typedResponse = response as { data?: any };
+      if (typedResponse.data) {
+        return mapProductFromBackend(typedResponse.data);
       }
 
       throw new Error('Invalid response after status update');
@@ -286,8 +288,8 @@ export const productService = {
       method: 'DELETE',
     });
   },
-  async getProducerProducts() {
-    const response = await api.request('/products/producer');
-    return response.data;
+  async getProducerProducts(): Promise<Product[]> {
+    const response = await api.request('/products/producer') as { data: { products: Product[] } };
+    return response.data.products.map(mapProductFromBackend);
   },
 };

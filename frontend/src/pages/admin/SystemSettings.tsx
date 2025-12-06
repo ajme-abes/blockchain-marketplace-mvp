@@ -163,20 +163,26 @@ const SystemSettings = () => {
 
       // Fetch real data from backend
       const [dashboardResponse, healthResponse] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/dashboard/stats', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        }),
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/system/health', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        })
+        fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/dashboard/stats`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          }
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/system/health`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          }
+        )
       ]);
 
       if (dashboardResponse.ok && healthResponse.ok) {
