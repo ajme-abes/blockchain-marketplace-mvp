@@ -17,7 +17,9 @@
     "test:month": "node scripts/testMonthRange.js",
     "test:growth": "node scripts/testGrowthCalculations.js",
     "seed:testdata": "node scripts/createTestData.js",
-    "db:seed": "npm run seed:admin"
+    "db:seed": "npm run seed:admin",
+    "verify:user": "node scripts/verifyUserManually.js",
+    "check:email": "node scripts/checkEmailConfig.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
