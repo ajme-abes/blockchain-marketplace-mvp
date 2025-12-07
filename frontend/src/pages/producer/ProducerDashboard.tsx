@@ -160,11 +160,11 @@ const ProducerDashboard = () => {
       description: t('producer.dashboard.awaitingProcessing')
     },
     {
-      title: t('producer.dashboard.totalEarnings'),
+      title: 'Paid Earnings',
       value: formatPrice(stats.totalEarnings),
       icon: DollarSign,
       color: 'text-green-600',
-      description: t('producer.dashboard.allTimeRevenue')
+      description: 'Only when admin pays out'
     },
     {
       title: t('producer.dashboard.growth'),
