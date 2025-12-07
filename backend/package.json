@@ -18,6 +18,13 @@
     "test:growth": "node scripts/testGrowthCalculations.js",
     "seed:testdata": "node scripts/createTestData.js",
     "db:seed": "npm run seed:admin",
+    "dev:setup": "node dev-setup.js install",
+    "dev:ngrok": "node dev-setup.js ngrok",
+    "dev:status": "node dev-setup.js status",
+    "webhook:info": "node webhook-config.js",
+    "webhook:commands": "node webhook-config.js commands",
+    "test:webhook": "node test-local-payment.js webhook",
+    "test:payment": "node test-local-payment.js full",
     "verify:user": "node scripts/verifyUserManually.js",
     "check:email": "node scripts/checkEmailConfig.js"
   },
