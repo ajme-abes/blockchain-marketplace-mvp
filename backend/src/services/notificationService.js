@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const nodemailer = require('nodemailer');
 const resendEmailService = require('./resendEmailService');
+const mailgunEmailService = require('./mailgunEmailService');
 
 class NotificationService {
   constructor() {
@@ -8,12 +9,18 @@ class NotificationService {
     this.initEmailTransporter();
   }
 
-  // === UPDATED METHOD TO USE RESEND ===
+  // === UPDATED METHOD TO USE MAILGUN ===
   async sendEmail(emailData) {
     try {
       const { to, subject, html, text } = emailData;
 
-      // Try Resend first (preferred for production)
+      // Try Mailgun first (preferred for production)
+      if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+        console.log('🔧 Using Mailgun for email...');
+        return await mailgunEmailService.sendEmail({ to, subject, html, text });
+      }
+
+      // Fallback to Resend
       if (process.env.RESEND_API_KEY) {
         console.log('🔧 Using Resend for email...');
         return await resendEmailService.sendEmail({ to, subject, html, text });
