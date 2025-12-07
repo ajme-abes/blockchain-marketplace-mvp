@@ -14,26 +14,50 @@ class NotificationService {
     try {
       const { to, subject, html, text } = emailData;
 
-      // Try Mailgun first (preferred for production)
+      // Try Gmail SMTP first (most reliable on Render)
+      if (this.isEmailConfigured && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+        console.log('🔧 Using Gmail SMTP for email...');
+        const mailOptions = {
+          from: process.env.EMAIL_FROM || `"EthioTrust Marketplace" <${process.env.EMAIL_USER}>`,
+          to: to,
+          subject: subject,
+          html: html,
+          text: text || this.htmlToText(html)
+        };
+
+        try {
+          const result = await this.transporter.sendMail(mailOptions);
+          console.log(`📧 Email sent via Gmail to ${to}: ${subject}`);
+          console.log('📧 Message ID:', result.messageId);
+
+          return {
+            success: true,
+            messageId: result.messageId
+          };
+        } catch (error) {
+          console.error('❌ Gmail SMTP error:', error.message);
+          // Continue to other methods if Gmail fails
+        }
+      }
+
+      // Try Mailgun second
       if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
         console.log('🔧 Using Mailgun for email...');
         return await mailgunEmailService.sendEmail({ to, subject, html, text });
       }
 
-      // Fallback to Resend
+      // Try Resend third
       if (process.env.RESEND_API_KEY) {
         console.log('🔧 Using Resend for email...');
         return await resendEmailService.sendEmail({ to, subject, html, text });
       }
 
-      // Fallback to nodemailer (Gmail/SMTP)
-      if (!this.isEmailConfigured) {
-        return {
-          success: false,
-          error: 'Email not configured',
-          note: 'Set RESEND_API_KEY or EMAIL_USER/EMAIL_PASSWORD in .env'
-        };
-      }
+      // No email service configured
+      return {
+        success: false,
+        error: 'No email service configured',
+        note: 'Set EMAIL_USER/EMAIL_PASSWORD, MAILGUN_API_KEY, or RESEND_API_KEY'
+      };
 
       console.log('🔧 Using nodemailer for email...');
       const mailOptions = {
