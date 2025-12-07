@@ -38,6 +38,8 @@ class ResendEmailService {
         try {
             const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
+            console.log('🔧 Sending email via Resend:', { to, subject, from });
+
             const result = await this.resend.emails.send({
                 from,
                 to,
@@ -46,15 +48,30 @@ class ResendEmailService {
                 text: text || this.htmlToText(html)
             });
 
-            console.log(`✅ Email sent via Resend to ${to}: ${subject}`);
-            console.log('📧 Message ID:', result.id);
+            console.log('🔧 Resend API response:', JSON.stringify(result, null, 2));
 
-            return {
-                success: true,
-                messageId: result.id
-            };
+            // Resend returns { data: { id: '...' }, error: null } on success
+            const messageId = result?.data?.id || result?.id;
+
+            if (messageId) {
+                console.log(`✅ Email sent via Resend to ${to}: ${subject}`);
+                console.log('📧 Message ID:', messageId);
+
+                return {
+                    success: true,
+                    messageId: messageId
+                };
+            } else {
+                console.error('⚠️ Email sent but no message ID returned:', result);
+                return {
+                    success: true,
+                    messageId: 'unknown',
+                    warning: 'No message ID in response'
+                };
+            }
         } catch (error) {
-            console.error('❌ Resend send error:', error.message);
+            console.error('❌ Resend send error:', error);
+            console.error('❌ Error details:', error.message);
             return {
                 success: false,
                 error: error.message
