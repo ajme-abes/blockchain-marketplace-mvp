@@ -334,10 +334,11 @@ class TransactionService {
       // Calculate sales statistics - FIXED: Use net earnings instead of gross sales
       const confirmedOrders = orders.filter(o => o.paymentStatus === 'CONFIRMED');
 
-      // Get actual producer earnings from OrderProducer table
+      // Get actual producer earnings from OrderProducer table - ONLY when payout is completed
       const earningsResult = await prisma.orderProducer.aggregate({
         where: {
           producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
           order: {
             paymentStatus: 'CONFIRMED'
           }
@@ -464,10 +465,11 @@ class TransactionService {
       // Product performance - FIXED: Use net earnings instead of gross sales
       const productPerformance = {};
 
-      // Get OrderProducer data to calculate net earnings per product
+      // Get OrderProducer data to calculate net earnings per product - ONLY when payout is completed
       const orderProducers = await prisma.orderProducer.findMany({
         where: {
           producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
           order: {
             paymentStatus: 'CONFIRMED',
             orderDate: {
@@ -506,10 +508,11 @@ class TransactionService {
         });
       });
 
-      // Calculate total net earnings for the period
+      // Calculate total net earnings for the period - ONLY when payout is completed
       const totalNetEarnings = await prisma.orderProducer.aggregate({
         where: {
           producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
           order: {
             paymentStatus: 'CONFIRMED',
             orderDate: {

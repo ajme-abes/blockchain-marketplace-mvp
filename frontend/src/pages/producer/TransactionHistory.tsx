@@ -142,7 +142,7 @@ const ProducerTransactionHistory = () => {
         <div className="flex-1 flex flex-col">
           <PageHeader
             title="Transaction History"
-            description="View your sales history, earnings, and payout status"
+            description="View your sales history and earnings (counted only when admin completes payout)"
           />
 
           <main className="flex-1 p-6">
@@ -152,9 +152,9 @@ const ProducerTransactionHistory = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Net Earnings</p>
+                      <p className="text-sm font-medium text-muted-foreground">Paid Earnings</p>
                       <p className="text-2xl font-bold text-green-600">{stats.totalRevenue || 0} ETB</p>
-                      <p className="text-xs text-muted-foreground">After 10% commission</p>
+                      <p className="text-xs text-muted-foreground">Only when admin pays out</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-green-500" />
                   </div>

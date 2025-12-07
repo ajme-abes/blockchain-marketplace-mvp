@@ -117,10 +117,11 @@ class AnalyticsService {
 
     // FIXED: Calculate actual earnings per product
     const performanceData = await Promise.all(products.map(async (product) => {
-      // Get actual earnings for this product from OrderProducer table
+      // Get actual earnings for this product from OrderProducer table - ONLY when payout is completed
       const earnings = await prisma.orderProducer.aggregate({
         where: {
           producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
           order: {
             paymentStatus: 'CONFIRMED',
             orderItems: {
@@ -207,10 +208,11 @@ class AnalyticsService {
       return 0;
     }
 
-    // Calculate net earnings from OrderProducer table
+    // Calculate net earnings from OrderProducer table - ONLY when payout is completed
     const netEarnings = await prisma.orderProducer.aggregate({
       where: {
         producerId: producer.id,
+        payoutStatus: 'COMPLETED', // Only count when admin has made the payout
         order: {
           paymentStatus: 'CONFIRMED'
         }
@@ -316,10 +318,11 @@ class AnalyticsService {
 
     // FIXED: Calculate actual earnings for top products
     const topProductsData = await Promise.all(products.map(async (product) => {
-      // Get actual earnings for this product
+      // Get actual earnings for this product - ONLY when payout is completed
       const earnings = await prisma.orderProducer.aggregate({
         where: {
           producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
           order: {
             paymentStatus: 'CONFIRMED',
             orderItems: {
