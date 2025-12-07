@@ -2,6 +2,7 @@ const { prisma } = require('../config/database');
 const nodemailer = require('nodemailer');
 const resendEmailService = require('./resendEmailService');
 const mailgunEmailService = require('./mailgunEmailService');
+const brevoEmailService = require('./brevoEmailService');
 
 class NotificationService {
   constructor() {
@@ -14,30 +15,10 @@ class NotificationService {
     try {
       const { to, subject, html, text } = emailData;
 
-      // Try Gmail SMTP first (most reliable on Render)
-      if (this.isEmailConfigured && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-        console.log('🔧 Using Gmail SMTP for email...');
-        const mailOptions = {
-          from: process.env.EMAIL_FROM || `"EthioTrust Marketplace" <${process.env.EMAIL_USER}>`,
-          to: to,
-          subject: subject,
-          html: html,
-          text: text || this.htmlToText(html)
-        };
-
-        try {
-          const result = await this.transporter.sendMail(mailOptions);
-          console.log(`📧 Email sent via Gmail to ${to}: ${subject}`);
-          console.log('📧 Message ID:', result.messageId);
-
-          return {
-            success: true,
-            messageId: result.messageId
-          };
-        } catch (error) {
-          console.error('❌ Gmail SMTP error:', error.message);
-          // Continue to other methods if Gmail fails
-        }
+      // Try Brevo first (HTTP API - works perfectly on Render)
+      if (process.env.BREVO_API_KEY) {
+        console.log('🔧 Using Brevo for email...');
+        return await brevoEmailService.sendEmail({ to, subject, html, text });
       }
 
       // Try Mailgun second
