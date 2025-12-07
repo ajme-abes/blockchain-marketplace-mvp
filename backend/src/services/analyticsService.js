@@ -1,7 +1,7 @@
 const { prisma } = require('../config/database');
 
 class AnalyticsService {
-  
+
   // Get overview statistics for producer
   async getProducerOverview(producerId, timeframe = 'monthly') {
     try {
@@ -20,9 +20,9 @@ class AnalyticsService {
       }
 
       const productIds = producer.products.map(p => p.id);
-      
-      // Calculate basic stats
-      const [totalRevenue, totalOrders, totalCustomers, averageRating] = await Promise.all([
+
+      // Calculate basic stats - FIXED: Use actual earnings
+      const [revenueData, totalOrders, totalCustomers, averageRating] = await Promise.all([
         this.getTotalRevenue(productIds),
         this.getTotalOrders(productIds),
         this.getTotalCustomers(productIds),
@@ -33,7 +33,10 @@ class AnalyticsService {
       const topProducts = await this.getTopProducts(producerId, 5);
 
       return {
-        totalRevenue,
+        // FIXED: Return net earnings instead of gross sales
+        totalRevenue: revenueData.netEarnings || 0, // What producer actually earns
+        grossSales: revenueData.grossSales || 0,    // Total sales before commission
+        commission: revenueData.commission || 0,     // Platform commission
         totalOrders,
         totalCustomers,
         averageRating,
@@ -63,7 +66,7 @@ class AnalyticsService {
     }
 
     const productIds = producer.products.map(p => p.id);
-    
+
     // For now, return simple trend data - we can enhance this later
     const salesTrend = [
       { period: 'Jan', revenue: 4000, orders: 24, averageOrderValue: 167 },
@@ -112,10 +115,41 @@ class AnalyticsService {
       }
     });
 
-    const performanceData = products.map(product => {
-      const totalRevenue = (product.price * (product._count.orderItems || 0)) * 0.8; // Estimate
+    // FIXED: Calculate actual earnings per product
+    const performanceData = await Promise.all(products.map(async (product) => {
+      // Get actual earnings for this product from OrderProducer table
+      const earnings = await prisma.orderProducer.aggregate({
+        where: {
+          producerId: producerId,
+          order: {
+            paymentStatus: 'CONFIRMED',
+            orderItems: {
+              some: {
+                productId: product.id
+              }
+            }
+          }
+        },
+        _sum: {
+          producerAmount: true
+        }
+      });
+
+      // Get gross sales for comparison
+      const grossSales = await prisma.orderItem.aggregate({
+        where: {
+          productId: product.id,
+          order: {
+            paymentStatus: 'CONFIRMED'
+          }
+        },
+        _sum: {
+          subtotal: true
+        }
+      });
+
       const totalSales = product._count.orderItems || 0;
-      const avgRating = product.reviews.length > 0 
+      const avgRating = product.reviews.length > 0
         ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
         : 0;
 
@@ -124,7 +158,8 @@ class AnalyticsService {
         name: product.name,
         category: product.category,
         price: product.price,
-        totalRevenue,
+        totalRevenue: earnings._sum.producerAmount || 0, // Net earnings
+        grossSales: grossSales._sum.subtotal || 0,       // Gross sales
         totalSales,
         orderCount: product._count.orderItems,
         reviewCount: product._count.reviews,
@@ -132,7 +167,7 @@ class AnalyticsService {
         stockLevel: product.quantityAvailable,
         status: product.quantityAvailable > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
       };
-    });
+    }));
 
     return performanceData.sort((a, b) => b.totalRevenue - a.totalRevenue);
   }
@@ -155,9 +190,38 @@ class AnalyticsService {
     };
   }
 
-  // Helper methods
+  // Helper methods - FIXED: Calculate actual producer earnings, not gross sales
   async getTotalRevenue(productIds) {
-    const result = await prisma.orderItem.aggregate({
+    // Get producer earnings (net amount after commission) instead of gross sales
+    const producer = await prisma.producer.findFirst({
+      where: {
+        products: {
+          some: {
+            id: { in: productIds }
+          }
+        }
+      }
+    });
+
+    if (!producer) {
+      return 0;
+    }
+
+    // Calculate net earnings from OrderProducer table
+    const netEarnings = await prisma.orderProducer.aggregate({
+      where: {
+        producerId: producer.id,
+        order: {
+          paymentStatus: 'CONFIRMED'
+        }
+      },
+      _sum: {
+        producerAmount: true // This is the net amount after commission
+      }
+    });
+
+    // Also get gross sales for comparison
+    const grossSales = await prisma.orderItem.aggregate({
       where: {
         productId: { in: productIds },
         order: {
@@ -169,7 +233,11 @@ class AnalyticsService {
       }
     });
 
-    return result._sum.subtotal || 29800; // Fallback to mock data if no real data
+    return {
+      netEarnings: netEarnings._sum.producerAmount || 0,
+      grossSales: grossSales._sum.subtotal || 0,
+      commission: (grossSales._sum.subtotal || 0) - (netEarnings._sum.producerAmount || 0)
+    };
   }
 
   async getTotalOrders(productIds) {
@@ -246,13 +314,36 @@ class AnalyticsService {
       take: limit
     });
 
-    return products.map(product => ({
-      id: product.id,
-      name: product.name,
-      salesCount: product._count.orderItems || Math.floor(Math.random() * 50) + 10,
-      totalRevenue: (product.price * (product._count.orderItems || 15)) * 0.8,
-      imageUrl: product.imageUrl
+    // FIXED: Calculate actual earnings for top products
+    const topProductsData = await Promise.all(products.map(async (product) => {
+      // Get actual earnings for this product
+      const earnings = await prisma.orderProducer.aggregate({
+        where: {
+          producerId: producerId,
+          order: {
+            paymentStatus: 'CONFIRMED',
+            orderItems: {
+              some: {
+                productId: product.id
+              }
+            }
+          }
+        },
+        _sum: {
+          producerAmount: true
+        }
+      });
+
+      return {
+        id: product.id,
+        name: product.name,
+        salesCount: product._count.orderItems || 0,
+        totalRevenue: earnings._sum.producerAmount || 0, // Net earnings
+        imageUrl: product.imageUrl
+      };
     }));
+
+    return topProductsData;
   }
 }
 
