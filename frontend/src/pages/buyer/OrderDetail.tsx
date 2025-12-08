@@ -25,7 +25,9 @@ import {
   Mail,
   Shield,
   FileText,
-  Calendar
+  Calendar,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, Upload, X, AlertCircle, Users } from 'lucide-react';
@@ -40,6 +42,8 @@ interface Order {
   shippingAddress: any;
   blockchainTxHash?: string;
   blockchainRecorded?: boolean;
+  blockNumber?: number;
+  blockchainRecordedAt?: string;
   buyer?: {
     id: string;
     user: {
@@ -183,6 +187,7 @@ const OrderDetail = () => {
   });
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [checkingDispute, setCheckingDispute] = useState(false);
+  const [copiedTxHash, setCopiedTxHash] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -362,6 +367,24 @@ const OrderDetail = () => {
 
   const getPolygonscanUrl = (txHash: string) => {
     return `https://amoy.polygonscan.com/tx/${txHash}`;
+  };
+
+  const copyTxHash = async (txHash: string) => {
+    try {
+      await navigator.clipboard.writeText(txHash);
+      setCopiedTxHash(true);
+      toast({
+        title: "Copied!",
+        description: "Transaction hash copied to clipboard",
+      });
+      setTimeout(() => setCopiedTxHash(false), 2000);
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please copy manually",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleOpenDisputeModal = () => {
@@ -938,41 +961,116 @@ const OrderDetail = () => {
                   </Card>
                 )}
 
-                {/* Blockchain Verification */}
-                <Card>
+                {/* Enhanced Blockchain Verification */}
+                <Card className={order.blockchainTxHash ? "border-green-200 bg-green-50/30" : ""}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
+                      <Shield className="h-5 w-5 text-primary" />
                       Blockchain Verification
                     </CardTitle>
                     <CardDescription>
-                      Transaction recorded on Polygon Amoy
+                      Immutable record on Polygon Amoy
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-4">
                     {order.blockchainTxHash ? (
                       <>
-                        <div className="flex items-center gap-2 text-green-600">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="text-sm font-medium">Verified on Blockchain</span>
+                        {/* Verification Status */}
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-green-600">Verified on Blockchain</p>
+                            <p className="text-xs text-muted-foreground">Permanently recorded and immutable</p>
+                          </div>
                         </div>
-                        <div className="text-xs bg-muted p-2 rounded break-all">
-                          {order.blockchainTxHash}
+
+                        <Separator />
+
+                        {/* Transaction Details */}
+                        <div className="space-y-3">
+                          {/* Transaction Hash */}
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Transaction Hash</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex-1 bg-muted p-2 rounded text-xs font-mono break-all">
+                                {order.blockchainTxHash}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="flex-shrink-0"
+                                onClick={() => copyTxHash(order.blockchainTxHash!)}
+                              >
+                                {copiedTxHash ? (
+                                  <Check className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Block Number & Timestamp */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs font-medium text-muted-foreground">Block Number</label>
+                              <p className="text-sm font-medium mt-1">
+                                {order.blockNumber || 'Confirming...'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-muted-foreground">Recorded</label>
+                              <p className="text-sm font-medium mt-1">
+                                {order.blockchainRecordedAt
+                                  ? new Date(order.blockchainRecordedAt).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })
+                                  : 'Recently'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Multi-Producer Info */}
+                          {order.items.some(item => item.product.producers && item.product.producers.length > 1) && (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Users className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">Multi-Producer Order</span>
+                              </div>
+                              <p className="text-xs text-blue-700">
+                                All {order.items[0].product.producers?.length || 0} producers are recorded on blockchain
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Immutable Badge */}
+                          <div className="flex items-center justify-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                            <Shield className="h-4 w-4 text-green-600" />
+                            <span className="text-xs font-semibold text-green-700">IMMUTABLE RECORD</span>
+                          </div>
                         </div>
+
+                        {/* View on Explorer Button */}
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
                           className="w-full"
                           onClick={() => window.open(getPolygonscanUrl(order.blockchainTxHash!), '_blank')}
                         >
-                          <ExternalLink className="h-3 w-3 mr-2" />
-                          View on Polygonscan
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View on Polygonscan Explorer
                         </Button>
                       </>
                     ) : (
-                      <div className="flex items-center gap-2 text-yellow-600">
-                        <Clock className="h-4 w-4" />
-                        <span className="text-sm">Pending blockchain verification</span>
+                      <div className="flex flex-col items-center justify-center py-4 text-center">
+                        <Clock className="h-8 w-8 text-yellow-600 mb-2 animate-pulse" />
+                        <p className="text-sm font-medium text-yellow-700">Pending Blockchain Recording</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Your order will be recorded on blockchain shortly
+                        </p>
                       </div>
                     )}
                   </CardContent>
