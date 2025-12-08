@@ -714,6 +714,194 @@ const OrderDetail = () => {
                   </CardContent>
                 </Card>
 
+                {/* Delivery Tracking Timeline */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck className="h-5 w-5" />
+                      Delivery Tracking
+                    </CardTitle>
+                    <CardDescription>
+                      Track your order from confirmation to delivery
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {/* Delivery Steps */}
+                      <div className="relative">
+                        {/* Vertical Line */}
+                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border"></div>
+
+                        {/* Step 1: Order Confirmed */}
+                        <div className="relative flex items-start gap-4 pb-8">
+                          <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-background border-border'
+                            }`}>
+                            {['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus) ? (
+                              <CheckCircle className="h-4 w-4 text-white" />
+                            ) : (
+                              <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <h4 className={`font-semibold ${['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
+                                ? 'text-foreground'
+                                : 'text-muted-foreground'
+                              }`}>
+                              Order Confirmed
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {order.statusHistory?.find(h => h.toStatus === 'CONFIRMED')
+                                ? formatDate(order.statusHistory.find(h => h.toStatus === 'CONFIRMED')!.timestamp)
+                                : order.deliveryStatus === 'CONFIRMED' || order.deliveryStatus === 'SHIPPED' || order.deliveryStatus === 'DELIVERED'
+                                  ? 'Confirmed'
+                                  : 'Awaiting confirmation'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Step 2: Shipped */}
+                        <div className="relative flex items-start gap-4 pb-8">
+                          <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
+                              ? 'bg-blue-500 border-blue-500'
+                              : order.deliveryStatus === 'CONFIRMED'
+                                ? 'bg-yellow-500 border-yellow-500 animate-pulse'
+                                : 'bg-background border-border'
+                            }`}>
+                            {['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus) ? (
+                              <Truck className="h-4 w-4 text-white" />
+                            ) : order.deliveryStatus === 'CONFIRMED' ? (
+                              <Clock className="h-4 w-4 text-white" />
+                            ) : (
+                              <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <h4 className={`font-semibold ${['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
+                                ? 'text-foreground'
+                                : order.deliveryStatus === 'CONFIRMED'
+                                  ? 'text-yellow-600'
+                                  : 'text-muted-foreground'
+                              }`}>
+                              Shipped
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {order.statusHistory?.find(h => h.toStatus === 'SHIPPED')
+                                ? formatDate(order.statusHistory.find(h => h.toStatus === 'SHIPPED')!.timestamp)
+                                : order.deliveryStatus === 'SHIPPED' || order.deliveryStatus === 'DELIVERED'
+                                  ? 'In transit'
+                                  : order.deliveryStatus === 'CONFIRMED'
+                                    ? 'Preparing for shipment'
+                                    : 'Not yet shipped'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Step 3: Out for Delivery */}
+                        <div className="relative flex items-start gap-4 pb-8">
+                          <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${order.deliveryStatus === 'DELIVERED'
+                              ? 'bg-purple-500 border-purple-500'
+                              : order.deliveryStatus === 'SHIPPED'
+                                ? 'bg-yellow-500 border-yellow-500 animate-pulse'
+                                : 'bg-background border-border'
+                            }`}>
+                            {order.deliveryStatus === 'DELIVERED' ? (
+                              <Package className="h-4 w-4 text-white" />
+                            ) : order.deliveryStatus === 'SHIPPED' ? (
+                              <Clock className="h-4 w-4 text-white" />
+                            ) : (
+                              <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <h4 className={`font-semibold ${order.deliveryStatus === 'DELIVERED'
+                                ? 'text-foreground'
+                                : order.deliveryStatus === 'SHIPPED'
+                                  ? 'text-yellow-600'
+                                  : 'text-muted-foreground'
+                              }`}>
+                              Out for Delivery
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {order.deliveryStatus === 'DELIVERED'
+                                ? 'Package was out for delivery'
+                                : order.deliveryStatus === 'SHIPPED'
+                                  ? 'Package will be out for delivery soon'
+                                  : 'Awaiting shipment'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Step 4: Delivered */}
+                        <div className="relative flex items-start gap-4">
+                          <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${order.deliveryStatus === 'DELIVERED'
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-background border-border'
+                            }`}>
+                            {order.deliveryStatus === 'DELIVERED' ? (
+                              <CheckCircle className="h-4 w-4 text-white" />
+                            ) : (
+                              <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <h4 className={`font-semibold ${order.deliveryStatus === 'DELIVERED'
+                                ? 'text-green-600'
+                                : 'text-muted-foreground'
+                              }`}>
+                              Delivered
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {order.statusHistory?.find(h => h.toStatus === 'DELIVERED')
+                                ? formatDate(order.statusHistory.find(h => h.toStatus === 'DELIVERED')!.timestamp)
+                                : order.deliveryStatus === 'DELIVERED'
+                                  ? 'Successfully delivered'
+                                  : 'Not yet delivered'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Estimated Delivery (if not delivered) */}
+                      {order.deliveryStatus !== 'DELIVERED' && (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <Calendar className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-blue-900 mb-1">Estimated Delivery</h4>
+                              <p className="text-sm text-blue-700">
+                                {order.deliveryStatus === 'PENDING'
+                                  ? 'Delivery date will be confirmed after order confirmation'
+                                  : order.deliveryStatus === 'CONFIRMED'
+                                    ? 'Estimated 3-5 business days after shipment'
+                                    : order.deliveryStatus === 'SHIPPED'
+                                      ? 'Expected within 2-3 business days'
+                                      : 'To be confirmed'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Delivery Success Message */}
+                      {order.deliveryStatus === 'DELIVERED' && (
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-green-900 mb-1">Order Delivered Successfully!</h4>
+                              <p className="text-sm text-green-700">
+                                Your order has been delivered. Thank you for shopping with us!
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Order Items */}
                 <Card>
                   <CardHeader>
