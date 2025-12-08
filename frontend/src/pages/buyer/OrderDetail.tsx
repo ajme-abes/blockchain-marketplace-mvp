@@ -745,6 +745,19 @@ const OrderDetail = () => {
                       )}
                     </div>
 
+                    {/* Multi-Producer Warning */}
+                    {canUpdateStatus && order.items.some(item => item.product.producers && item.product.producers.length > 1) && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs text-amber-800">
+                            <p className="font-medium mb-1">Multi-Producer Order</p>
+                            <p>This order contains products from multiple producers. Updating the status will affect the entire order for all producers. Please coordinate with co-producers before marking as shipped or delivered.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Status Timeline */}
                     {order.statusHistory && order.statusHistory.length > 0 && (
                       <div className="space-y-3">

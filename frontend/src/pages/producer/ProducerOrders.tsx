@@ -451,15 +451,10 @@ const ProducerOrders = () => {
                             {order.deliveryStatus === 'SHIPPED' && (
                               <Button
                                 size="sm"
-                                onClick={() => updateOrderStatus(order.id, 'DELIVERED')}
-                                disabled={updatingStatus === order.id}
+                                onClick={() => navigate(`/orders/${order.id}`)}
                               >
-                                {updatingStatus === order.id ? (
-                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                )}
-                                Deliver
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Upload Proof & Deliver
                               </Button>
                             )}
                           </div>
