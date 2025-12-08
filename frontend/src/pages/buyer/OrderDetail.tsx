@@ -203,6 +203,11 @@ const OrderDetail = () => {
   const [uploadingProof, setUploadingProof] = useState(false);
   const [showDeliveryProofModal, setShowDeliveryProofModal] = useState(false);
 
+  // Define role checks early so they can be used in useEffect
+  const isProducer = user?.role === 'PRODUCER';
+  const isBuyer = user?.role === 'BUYER';
+  const canUpdateStatus = isProducer || user?.role === 'ADMIN';
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -212,6 +217,16 @@ const OrderDetail = () => {
       fetchOrderDetails();
     }
   }, [isAuthenticated, navigate, orderId]);
+
+  // Auto-open delivery proof modal if coming from order management
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('uploadProof') === 'true' && order?.deliveryStatus === 'SHIPPED' && isProducer) {
+      setShowDeliveryProofModal(true);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [order, isProducer]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -279,10 +294,12 @@ const OrderDetail = () => {
       formData.append('status', 'DELIVERED');
       formData.append('deliveryNotes', deliveryNotes);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status-with-proof`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${apiUrl}/api/orders/${orderId}/status-with-proof`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
@@ -587,9 +604,6 @@ const OrderDetail = () => {
   };
 
   const selectedReason = DISPUTE_REASONS.find(r => r.value === disputeForm.reason);
-  const isProducer = user?.role === 'PRODUCER';
-  const isBuyer = user?.role === 'BUYER';
-  const canUpdateStatus = isProducer || user?.role === 'ADMIN';
   const hasActiveDispute = order?.dispute && order.dispute.status !== 'RESOLVED' && order.dispute.status !== 'CANCELLED';
 
   const handleCreatePaymentLink = async () => {
@@ -968,11 +982,25 @@ const OrderDetail = () => {
                         <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                           <div className="flex items-start gap-3">
                             <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                            <div>
+                            <div className="flex-1">
                               <h4 className="font-semibold text-green-900 mb-1">Order Delivered Successfully!</h4>
-                              <p className="text-sm text-green-700">
+                              <p className="text-sm text-green-700 mb-2">
                                 Your order has been delivered. Thank you for shopping with us!
                               </p>
+                              {order.deliveryProofUrl && isBuyer && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-white border-green-300 text-green-700 hover:bg-green-100"
+                                  onClick={() => {
+                                    const proofElement = document.getElementById('delivery-proof-section');
+                                    proofElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }}
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  View Delivery Proof
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -983,7 +1011,7 @@ const OrderDetail = () => {
 
                 {/* Delivery Proof Card */}
                 {order.deliveryProofUrl && (
-                  <Card className="border-green-200 bg-green-50/30">
+                  <Card id="delivery-proof-section" className="border-green-200 bg-green-50/30">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <CheckCircle className="h-5 w-5 text-green-600" />
@@ -1560,7 +1588,7 @@ const OrderDetail = () => {
       {/* Delivery Proof Upload Modal */}
       {showDeliveryProofModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-background rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto border shadow-lg">
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -1641,10 +1669,23 @@ const OrderDetail = () => {
                   value={deliveryNotes}
                   onChange={(e) => setDeliveryNotes(e.target.value)}
                   placeholder="Add any notes about the delivery (e.g., handed to customer, left at door, etc.)"
-                  className="w-full p-2 border rounded-md min-h-[80px]"
+                  className="w-full p-2 border rounded-md min-h-[80px] bg-background text-foreground"
                   disabled={uploadingProof}
                 />
               </div>
+
+              {/* Multi-Producer Warning */}
+              {order.items.some(item => item.product.producers && item.product.producers.length > 1) && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-800">
+                      <p className="font-medium mb-1">Multi-Producer Order</p>
+                      <p>This order has multiple producers. Marking as delivered will update the status for the entire order. All producers will see this delivery proof.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Info Box */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1658,7 +1699,7 @@ const OrderDetail = () => {
               </div>
             </div>
 
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+            <div className="p-6 border-t bg-muted/30 flex justify-end gap-3">
               <Button
                 variant="outline"
                 onClick={() => setShowDeliveryProofModal(false)}
@@ -1669,7 +1710,7 @@ const OrderDetail = () => {
               <Button
                 onClick={handleDeliveryProofUpload}
                 disabled={uploadingProof || !deliveryProofFile}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 text-white"
               >
                 {uploadingProof ? (
                   <>

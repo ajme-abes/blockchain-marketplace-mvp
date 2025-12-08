@@ -196,6 +196,15 @@ class OrderService {
             }
           },
           orderBy: { createdAt: 'asc' }
+        },
+        dispute: {
+          select: {
+            id: true,
+            status: true,
+            reason: true,
+            description: true,
+            createdAt: true
+          }
         }
       }
     });
@@ -758,6 +767,15 @@ class OrderService {
       orderDate: order.orderDate,
       shippingAddress: order.shippingAddress,
       blockchainTxHash: order.blockchainTxHash,
+      blockchainRecorded: order.blockchainRecorded,
+      blockchainRecordedAt: order.blockchainRecordedAt,
+      blockchainRecords: order.blockchainRecords ? order.blockchainRecords.map(record => ({
+        id: record.id,
+        txHash: record.txHash,
+        blockNumber: record.blockNumber,
+        timestamp: record.timestamp,
+        status: record.status
+      })) : [],
       deliveryProofUrl: order.deliveryProofUrl,
       deliveryProofIpfsCid: order.deliveryProofIpfsCid,
       deliveredAt: order.deliveredAt,
@@ -772,6 +790,7 @@ class OrderService {
           id: item.product.id,
           name: item.product.name,
           price: item.price,
+          imageUrl: item.product.imageUrl,
           producer: item.product.producer ? {
             id: item.product.producer.id,
             businessName: item.product.producer.businessName,
@@ -791,6 +810,13 @@ class OrderService {
         reason: history.reason,
         timestamp: history.createdAt
       })) : [],
+      dispute: order.dispute ? {
+        id: order.dispute.id,
+        status: order.dispute.status,
+        reason: order.dispute.reason,
+        description: order.dispute.description,
+        createdAt: order.dispute.createdAt
+      } : null,
       createdAt: order.orderDate,
       updatedAt: order.updatedAt
     };

@@ -404,14 +404,18 @@ router.put('/:id/status-with-proof',
       if (req.file && status === 'DELIVERED') {
         console.log('📸 Uploading delivery proof to IPFS...');
 
-        const ipfsResult = await ipfsService.uploadFile(req.file.buffer, {
-          filename: `delivery-proof-${id}-${Date.now()}.${req.file.mimetype.split('/')[1]}`,
-          mimetype: req.file.mimetype
-        });
+        const filename = `delivery-proof-${id}-${Date.now()}.${req.file.mimetype.split('/')[1]}`;
+        const ipfsResult = await ipfsService.uploadFile(
+          req.file.buffer,
+          filename,
+          'DOCUMENT', // category
+          req.user.id, // userId
+          null // productId
+        );
 
         if (ipfsResult.success) {
           deliveryProof = {
-            url: ipfsResult.url,
+            url: ipfsResult.pinataUrl || `https://gateway.pinata.cloud/ipfs/${ipfsResult.cid}`,
             cid: ipfsResult.cid,
             notes: deliveryNotes || null
           };

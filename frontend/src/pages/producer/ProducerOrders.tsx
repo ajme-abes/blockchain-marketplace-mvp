@@ -451,7 +451,7 @@ const ProducerOrders = () => {
                             {order.deliveryStatus === 'SHIPPED' && (
                               <Button
                                 size="sm"
-                                onClick={() => navigate(`/orders/${order.id}`)}
+                                onClick={() => navigate(`/orders/${order.id}?uploadProof=true`)}
                               >
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Upload Proof & Deliver
