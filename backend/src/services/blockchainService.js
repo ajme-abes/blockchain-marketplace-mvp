@@ -544,13 +544,15 @@ class BlockchainService {
 
         // ✅ FIXED: Use transaction to update both Order and create BlockchainRecord
         await prisma.$transaction(async (tx) => {
-          // Update order with blockchain info
+          // Update order with blockchain info including block number and timestamp
           await tx.order.update({
             where: { id: orderId },
             data: {
               blockchainTxHash: result.transactionHash,
               blockchainRecorded: true,
               blockchainError: null,
+              blockchainOrderId: result.contractTxHash || result.transactionHash,
+              blockchainRecordedAt: new Date(),
               updatedAt: new Date()
             }
           });

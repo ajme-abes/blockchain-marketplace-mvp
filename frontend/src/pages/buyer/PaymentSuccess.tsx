@@ -193,7 +193,7 @@ const PaymentSuccess = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Order Not Found</h1>
-          <Button onClick={() => navigate('/orders')}>View All Orders</Button>
+          <Button onClick={() => navigate('/my-orders')}>View All Orders</Button>
         </div>
       </div>
     );

@@ -199,6 +199,7 @@ model Order {
   blockchainTxHash String?       @unique
   blockchainOrderId    String?   @unique  
   blockchainRecorded   Boolean?  @default(false)
+  blockchainRecordedAt DateTime?
   blockchainError      String?   
   
   shippingAddress  Json?

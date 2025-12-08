@@ -42,8 +42,14 @@ interface Order {
   shippingAddress: any;
   blockchainTxHash?: string;
   blockchainRecorded?: boolean;
-  blockNumber?: number;
   blockchainRecordedAt?: string;
+  blockchainRecords?: Array<{
+    id: string;
+    txHash: string;
+    blockNumber: string;
+    timestamp: string;
+    status: string;
+  }>;
   buyer?: {
     id: string;
     user: {
@@ -976,30 +982,31 @@ const OrderDetail = () => {
                     {order.blockchainTxHash ? (
                       <>
                         {/* Verification Status */}
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          <div>
-                            <p className="text-sm font-semibold text-green-600">Verified on Blockchain</p>
-                            <p className="text-xs text-muted-foreground">Permanently recorded and immutable</p>
+                        <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-green-700 mb-1">Verified on Blockchain</p>
+                            <p className="text-xs text-green-600">Permanently recorded and immutable</p>
                           </div>
                         </div>
 
-                        <Separator />
+                        <Separator className="my-4" />
 
                         {/* Transaction Details */}
                         <div className="space-y-3">
                           {/* Transaction Hash */}
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Transaction Hash</label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <div className="flex-1 bg-muted p-2 rounded text-xs font-mono break-all">
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium text-muted-foreground block">Transaction Hash</label>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-muted p-3 rounded-md text-xs font-mono break-all">
                                 {order.blockchainTxHash}
                               </div>
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="flex-shrink-0"
+                                className="flex-shrink-0 h-10 w-10"
                                 onClick={() => copyTxHash(order.blockchainTxHash!)}
+                                title="Copy transaction hash"
                               >
                                 {copiedTxHash ? (
                                   <Check className="h-4 w-4 text-green-600" />
@@ -1011,16 +1018,18 @@ const OrderDetail = () => {
                           </div>
 
                           {/* Block Number & Timestamp */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-xs font-medium text-muted-foreground">Block Number</label>
-                              <p className="text-sm font-medium mt-1">
-                                {order.blockNumber || 'Confirming...'}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground block">Block Number</label>
+                              <p className="text-sm font-semibold">
+                                {order.blockchainRecords && order.blockchainRecords.length > 0 && order.blockchainRecords[0].blockNumber
+                                  ? `#${order.blockchainRecords[0].blockNumber}`
+                                  : 'Confirming...'}
                               </p>
                             </div>
-                            <div>
-                              <label className="text-xs font-medium text-muted-foreground">Recorded</label>
-                              <p className="text-sm font-medium mt-1">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground block">Recorded</label>
+                              <p className="text-sm font-semibold">
                                 {order.blockchainRecordedAt
                                   ? new Date(order.blockchainRecordedAt).toLocaleDateString('en-US', {
                                     month: 'short',
@@ -1028,7 +1037,14 @@ const OrderDetail = () => {
                                     hour: '2-digit',
                                     minute: '2-digit'
                                   })
-                                  : 'Recently'}
+                                  : order.blockchainRecords && order.blockchainRecords.length > 0
+                                    ? new Date(order.blockchainRecords[0].timestamp).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                    : 'Recently'}
                               </p>
                             </div>
                           </div>
@@ -1047,17 +1063,17 @@ const OrderDetail = () => {
                           )}
 
                           {/* Immutable Badge */}
-                          <div className="flex items-center justify-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                            <Shield className="h-4 w-4 text-green-600" />
-                            <span className="text-xs font-semibold text-green-700">IMMUTABLE RECORD</span>
+                          <div className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg mt-2">
+                            <Shield className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-bold text-green-700 tracking-wide">IMMUTABLE RECORD</span>
                           </div>
                         </div>
 
                         {/* View on Explorer Button */}
                         <Button
                           variant="default"
-                          size="sm"
-                          className="w-full"
+                          size="default"
+                          className="w-full mt-4"
                           onClick={() => window.open(getPolygonscanUrl(order.blockchainTxHash!), '_blank')}
                         >
                           <ExternalLink className="h-4 w-4 mr-2" />
