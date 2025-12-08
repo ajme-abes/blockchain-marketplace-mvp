@@ -41,24 +41,25 @@ router.get('/', authenticateToken, checkUserStatus, requireRole(['ADMIN']), asyn
     }
 });
 
-// Create testimonial (Public or Authenticated)
-router.post('/', async (req, res) => {
+// Create testimonial (Authenticated users only)
+router.post('/', authenticateToken, checkUserStatus, async (req, res) => {
     try {
-        const { name, role, message, rating } = req.body;
+        const { message, rating } = req.body;
 
-        if (!name || !role || !message) {
+        if (!message) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Name, role, and message are required'
+                message: 'Message is required'
             });
         }
 
+        // Use authenticated user's data from their profile
         const testimonial = await testimonialService.createTestimonial({
-            name,
-            role,
+            name: req.user.name,
+            role: req.user.role,
             message,
             rating: rating || 5,
-            userId: req.user?.id || null
+            userId: req.user.id
         });
 
         res.status(201).json({

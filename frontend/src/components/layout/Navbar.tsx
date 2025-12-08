@@ -73,6 +73,13 @@ export const Navbar = () => {
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-amber-400 to-orange-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
             <Link
+              to="/about"
+              className="relative text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors group py-2"
+            >
+              About Us
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-amber-400 to-orange-500 group-hover:w-full transition-all duration-300"></span>
+            </Link>
+            <Link
               to="/contact"
               className="relative text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors group py-2"
             >
@@ -267,6 +274,14 @@ export const Navbar = () => {
                   >
                     <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
                     {t('nav.marketplace')}
+                  </Link>
+                  <Link
+                    to="/about"
+                    className="flex items-center gap-3 text-lg font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50 rounded-xl p-3 transition-all"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                    About
                   </Link>
                   <Link
                     to="/contact"

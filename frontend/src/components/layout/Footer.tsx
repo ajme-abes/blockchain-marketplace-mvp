@@ -27,7 +27,7 @@ export const Footer = () => {
                   EthioTrust
                 </span>
                 <span className="text-sm text-amber-600 dark:text-amber-400 font-medium -mt-1">
-                  {t('footer.brand.tagline')}
+                  Trusted Ethiopian Marketplace
                 </span>
               </div>
             </div>

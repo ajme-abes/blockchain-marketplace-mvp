@@ -66,8 +66,10 @@ import AuditLogs from "./pages/admin/AuditLogs";
 import SystemSettings from "./pages/admin/SystemSettings";
 import TestimonialManagement from "./pages/admin/TestimonialManagement";
 import ContactMessages from "./pages/admin/ContactMessages";
+import AboutUsManagement from "./pages/admin/AboutUsManagement";
 import MyMessages from "./pages/common/MyMessages";
 import ProducerProfile from "./pages/common/ProducerProfile";
+import ShareTestimonial from "./pages/common/ShareTestimonial";
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -188,6 +190,11 @@ const App = () => (
                           <Route path="/my-messages" element={
                             <ProtectedRoute>
                               <MyMessages />
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/share-testimonial" element={
+                            <ProtectedRoute>
+                              <ShareTestimonial />
                             </ProtectedRoute>
                           } />
 
@@ -365,6 +372,12 @@ const App = () => (
                           <Route path="/admin/testimonials" element={
                             <RoleRoute allowedRoles={['admin']}>
                               <TestimonialManagement />
+                            </RoleRoute>
+                          } />
+
+                          <Route path="/admin/about-us" element={
+                            <RoleRoute allowedRoles={['admin']}>
+                              <AboutUsManagement />
                             </RoleRoute>
                           } />
 

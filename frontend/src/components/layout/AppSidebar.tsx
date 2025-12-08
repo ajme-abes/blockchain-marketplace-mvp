@@ -21,6 +21,7 @@ import {
   TrendingUp,
   DollarSign,
   Mail,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -55,11 +56,14 @@ export const AppSidebar = () => {
 
   // Core links for ALL roles
   const coreLinks = [
+    { title: 'Home', url: '/', icon: Sparkles },
     { title: 'sidebar.dashboard', url: '/dashboard', icon: Home },
     { title: 'sidebar.profile', url: '/profile', icon: User },
     { title: 'sidebar.settings', url: '/settings', icon: Settings },
-    { title: 'sidebar.aboutUs', url: '/about', icon: Info },
   ];
+
+  // Testimonial link for buyers and producers only
+  const testimonialLink = { title: 'Share Testimonial', url: '/share-testimonial', icon: Star };
 
   // Role-specific additional common links
   const getRoleSpecificLinks = (role: string) => {
@@ -106,12 +110,18 @@ export const AppSidebar = () => {
     { title: 'sidebar.admin.disputeManagement', url: '/admin/disputes', icon: Scale },
     { title: 'sidebar.admin.testimonials', url: '/admin/testimonials', icon: MessageSquare },
     { title: 'sidebar.admin.contactMessages', url: '/admin/contact-messages', icon: Mail },
+    { title: 'About Us Management', url: '/admin/about-us', icon: Info },
     { title: 'sidebar.admin.systemAnalytics', url: '/admin/analytics', icon: TrendingUp },
     { title: 'sidebar.admin.auditLogs', url: '/admin/logs', icon: FileText },
     { title: 'sidebar.admin.systemSettings', url: '/admin/settings', icon: Settings },
   ];
 
   const commonLinks = [...coreLinks, ...getRoleSpecificLinks(user?.role || '')];
+
+  // Add testimonial link for buyers and producers
+  if (user?.role === 'BUYER' || user?.role === 'PRODUCER') {
+    commonLinks.push(testimonialLink);
+  }
 
   let roleLinks: typeof commonLinks = [];
   if (user?.role === 'PRODUCER') roleLinks = producerLinks;

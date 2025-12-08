@@ -137,14 +137,19 @@ class TestimonialService {
     formatTestimonial(testimonial) {
         return {
             id: testimonial.id,
-            name: testimonial.name,
+            name: testimonial.user?.name || testimonial.name, // Prefer user's actual name
             role: testimonial.role,
             message: testimonial.message,
             rating: testimonial.rating,
-            photo: testimonial.user?.avatarUrl || testimonial.photo || `https://i.pravatar.cc/150?u=${testimonial.id}`,
+            photo: testimonial.user?.avatarUrl || testimonial.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}&background=random&size=150`,
             isApproved: testimonial.isApproved,
             isPublished: testimonial.isPublished,
             userId: testimonial.userId,
+            user: testimonial.user ? {
+                id: testimonial.user.id,
+                name: testimonial.user.name,
+                avatarUrl: testimonial.user.avatarUrl
+            } : null,
             createdAt: testimonial.createdAt,
             updatedAt: testimonial.updatedAt
         };
