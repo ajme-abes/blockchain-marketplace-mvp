@@ -68,7 +68,13 @@ class ApiService {
     let requestBody = options.data || options.body;
 
     if (requestBody) {
-      if (typeof requestBody === 'object') {
+      // Check if it's FormData - don't stringify it and let browser set Content-Type
+      if (requestBody instanceof FormData) {
+        config.body = requestBody;
+        // Remove Content-Type header to let browser set it with boundary
+        delete (config.headers as any)['Content-Type'];
+        console.log('🔧 Request body is FormData');
+      } else if (typeof requestBody === 'object') {
         config.body = JSON.stringify(requestBody);
         console.log('🔧 Request body stringified:', config.body.substring(0, 200) + '...');
       } else {
