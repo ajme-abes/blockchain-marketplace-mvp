@@ -50,6 +50,10 @@ interface Order {
     timestamp: string;
     status: string;
   }>;
+  deliveryProofUrl?: string;
+  deliveryProofIpfsCid?: string;
+  deliveredAt?: string;
+  deliveryNotes?: string;
   buyer?: {
     id: string;
     user: {
@@ -194,6 +198,10 @@ const OrderDetail = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [checkingDispute, setCheckingDispute] = useState(false);
   const [copiedTxHash, setCopiedTxHash] = useState(false);
+  const [deliveryProofFile, setDeliveryProofFile] = useState<File | null>(null);
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [showDeliveryProofModal, setShowDeliveryProofModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -246,6 +254,64 @@ const OrderDetail = () => {
       });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleMarkAsDelivered = () => {
+    setShowDeliveryProofModal(true);
+  };
+
+  const handleDeliveryProofUpload = async () => {
+    if (!orderId || !deliveryProofFile) {
+      toast({
+        title: "Missing information",
+        description: "Please select a delivery proof image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setUploadingProof(true);
+
+      const formData = new FormData();
+      formData.append('deliveryProof', deliveryProofFile);
+      formData.append('status', 'DELIVERED');
+      formData.append('deliveryNotes', deliveryNotes);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status-with-proof`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || 'Failed to upload delivery proof');
+      }
+
+      toast({
+        title: "Success!",
+        description: "Order marked as delivered with proof uploaded to IPFS",
+      });
+
+      setShowDeliveryProofModal(false);
+      setDeliveryProofFile(null);
+      setDeliveryNotes('');
+      fetchOrderDetails();
+
+    } catch (error: any) {
+      console.error('Failed to upload delivery proof:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload delivery proof",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -669,7 +735,7 @@ const OrderDetail = () => {
                           {order.deliveryStatus === 'SHIPPED' && (
                             <Button
                               size="sm"
-                              onClick={() => updateOrderStatus('DELIVERED')}
+                              onClick={handleMarkAsDelivered}
                               disabled={updatingStatus}
                             >
                               Mark as Delivered
@@ -735,8 +801,8 @@ const OrderDetail = () => {
                         {/* Step 1: Order Confirmed */}
                         <div className="relative flex items-start gap-4 pb-8">
                           <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
-                              ? 'bg-green-500 border-green-500'
-                              : 'bg-background border-border'
+                            ? 'bg-green-500 border-green-500'
+                            : 'bg-background border-border'
                             }`}>
                             {['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus) ? (
                               <CheckCircle className="h-4 w-4 text-white" />
@@ -746,8 +812,8 @@ const OrderDetail = () => {
                           </div>
                           <div className="flex-1 pt-1">
                             <h4 className={`font-semibold ${['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
-                                ? 'text-foreground'
-                                : 'text-muted-foreground'
+                              ? 'text-foreground'
+                              : 'text-muted-foreground'
                               }`}>
                               Order Confirmed
                             </h4>
@@ -764,10 +830,10 @@ const OrderDetail = () => {
                         {/* Step 2: Shipped */}
                         <div className="relative flex items-start gap-4 pb-8">
                           <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
-                              ? 'bg-blue-500 border-blue-500'
-                              : order.deliveryStatus === 'CONFIRMED'
-                                ? 'bg-yellow-500 border-yellow-500 animate-pulse'
-                                : 'bg-background border-border'
+                            ? 'bg-blue-500 border-blue-500'
+                            : order.deliveryStatus === 'CONFIRMED'
+                              ? 'bg-yellow-500 border-yellow-500 animate-pulse'
+                              : 'bg-background border-border'
                             }`}>
                             {['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus) ? (
                               <Truck className="h-4 w-4 text-white" />
@@ -779,10 +845,10 @@ const OrderDetail = () => {
                           </div>
                           <div className="flex-1 pt-1">
                             <h4 className={`font-semibold ${['SHIPPED', 'DELIVERED'].includes(order.deliveryStatus)
-                                ? 'text-foreground'
-                                : order.deliveryStatus === 'CONFIRMED'
-                                  ? 'text-yellow-600'
-                                  : 'text-muted-foreground'
+                              ? 'text-foreground'
+                              : order.deliveryStatus === 'CONFIRMED'
+                                ? 'text-yellow-600'
+                                : 'text-muted-foreground'
                               }`}>
                               Shipped
                             </h4>
@@ -801,10 +867,10 @@ const OrderDetail = () => {
                         {/* Step 3: Out for Delivery */}
                         <div className="relative flex items-start gap-4 pb-8">
                           <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${order.deliveryStatus === 'DELIVERED'
-                              ? 'bg-purple-500 border-purple-500'
-                              : order.deliveryStatus === 'SHIPPED'
-                                ? 'bg-yellow-500 border-yellow-500 animate-pulse'
-                                : 'bg-background border-border'
+                            ? 'bg-purple-500 border-purple-500'
+                            : order.deliveryStatus === 'SHIPPED'
+                              ? 'bg-yellow-500 border-yellow-500 animate-pulse'
+                              : 'bg-background border-border'
                             }`}>
                             {order.deliveryStatus === 'DELIVERED' ? (
                               <Package className="h-4 w-4 text-white" />
@@ -816,10 +882,10 @@ const OrderDetail = () => {
                           </div>
                           <div className="flex-1 pt-1">
                             <h4 className={`font-semibold ${order.deliveryStatus === 'DELIVERED'
-                                ? 'text-foreground'
-                                : order.deliveryStatus === 'SHIPPED'
-                                  ? 'text-yellow-600'
-                                  : 'text-muted-foreground'
+                              ? 'text-foreground'
+                              : order.deliveryStatus === 'SHIPPED'
+                                ? 'text-yellow-600'
+                                : 'text-muted-foreground'
                               }`}>
                               Out for Delivery
                             </h4>
@@ -836,8 +902,8 @@ const OrderDetail = () => {
                         {/* Step 4: Delivered */}
                         <div className="relative flex items-start gap-4">
                           <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 ${order.deliveryStatus === 'DELIVERED'
-                              ? 'bg-green-500 border-green-500'
-                              : 'bg-background border-border'
+                            ? 'bg-green-500 border-green-500'
+                            : 'bg-background border-border'
                             }`}>
                             {order.deliveryStatus === 'DELIVERED' ? (
                               <CheckCircle className="h-4 w-4 text-white" />
@@ -847,8 +913,8 @@ const OrderDetail = () => {
                           </div>
                           <div className="flex-1 pt-1">
                             <h4 className={`font-semibold ${order.deliveryStatus === 'DELIVERED'
-                                ? 'text-green-600'
-                                : 'text-muted-foreground'
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
                               }`}>
                               Delivered
                             </h4>
@@ -901,6 +967,69 @@ const OrderDetail = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Delivery Proof Card */}
+                {order.deliveryProofUrl && (
+                  <Card className="border-green-200 bg-green-50/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        Delivery Proof
+                      </CardTitle>
+                      <CardDescription>
+                        Photo evidence of delivery uploaded by seller
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Delivery Photo */}
+                      <div className="relative rounded-lg overflow-hidden border-2 border-green-200">
+                        <img
+                          src={order.deliveryProofUrl}
+                          alt="Delivery Proof"
+                          className="w-full h-auto max-h-96 object-contain bg-white"
+                        />
+                      </div>
+
+                      {/* Delivery Details */}
+                      <div className="space-y-2">
+                        {order.deliveredAt && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Delivered on:</span>
+                            <span className="font-medium">{formatDate(order.deliveredAt)}</span>
+                          </div>
+                        )}
+
+                        {order.deliveryNotes && (
+                          <div className="p-3 bg-white border border-green-200 rounded-lg">
+                            <p className="text-sm font-medium text-green-900 mb-1">Delivery Notes:</p>
+                            <p className="text-sm text-green-700">{order.deliveryNotes}</p>
+                          </div>
+                        )}
+
+                        {order.deliveryProofIpfsCid && (
+                          <div className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg">
+                            <Shield className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-green-900 mb-1">Stored on IPFS</p>
+                              <p className="text-xs text-muted-foreground font-mono truncate">
+                                {order.deliveryProofIpfsCid}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`https://ipfs.io/ipfs/${order.deliveryProofIpfsCid}`, '_blank')}
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Order Items */}
                 <Card>
@@ -1414,6 +1543,137 @@ const OrderDetail = () => {
           </main>
         </div>
       </div>
+
+      {/* Delivery Proof Upload Modal */}
+      {showDeliveryProofModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  Mark as Delivered
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeliveryProofModal(false)}
+                  disabled={uploadingProof}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload proof of delivery to complete this order
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Delivery Proof Upload */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Delivery Photo *
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setDeliveryProofFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="delivery-proof-upload"
+                    disabled={uploadingProof}
+                  />
+                  <label htmlFor="delivery-proof-upload" className="cursor-pointer">
+                    <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600">
+                      Click to upload delivery photo
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Maximum 10MB • JPG, PNG, WEBP
+                    </p>
+                  </label>
+                </div>
+
+                {deliveryProofFile && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-900">
+                          {deliveryProofFile.name}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeliveryProofFile(null)}
+                        disabled={uploadingProof}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-green-700 mt-1">
+                      {(deliveryProofFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Delivery Notes */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Delivery Notes (Optional)
+                </label>
+                <textarea
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="Add any notes about the delivery (e.g., handed to customer, left at door, etc.)"
+                  className="w-full p-2 border rounded-md min-h-[80px]"
+                  disabled={uploadingProof}
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-700">
+                    <p className="font-medium mb-1">Secure Storage</p>
+                    <p>Your delivery proof will be stored on IPFS (decentralized storage) and linked to the blockchain record for permanent verification.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeliveryProofModal(false)}
+                disabled={uploadingProof}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeliveryProofUpload}
+                disabled={uploadingProof || !deliveryProofFile}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {uploadingProof ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Uploading to IPFS...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Mark as Delivered
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dispute Creation Modal */}
       {showDisputeModal && (

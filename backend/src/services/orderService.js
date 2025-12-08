@@ -455,7 +455,7 @@ class OrderService {
     };
   }
 
-  async updateOrderStatus(orderId, status, updatedBy, reason = null) {
+  async updateOrderStatus(orderId, status, updatedBy, reason = null, deliveryProof = null) {
     // Get current order first to know the fromStatus
     const currentOrder = await prisma.order.findUnique({
       where: { id: orderId },
@@ -471,13 +471,26 @@ class OrderService {
 
     // Update order status and create history in transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Prepare update data
+      const updateData = {
+        deliveryStatus: toStatus,
+        ...(toStatus === 'DELIVERED' && {
+          paymentStatus: 'CONFIRMED',
+          deliveredAt: new Date()
+        })
+      };
+
+      // Add delivery proof if provided
+      if (deliveryProof) {
+        updateData.deliveryProofUrl = deliveryProof.url;
+        updateData.deliveryProofIpfsCid = deliveryProof.cid;
+        updateData.deliveryNotes = deliveryProof.notes || null;
+      }
+
       // Update order status
       const order = await tx.order.update({
         where: { id: orderId },
-        data: {
-          deliveryStatus: toStatus,
-          ...(toStatus === 'DELIVERED' && { paymentStatus: 'CONFIRMED' })
-        },
+        data: updateData,
         include: {
           buyer: {
             include: {
@@ -529,7 +542,11 @@ class OrderService {
           entity: 'Order',
           entityId: orderId,
           oldValues: { deliveryStatus: fromStatus },
-          newValues: { deliveryStatus: toStatus, reason },
+          newValues: {
+            deliveryStatus: toStatus,
+            reason,
+            ...(deliveryProof && { deliveryProof: 'uploaded' })
+          },
           userId: updatedBy,
           ipAddress: 'system'
         }
@@ -741,6 +758,10 @@ class OrderService {
       orderDate: order.orderDate,
       shippingAddress: order.shippingAddress,
       blockchainTxHash: order.blockchainTxHash,
+      deliveryProofUrl: order.deliveryProofUrl,
+      deliveryProofIpfsCid: order.deliveryProofIpfsCid,
+      deliveredAt: order.deliveredAt,
+      deliveryNotes: order.deliveryNotes,
       buyer: order.buyer ? {
         id: order.buyer.id,
         user: order.buyer.user

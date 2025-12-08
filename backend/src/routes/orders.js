@@ -1,8 +1,26 @@
 // backend/src/routes/orders.js
 const express = require('express');
+const multer = require('multer');
 const { authenticateToken, requireRole, checkUserStatus } = require('../middleware/auth');
 const orderService = require('../services/orderService');
+const ipfsService = require('../services/ipfsService');
 const router = express.Router();
+
+// Configure multer for delivery proof uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed for delivery proof!'), false);
+    }
+  }
+});
 
 function validateOrderStatusTransition(currentStatus, newStatus, userRole) {
   const validTransitions = {
@@ -28,7 +46,7 @@ function validateOrderStatusTransition(currentStatus, newStatus, userRole) {
 
 
 // Create order (BUYER only)
-router.post('/', authenticateToken,checkUserStatus, requireRole(['BUYER']), async (req, res) => {
+router.post('/', authenticateToken, checkUserStatus, requireRole(['BUYER']), async (req, res) => {
   try {
     const { items, shippingAddress } = req.body;
 
@@ -121,7 +139,7 @@ router.post('/', authenticateToken,checkUserStatus, requireRole(['BUYER']), asyn
 });
 
 // Get single order
-router.get('/:id', authenticateToken,checkUserStatus, async (req, res) => {
+router.get('/:id', authenticateToken, checkUserStatus, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -308,8 +326,8 @@ router.put('/:id/status', authenticateToken, checkUserStatus, requireRole(['PROD
 
     // Validate status transition
     const isValidTransition = validateOrderStatusTransition(
-      currentOrder.deliveryStatus, 
-      status, 
+      currentOrder.deliveryStatus,
+      status,
       req.user.role
     );
 
@@ -337,6 +355,103 @@ router.put('/:id/status', authenticateToken, checkUserStatus, requireRole(['PROD
     });
   }
 });
+
+// Update order status with delivery proof (PRODUCER only)
+router.put('/:id/status-with-proof',
+  authenticateToken,
+  checkUserStatus,
+  requireRole(['PRODUCER', 'ADMIN']),
+  upload.single('deliveryProof'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, reason, deliveryNotes } = req.body;
+
+      // Validate status
+      if (!status) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Status is required'
+        });
+      }
+
+      // Get current order
+      const currentOrder = await orderService.getOrderById(id);
+      if (!currentOrder) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Order not found'
+        });
+      }
+
+      // Validate transition
+      const isValidTransition = validateOrderStatusTransition(
+        currentOrder.deliveryStatus,
+        status,
+        req.user.role
+      );
+
+      if (!isValidTransition) {
+        return res.status(400).json({
+          status: 'error',
+          message: `Invalid status transition from ${currentOrder.deliveryStatus} to ${status}`
+        });
+      }
+
+      let deliveryProof = null;
+
+      // Upload delivery proof to IPFS if provided
+      if (req.file && status === 'DELIVERED') {
+        console.log('📸 Uploading delivery proof to IPFS...');
+
+        const ipfsResult = await ipfsService.uploadFile(req.file.buffer, {
+          filename: `delivery-proof-${id}-${Date.now()}.${req.file.mimetype.split('/')[1]}`,
+          mimetype: req.file.mimetype
+        });
+
+        if (ipfsResult.success) {
+          deliveryProof = {
+            url: ipfsResult.url,
+            cid: ipfsResult.cid,
+            notes: deliveryNotes || null
+          };
+          console.log('✅ Delivery proof uploaded:', ipfsResult.cid);
+        } else {
+          console.error('❌ Failed to upload delivery proof:', ipfsResult.error);
+          return res.status(500).json({
+            status: 'error',
+            message: 'Failed to upload delivery proof to IPFS'
+          });
+        }
+      }
+
+      // Update order status with delivery proof
+      const order = await orderService.updateOrderStatus(
+        id,
+        status,
+        req.user.id,
+        reason,
+        deliveryProof
+      );
+
+      res.json({
+        status: 'success',
+        message: deliveryProof
+          ? 'Order marked as delivered with proof'
+          : 'Order status updated successfully',
+        data: order
+      });
+
+    } catch (error) {
+      console.error('Update order status with proof error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to update order status',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+);
 
 // Cancel order (BUYER only)
 router.post('/:id/cancel', authenticateToken, checkUserStatus, requireRole(['BUYER']), async (req, res) => {
@@ -413,7 +528,7 @@ async function checkOrderAccess(user, order) {
 
     // Check if any order item belongs to producer's products
     const producerProductIds = producer.products.map(p => p.id);
-    return order.items.some(item => 
+    return order.items.some(item =>
       producerProductIds.includes(item.product.id)
     );
   }
