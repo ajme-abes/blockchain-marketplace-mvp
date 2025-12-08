@@ -300,7 +300,7 @@ export const FeaturedProducts = () => {
         {/* View All Button */}
         {!loading && !error && products.length > 0 && (
           <div className="text-center mt-12">
-            <Link to="/products">
+            <Link to="/marketplace">
               <Button size="lg" variant="outline" className="group">
                 View All Products
                 <TrendingUp className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />

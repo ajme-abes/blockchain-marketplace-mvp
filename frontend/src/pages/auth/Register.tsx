@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, CheckCircle, XCircle, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSelector } from '@/components/layout/LanguageSelector';
 import { toast } from 'sonner';
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
 import { useAuthErrors } from '@/hooks/useAuthErrors';
@@ -29,7 +31,8 @@ const Register = () => {
   const [authErrorData, setAuthErrorData] = useState<any>(null);
 
   const { register, loading, error, clearError } = useAuth();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const passwordValidation = usePasswordStrength(formData.password);
   const { handleAndShowError } = useAuthErrors();
@@ -111,6 +114,18 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-amber-50 to-green-50 dark:from-gray-900 dark:via-amber-900/20 dark:to-green-900/20 p-4">
+      <div className="absolute top-4 right-4 flex gap-2">
+        <LanguageSelector />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleTheme}
+          className="border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50"
+        >
+          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+        </Button>
+      </div>
+
       <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-3xl">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="space-y-2">
