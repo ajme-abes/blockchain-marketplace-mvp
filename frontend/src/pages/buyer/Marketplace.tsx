@@ -373,6 +373,17 @@ const Marketplace = () => {
                             {product.region || 'Local'}
                           </Badge>
 
+                          {/* Stock Status Badge */}
+                          {stock === 0 ? (
+                            <Badge variant="destructive" className="text-xs">
+                              Out of Stock
+                            </Badge>
+                          ) : stock < 5 ? (
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                              Low Stock
+                            </Badge>
+                          ) : null}
+
                           <div className="flex items-center gap-1 text-sm ml-auto">
                             <Star
                               className={`h-4 w-4 ${ratingInfo.hasRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'

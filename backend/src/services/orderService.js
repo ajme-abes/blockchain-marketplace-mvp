@@ -98,9 +98,9 @@ class OrderService {
         }
       });
 
-      // 4. Update product quantities
+      // 4. Update product quantities and check stock
       for (const item of items) {
-        await tx.product.update({
+        const updatedProduct = await tx.product.update({
           where: { id: item.productId },
           data: {
             quantityAvailable: {
@@ -108,6 +108,18 @@ class OrderService {
             }
           }
         });
+
+        // ✅ NEW: Auto-set to OUT_OF_STOCK if quantity reaches 0
+        if (updatedProduct.quantityAvailable <= 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              status: 'OUT_OF_STOCK',
+              quantityAvailable: 0 // Ensure it's exactly 0, not negative
+            }
+          });
+          console.log(`📦 Product ${item.productId} is now OUT_OF_STOCK`);
+        }
       }
 
       return newOrder;
@@ -196,6 +208,15 @@ class OrderService {
             }
           },
           orderBy: { createdAt: 'asc' }
+        },
+        dispute: {
+          select: {
+            id: true,
+            status: true,
+            reason: true,
+            description: true,
+            createdAt: true
+          }
         }
       }
     });
@@ -455,7 +476,7 @@ class OrderService {
     };
   }
 
-  async updateOrderStatus(orderId, status, updatedBy, reason = null) {
+  async updateOrderStatus(orderId, status, updatedBy, reason = null, deliveryProof = null) {
     // Get current order first to know the fromStatus
     const currentOrder = await prisma.order.findUnique({
       where: { id: orderId },
@@ -471,13 +492,26 @@ class OrderService {
 
     // Update order status and create history in transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Prepare update data
+      const updateData = {
+        deliveryStatus: toStatus,
+        ...(toStatus === 'DELIVERED' && {
+          paymentStatus: 'CONFIRMED',
+          deliveredAt: new Date()
+        })
+      };
+
+      // Add delivery proof if provided
+      if (deliveryProof) {
+        updateData.deliveryProofUrl = deliveryProof.url;
+        updateData.deliveryProofIpfsCid = deliveryProof.cid;
+        updateData.deliveryNotes = deliveryProof.notes || null;
+      }
+
       // Update order status
       const order = await tx.order.update({
         where: { id: orderId },
-        data: {
-          deliveryStatus: toStatus,
-          ...(toStatus === 'DELIVERED' && { paymentStatus: 'CONFIRMED' })
-        },
+        data: updateData,
         include: {
           buyer: {
             include: {
@@ -529,7 +563,11 @@ class OrderService {
           entity: 'Order',
           entityId: orderId,
           oldValues: { deliveryStatus: fromStatus },
-          newValues: { deliveryStatus: toStatus, reason },
+          newValues: {
+            deliveryStatus: toStatus,
+            reason,
+            ...(deliveryProof && { deliveryProof: 'uploaded' })
+          },
           userId: updatedBy,
           ipAddress: 'system'
         }
@@ -741,6 +779,19 @@ class OrderService {
       orderDate: order.orderDate,
       shippingAddress: order.shippingAddress,
       blockchainTxHash: order.blockchainTxHash,
+      blockchainRecorded: order.blockchainRecorded,
+      blockchainRecordedAt: order.blockchainRecordedAt,
+      blockchainRecords: order.blockchainRecords ? order.blockchainRecords.map(record => ({
+        id: record.id,
+        txHash: record.txHash,
+        blockNumber: record.blockNumber,
+        timestamp: record.timestamp,
+        status: record.status
+      })) : [],
+      deliveryProofUrl: order.deliveryProofUrl,
+      deliveryProofIpfsCid: order.deliveryProofIpfsCid,
+      deliveredAt: order.deliveredAt,
+      deliveryNotes: order.deliveryNotes,
       buyer: order.buyer ? {
         id: order.buyer.id,
         user: order.buyer.user
@@ -751,6 +802,7 @@ class OrderService {
           id: item.product.id,
           name: item.product.name,
           price: item.price,
+          imageUrl: item.product.imageUrl,
           producer: item.product.producer ? {
             id: item.product.producer.id,
             businessName: item.product.producer.businessName,
@@ -770,6 +822,13 @@ class OrderService {
         reason: history.reason,
         timestamp: history.createdAt
       })) : [],
+      dispute: order.dispute ? {
+        id: order.dispute.id,
+        status: order.dispute.status,
+        reason: order.dispute.reason,
+        description: order.dispute.description,
+        createdAt: order.dispute.createdAt
+      } : null,
       createdAt: order.orderDate,
       updatedAt: order.updatedAt
     };

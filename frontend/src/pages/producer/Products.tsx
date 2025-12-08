@@ -36,7 +36,7 @@ const Products = () => {
     try {
       setLoading(true);
       console.log('🔄 Loading products from backend...');
-      
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/my/products`,
         {
@@ -53,11 +53,11 @@ const Products = () => {
 
       const data = await response.json();
       console.log('✅ Backend products response:', data);
-      
+
       // Extract products from the nested structure
       const productsData = data.data?.products || data.data || [];
       console.log('🔄 Products data extracted:', productsData);
-      
+
       setProducts(productsData);
     } catch (error: any) {
       console.error('❌ Failed to load products:', error);
@@ -88,25 +88,25 @@ const Products = () => {
     if (!window.confirm('Are you sure you want to delete this product? It will be hidden from buyers but kept in your records.')) {
       return;
     }
-  
+
     try {
       setDeletingId(productId);
       console.log('🗑️ Soft deleting product:', productId);
-      
+
       await productService.deleteProduct(productId);
-      
+
       toast({
         title: "Product deleted",
         description: "Product has been hidden from buyers",
       });
-      
+
       // Update local state - mark as inactive instead of removing
-      setProducts(prev => 
-        prev.map(product => 
+      setProducts(prev =>
+        prev.map(product =>
           product.id === productId ? { ...product, status: 'inactive' } : product
         )
       );
-      
+
     } catch (error: any) {
       console.error('❌ Failed to delete product:', error);
       toast({
@@ -133,27 +133,27 @@ const Products = () => {
           body: JSON.stringify({ status }),
         }
       );
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP ${response.status}`);
       }
-  
+
       const result = await response.json();
       console.log('✅ Status update response:', result);
-      
+
       // Update local state immediately for better UX
-      setProducts(prev => 
-        prev.map(product => 
+      setProducts(prev =>
+        prev.map(product =>
           product.id === productId ? { ...product, status: status.toLowerCase() } : product
         )
       );
-      
+
       toast({
         title: "Status updated!",
         description: `Product is now ${status === 'ACTIVE' ? 'visible to buyers' : 'hidden from buyers'}`,
       });
-      
+
     } catch (error: any) {
       console.error('❌ Failed to update status:', error);
       toast({
@@ -161,7 +161,7 @@ const Products = () => {
         description: error.message || "Failed to update product status",
         variant: "destructive",
       });
-      
+
       // Reload products to reset any incorrect state
       await loadProducts();
     } finally {
@@ -271,8 +271,8 @@ const Products = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="My Products" 
+          <PageHeader
+            title="My Products"
             description="Manage your product listings and inventory"
           />
 
@@ -357,66 +357,37 @@ const Products = () => {
                               </p>
                             </div>
                           </div>
-                          
-                          {/* ✅ FIXED: Real Active/Inactive buttons */}
-<div className="flex gap-1 mb-3">
-  <Button
-    variant={product.status === 'active' ? 'default' : 'outline'}
-    size="sm"
-    className="flex-1 text-xs"
-    onClick={() => updateProductStatus(product.id, 'ACTIVE')}
-    disabled={isUpdating || stock === 0}
-  >
-    {isUpdating && product.status !== 'active' ? (
-      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-    ) : null}
-    Active
-  </Button>
-  <Button
-    variant={product.status === 'inactive' ? 'default' : 'outline'}
-    size="sm"
-    className="flex-1 text-xs"
-    onClick={() => updateProductStatus(product.id, 'INACTIVE')}
-    disabled={isUpdating}
-  >
-    {isUpdating && product.status !== 'inactive' ? (
-      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-    ) : null}
-    Inactive
-  </Button>
-</div>
-
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               className="flex-1"
                               onClick={() => handleViewProduct(product.id)}
                             >
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               className="flex-1"
                               onClick={() => handleEditProduct(product.id)}
                             >
                               <Edit className="h-3 w-3 mr-1" />
                               Edit
                             </Button>
-<Button 
-variant="outline" 
-size="sm"
-onClick={() => handleDeleteProduct(product.id)}
-disabled={deletingId === product.id}
->
-{deletingId === product.id ? (
-  <Loader2 className="h-3 w-3 animate-spin" />
-) : (
-  <Trash2 className="h-3 w-3" />
-)}
-</Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              disabled={deletingId === product.id}
+                            >
+                              {deletingId === product.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>

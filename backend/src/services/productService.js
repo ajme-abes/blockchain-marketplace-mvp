@@ -114,7 +114,8 @@ class ProductService {
     } = filters;
 
     const where = {
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      quantityAvailable: { gt: 0 } // ✅ Only show products with stock
     };
 
     // Apply filters - case-insensitive category match
