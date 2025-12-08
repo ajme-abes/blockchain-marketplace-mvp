@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Globe, Shield, Sparkles, Moon, Sun, ShoppingCart, Bell, User, LogOut } from 'lucide-react';
+import { Menu, X, Globe, Shield, Sparkles, Moon, Sun, ShoppingCart, Bell, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useChat } from '@/contexts/ChatContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import logo from '@/assets/ethiotrust-logo.png';
@@ -22,6 +23,7 @@ import { LanguageSelector } from '@/components/layout/LanguageSelector';
 export const Navbar = () => {
   const { isAuthenticated, user } = useAuth();
   const { state: cartState } = useCart();
+  const { unreadCount } = useChat();
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -132,6 +134,23 @@ export const Navbar = () => {
               </DropdownMenu>
             )}
 
+            {/* Messages - For authenticated users */}
+            {isAuthenticated && (
+              <Link to="/chats">
+                <Button variant="ghost" size="icon" className="relative">
+                  <MessageCircle className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            )}
+
             {/* Cart - Left side for buyers */}
             {isAuthenticated && user?.role === 'BUYER' && (
               <Link to="/cart">
@@ -181,7 +200,6 @@ export const Navbar = () => {
                     size="sm"
                     className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-amber-200 dark:hover:shadow-amber-800 transition-all duration-300 font-semibold"
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
                     {t('nav.register')}
                   </Button>
                 </Link>
@@ -271,6 +289,23 @@ export const Navbar = () => {
                         <Bell className="h-5 w-5" />
                         Notifications
                         <Badge variant="destructive" className="ml-auto">3</Badge>
+                      </Link>
+                    )}
+
+                    {/* Mobile Messages */}
+                    {isAuthenticated && (
+                      <Link
+                        to="/chats"
+                        className="flex items-center gap-3 text-lg font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/50 rounded-xl p-3 transition-all"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        Messages
+                        {unreadCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto">
+                            {unreadCount}
+                          </Badge>
+                        )}
                       </Link>
                     )}
 

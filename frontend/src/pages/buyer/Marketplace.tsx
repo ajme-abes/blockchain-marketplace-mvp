@@ -22,18 +22,29 @@ const Marketplace = () => {
   const { t } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  const { addToCart } = useCart(); 
+  const { addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('newest');
+  const [maxPrice, setMaxPrice] = useState<number>(10000);
 
   // Load real products from backend
   useEffect(() => {
     loadProducts();
   }, []);
+
+  // Calculate max price from products
+  useEffect(() => {
+    if (products.length > 0) {
+      const max = Math.max(...products.map(p => p.price));
+      const roundedMax = Math.ceil(max / 100) * 100; // Round up to nearest 100
+      setMaxPrice(roundedMax);
+      setPriceRange([0, roundedMax]);
+    }
+  }, [products]);
 
   const loadProducts = async () => {
     try {
@@ -78,106 +89,82 @@ const Marketplace = () => {
     }
   };
 
-  const filteredProducts = (Array.isArray(products) ? products : []).filter(
+  // Filter products
+  const filtered = (Array.isArray(products) ? products : []).filter(
     (product) => {
       if (!product) return false;
 
-      const isActive =
-        product.status === 'active' ||
-        product.status === 'ACTIVE' ||
-        product.status === 'Active' ||
-        !product.status; // If no status, assume active
-
+      // Check if product is active
+      const isActive = product.status === 'ACTIVE' || product.status === 'active';
       if (!isActive) return false;
 
+      // Search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesSearch =
-          (product.name && product.name.toLowerCase().includes(query)) ||
-          (product.producerName && product.producerName.toLowerCase().includes(query)) ||
-          (product.category && product.category.toLowerCase().includes(query)) ||
-          (product.description && product.description.toLowerCase().includes(query));
+          product.name?.toLowerCase().includes(query) ||
+          product.producerName?.toLowerCase().includes(query) ||
+          product.category?.toLowerCase().includes(query) ||
+          product.description?.toLowerCase().includes(query);
         if (!matchesSearch) return false;
       }
 
+      // Category filter
       if (selectedCategory && product.category !== selectedCategory) return false;
-      if (selectedRegion && product.region !== selectedRegion) return false;
+
+      // Price range filter
       if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
 
       return true;
     }
   );
 
-  // Debug logs
-  console.log('🔍 Debug - Product status analysis:', {
-    totalProducts: products.length,
-    filteredProducts: filteredProducts.length,
-    productStatuses: products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      status: p.status,
-      isActive:
-        p.status === 'active' || p.status === 'ACTIVE' || p.status === 'Active' || !p.status,
-    })),
-  });
-
-  console.log('🔍 Debug - Products data:', {
-    productsType: typeof products,
-    isArray: Array.isArray(products),
-    productsLength: Array.isArray(products) ? products.length : 'N/A',
-    productsSample: Array.isArray(products) && products.length > 0 ? products[0] : 'No products',
-    filteredCount: filteredProducts.length,
-  });
-
-  // Get display image URL with better fallbacks
-  const getDisplayImage = (product: Product) => {
-    if (product.imageUrl) return product.imageUrl;
-    if (product.images?.url) return product.images.url;
-    if (product.images?.ipfsCid) return `https://gateway.pinata.cloud/ipfs/${product.images.ipfsCid}`;
-    if (product.images && Array.isArray(product.images) && product.images.length > 0)
-      return product.images[0];
-    return 'https://via.placeholder.com/300x300?text=Product+Image';
-  };
-
-  // Get producer name with better logic
-  const getProducerName = (product: Product) => {
-    console.log('🔍 Producer data for product:', {
-      id: product.id,
-      name: product.name,
-      producerName: product.producerName,
-      producer: product.producer,
-    });
-
-    if (product.producerName && product.producerName !== 'Unknown Producer') {
-      return product.producerName;
+  // Sort products
+  const filteredProducts = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case 'price-low':
+        return a.price - b.price;
+      case 'price-high':
+        return b.price - a.price;
+      case 'rating':
+        return (b.rating || 0) - (a.rating || 0);
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'newest':
+      default:
+        return new Date(b.listingDate).getTime() - new Date(a.listingDate).getTime();
     }
-    if (product.producer?.businessName) return product.producer.businessName;
-    if (product.producer?.user?.name) return product.producer.user.name;
-    if (product.producer?.name) return product.producer.name;
-    return 'Local Farmer';
+  });
+
+  // Helper functions - simplified since backend provides clean data
+  const getDisplayImage = (product: Product) => {
+    return product.imageUrl || product.images?.url || 'https://via.placeholder.com/300x300?text=Product+Image';
   };
 
-  // Helper function for unit display
+  const getProducerName = (product: Product) => {
+    return product.producerName || 'Local Farmer';
+  };
+
   const getDisplayUnit = (unit: string | undefined) => {
     if (!unit) return 'unit';
 
-    const unitMap: { [key: string]: string } = {
-      kg: 'kg',
-      g: 'g',
-      piece: 'piece',
-      pieces: 'pieces',
-      bundle: 'bundle',
-      liter: 'liter',
-      l: 'liter',
-      dozen: 'dozen',
-      unit: 'unit',
-      units: 'units',
+    const unitLabels: { [key: string]: string } = {
+      'kg': 'kg',
+      'quintal': 'quintal',
+      'g': 'g',
+      'ton': 'ton',
+      'piece': 'piece',
+      'bundle': 'bundle',
+      'liter': 'L',
+      'dozen': 'dozen',
+      'bag': 'bag',
+      'box': 'box',
+      'unit': 'unit',
     };
 
-    return unitMap[unit.toLowerCase()] || unit;
+    return unitLabels[unit.toLowerCase()] || unit;
   };
 
-  // Helper function for rating display
   const getRatingDisplay = (rating: number | null | undefined) => {
     const actualRating = rating || 0;
     if (actualRating === 0) {
@@ -185,24 +172,6 @@ const Marketplace = () => {
     }
     return { display: actualRating.toFixed(1), hasRating: true };
   };
-
-  useEffect(() => {
-    if (filteredProducts.length > 0) {
-      console.log(
-        '🔍 Producer data analysis:',
-        filteredProducts.map((p) => ({
-          id: p.id,
-          name: p.name,
-          producerName: p.producerName,
-          producer: p.producer,
-          hasProducer: !!p.producer,
-          hasProducerName: !!p.producerName,
-          producerBusinessName: p.producer?.businessName,
-          producerUserName: p.producer?.user?.name,
-        }))
-      );
-    }
-  }, [filteredProducts]);
 
   const content = (
     <main className="container mx-auto px-4 py-8">
@@ -268,29 +237,13 @@ const Marketplace = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Region</label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={selectedRegion || ''}
-                      onChange={(e) => setSelectedRegion(e.target.value || null)}
-                    >
-                      <option value="">All Regions</option>
-                      {regions.map((reg) => (
-                        <option key={reg} value={reg}>
-                          {reg}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="text-sm font-medium mb-2 block">
                       Price Range: {priceRange[0]} - {priceRange[1]} ETB
                     </label>
                     <input
                       type="range"
                       min="0"
-                      max="1000"
+                      max={maxPrice}
                       value={priceRange[1]}
                       onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
                       className="w-full"
@@ -302,8 +255,7 @@ const Marketplace = () => {
                     className="w-full"
                     onClick={() => {
                       setSelectedCategory(null);
-                      setSelectedRegion(null);
-                      setPriceRange([0, 1000]);
+                      setPriceRange([0, maxPrice]);
                       setSearchQuery('');
                     }}
                   >
@@ -315,7 +267,7 @@ const Marketplace = () => {
           </aside>
 
           <div className="lg:col-span-3">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
               <div className="text-sm text-muted-foreground">
                 Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
                 {searchQuery && (
@@ -324,22 +276,37 @@ const Marketplace = () => {
                   </span>
                 )}
               </div>
-              {(searchQuery || selectedCategory || selectedRegion || priceRange[1] < 1000) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCategory(null);
-                    setSelectedRegion(null);
-                    setPriceRange([0, 1000]);
-                  }}
-                  className="text-xs"
+
+              <div className="flex items-center gap-2">
+                {/* Sort Dropdown */}
+                <select
+                  className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
                 >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear
-                </Button>
-              )}
+                  <option value="newest">Newest First</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                  <option value="rating">Top Rated</option>
+                  <option value="name">Name: A-Z</option>
+                </select>
+
+                {(searchQuery || selectedCategory || priceRange[1] < maxPrice) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory(null);
+                      setPriceRange([0, maxPrice]);
+                    }}
+                    className="text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
 
             {filteredProducts.length === 0 ? (
@@ -347,14 +314,13 @@ const Marketplace = () => {
                 <p className="text-muted-foreground text-lg mb-4">
                   {products.length === 0 ? 'No products available yet' : 'No products match your filters'}
                 </p>
-                {(searchQuery || selectedCategory || selectedRegion) && (
+                {(searchQuery || selectedCategory) && (
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedCategory(null);
-                      setSelectedRegion(null);
-                      setPriceRange([0, 1000]);
+                      setPriceRange([0, maxPrice]);
                     }}
                   >
                     Clear Filters
@@ -366,13 +332,7 @@ const Marketplace = () => {
                 {filteredProducts.map((product) => {
                   const ratingInfo = getRatingDisplay(product.rating);
                   const displayUnit = getDisplayUnit(product.unit);
-                  // Prefer common property names for quantity/stock/quantityAvailable
-                  const stock =
-                    product.quantityAvailable ??
-                    product.quantity ??
-                    product.stock ??
-                    product.qty ??
-                    0;
+                  const stock = product.quantityAvailable || 0;
 
                   return (
                     <Card
@@ -415,9 +375,8 @@ const Marketplace = () => {
 
                           <div className="flex items-center gap-1 text-sm ml-auto">
                             <Star
-                              className={`h-4 w-4 ${
-                                ratingInfo.hasRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-                              }`}
+                              className={`h-4 w-4 ${ratingInfo.hasRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                                }`}
                             />
                             <span className={ratingInfo.hasRating ? 'text-foreground font-medium' : 'text-muted-foreground'}>
                               {ratingInfo.display}
@@ -434,13 +393,12 @@ const Marketplace = () => {
                               /{displayUnit}
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Stock:</span>
-                            <span className={`font-medium ${
-                              stock === 0 ? 'text-destructive' : 
+                            <span className={`font-medium ${stock === 0 ? 'text-destructive' :
                               stock < 5 ? 'text-orange-500' : 'text-green-600'
-                            }`}>
+                              }`}>
                               {stock === 0 ? 'Out of stock' : `${stock} ${displayUnit} available`}
                             </span>
                           </div>
@@ -453,8 +411,8 @@ const Marketplace = () => {
                             <>
                               <div className="grid grid-cols-3 gap-2">
                                 {/* Add to Cart Button */}
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   className="h-10 flex items-center gap-1"
                                   onClick={(e) => {
@@ -483,11 +441,11 @@ const Marketplace = () => {
                                   <ShoppingCart className="h-4 w-4" />
                                   <span className="hidden sm:inline">Cart</span>
                                 </Button>
-                                
+
                                 {/* Buy Now Button */}
                                 <Link to={`/products/${product.id}`} className="block">
-                                  <Button 
-                                    variant="default" 
+                                  <Button
+                                    variant="default"
                                     size="sm"
                                     className="h-10 w-full flex items-center gap-1"
                                   >
@@ -495,11 +453,11 @@ const Marketplace = () => {
                                     <span className="hidden sm:inline">Buy</span>
                                   </Button>
                                 </Link>
-                                
+
                                 {/* View Details Button */}
                                 <Link to={`/products/${product.id}`} className="block">
-                                  <Button 
-                                    variant="secondary" 
+                                  <Button
+                                    variant="secondary"
                                     size="sm"
                                     className="h-10 w-full flex items-center gap-1"
                                   >
@@ -508,7 +466,7 @@ const Marketplace = () => {
                                   </Button>
                                 </Link>
                               </div>
-                              
+
                               {/* Stock warning for low stock items */}
                               {stock > 0 && stock < 5 && (
                                 <div className="text-xs text-orange-600 text-center font-medium">

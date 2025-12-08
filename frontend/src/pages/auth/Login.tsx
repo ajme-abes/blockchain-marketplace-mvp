@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Mail, Lock, Sparkles, Eye, EyeOff, Key, Moon, Sun } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Key, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -52,11 +52,9 @@ const Login = () => {
 
       // Redirect based on user role
       if (user?.role === 'ADMIN') {
-        navigate('/admin/dashboard');
-      } else if (user?.role === 'PRODUCER') {
-        navigate('/dashboard');
+        navigate('/admin'); // Admin dashboard route
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard'); // Dashboard component handles buyer/producer routing
       }
     } catch (error: any) {
       // Handle specific authentication errors
@@ -74,11 +72,9 @@ const Login = () => {
 
         // Complete login and redirect
         if (user?.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else if (user?.role === 'PRODUCER') {
-          navigate('/dashboard');
+          navigate('/admin'); // Admin dashboard route
         } else {
-          navigate('/dashboard');
+          navigate('/dashboard'); // Dashboard component handles buyer/producer routing
         }
       }
     } catch (error: any) {
@@ -145,11 +141,6 @@ const Login = () => {
 
       <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl">
         <CardHeader className="text-center space-y-4 pb-4">
-          <div className="flex justify-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
-              <Sparkles className="h-7 w-7 text-white" />
-            </div>
-          </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
               {t('login.welcomeBack')}

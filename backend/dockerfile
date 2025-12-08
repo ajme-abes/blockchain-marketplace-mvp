@@ -2,19 +2,26 @@ FROM node:18-bullseye
 
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y openssl libc6-dev curl && rm -rf /var/lib/apt/lists/*
+
 # Copy package files first for caching
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm install --legacy-peer-deps --fetch-retries=5 --fetch-retry-factor=2 --fetch-retry-mintimeout=2000
+RUN npm install --legacy-peer-deps
 
-# Copy all project files AFTER installing dependencies
+# Copy prisma schema
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy all project files
 COPY . .
 
 # Expose backend port
 EXPOSE 5000
 
-# For development, do NOT run prisma generate inside Docker
-# Generate Prisma client locally and mount node_modules
-CMD ["npm", "run", "dev"]
+# Start command with database migration
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npm start"]

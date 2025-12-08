@@ -114,7 +114,7 @@ const BankAccountManagement = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch('http://localhost:5000/api/bank-accounts/my-accounts', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bank-accounts/my-accounts`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -148,7 +148,7 @@ const BankAccountManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch('http://localhost:5000/api/bank-accounts/add', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bank-accounts/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -184,7 +184,7 @@ const BankAccountManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/bank-accounts/${selectedAccount.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bank-accounts/${selectedAccount.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -221,7 +221,7 @@ const BankAccountManagement = () => {
         try {
             setProcessing(true);
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/bank-accounts/${selectedAccount.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bank-accounts/${selectedAccount.id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -252,7 +252,7 @@ const BankAccountManagement = () => {
     const handleSetPrimary = async (accountId: string) => {
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`http://localhost:5000/api/bank-accounts/${accountId}/set-primary`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bank-accounts/${accountId}/set-primary`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`

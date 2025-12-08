@@ -1,6 +1,9 @@
 // src/pages/producer/EditProduct.tsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/layout/AppSidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,7 +20,7 @@ const EditProduct = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
@@ -30,6 +33,8 @@ const EditProduct = () => {
     price: '',
     category: '',
     quantityAvailable: '', // ✅ Fixed: quantity → quantityAvailable
+    unit: '',
+    region: '',
   });
 
   const categories = [
@@ -57,7 +62,9 @@ const EditProduct = () => {
         description: productData.description || '',
         price: productData.price?.toString() || '',
         category: productData.category || '',
-        quantityAvailable: productData.quantityAvailable?.toString() || '0' // ✅ Fixed
+        quantityAvailable: productData.quantityAvailable?.toString() || '0', // ✅ Fixed
+        unit: productData.unit || 'unit',
+        region: productData.region || '',
       });
 
       if (productData.imageUrl) setImagePreview(productData.imageUrl);
@@ -98,16 +105,16 @@ const EditProduct = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
-  
+
     try {
       setUpdating(true);
-  
+
       // Validate form
       if (!formData.name || !formData.price || !formData.category || !formData.quantityAvailable) {
         toast({ title: "Missing fields", description: "Please fill in all required fields", variant: "destructive" });
         return;
       }
-  
+
       // ✅ FIX: Use FormData with correct field names for upload.array()
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
@@ -115,13 +122,15 @@ const EditProduct = () => {
       formDataToSend.append('price', formData.price);
       formDataToSend.append('category', formData.category);
       formDataToSend.append('quantity', formData.quantityAvailable); // Backend expects 'quantity'
-  
+      formDataToSend.append('unit', formData.unit || 'unit'); // Add unit field
+      formDataToSend.append('region', formData.region || ''); // Add region field
+
       // ✅ FIX: Use 'images' field name and send as array (even for single file)
       if (newImage) {
         formDataToSend.append('images', newImage); // Field name MUST be 'images' (plural)
         console.log('🖼️ New image added to form data with field name "images":', newImage.name);
       }
-  
+
       console.log('🔄 Updating product with data:', {
         name: formData.name,
         price: formData.price,
@@ -131,15 +140,15 @@ const EditProduct = () => {
         fieldName: 'images', // Using correct field name for upload.array()
         uploadType: 'array' // Backend expects multiple files
       });
-  
+
       // Debug: Check what fields are being sent
       console.log('📋 FormData fields:');
       for (let pair of formDataToSend.entries()) {
         console.log('  ', pair[0], pair[1]);
       }
-  
+
       // Use direct fetch to handle FormData properly
-      const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/${id}`, {
         method: 'PUT',
         body: formDataToSend,
         headers: {
@@ -147,28 +156,40 @@ const EditProduct = () => {
           // Don't set Content-Type for FormData - browser will set it with boundary
         },
       });
-  
+
       if (!response.ok) {
+        // Handle 401 Unauthorized - redirect to login
+        if (response.status === 401) {
+          toast({
+            title: "Session expired",
+            description: "Please log in again",
+            variant: "destructive"
+          });
+          localStorage.removeItem('authToken');
+          navigate('/login');
+          return;
+        }
+
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
-  
+
       const result = await response.json();
       console.log('✅ Product update response:', result);
-  
-      toast({ 
-        title: "Product updated!", 
-        description: "Your product has been updated successfully" 
+
+      toast({
+        title: "Product updated!",
+        description: "Your product has been updated successfully"
       });
-      
+
       navigate('/my-products');
-      
+
     } catch (error: any) {
       console.error('❌ Failed to update product:', error);
-      toast({ 
-        title: "Error updating product", 
-        description: error.message || "Failed to update product", 
-        variant: "destructive" 
+      toast({
+        title: "Error updating product",
+        description: error.message || "Failed to update product",
+        variant: "destructive"
       });
     } finally {
       setUpdating(false);
@@ -196,163 +217,223 @@ const EditProduct = () => {
   }
 
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button variant="outline" size="icon" onClick={handleCancel}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold ml-2">Edit Product</h1>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <div className="flex-1 flex flex-col">
+          <PageHeader
+            title="Edit Product"
+            action={
+              <Button variant="outline" onClick={handleCancel}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Products
+              </Button>
+            }
+          />
+          <main className="flex-1 p-6">
+            <div className="max-w-4xl mx-auto">
+
+              <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-6">
+                {/* Image Column */}
+                <div className="lg:col-span-1">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Product Image</CardTitle>
+                      <CardDescription>Update your product image</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="aspect-square border-2 border-dashed rounded-lg overflow-hidden flex items-center justify-center">
+                        {imagePreview ? (
+                          <img
+                            src={imagePreview}
+                            alt="Product preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="image">Change Image</Label>
+                        <Input
+                          id="image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          JPG, PNG, WebP up to 5MB
+                        </p>
+                      </div>
+                      {newImage && (
+                        <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                          New image selected: {newImage.name}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Form Column */}
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Product Information</CardTitle>
+                      <CardDescription>Update your product details and pricing</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="name">Product Name *</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) => handleInputChange('description', e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="price">Price (ETB) *</Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.price}
+                            onChange={(e) => handleInputChange('price', e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="category">Category *</Label>
+                          <Select
+                            value={formData.category}
+                            onValueChange={(value) => handleInputChange('category', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map(cat => (
+                                <SelectItem key={cat} value={cat}>
+                                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="quantityAvailable">Available Quantity *</Label>
+                          <Input
+                            id="quantityAvailable"
+                            type="number"
+                            min="0"
+                            value={formData.quantityAvailable}
+                            onChange={(e) => handleInputChange('quantityAvailable', e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="unit">Unit *</Label>
+                          <Select
+                            value={formData.unit}
+                            onValueChange={(value) => handleInputChange('unit', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="kg">Kilogram (kg)</SelectItem>
+                              <SelectItem value="quintal">Quintal (100 kg)</SelectItem>
+                              <SelectItem value="g">Gram (g)</SelectItem>
+                              <SelectItem value="ton">Ton (1000 kg)</SelectItem>
+                              <SelectItem value="piece">Piece</SelectItem>
+                              <SelectItem value="bundle">Bundle</SelectItem>
+                              <SelectItem value="liter">Liter (L)</SelectItem>
+                              <SelectItem value="dozen">Dozen (12 pcs)</SelectItem>
+                              <SelectItem value="bag">Bag</SelectItem>
+                              <SelectItem value="box">Box</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="region">Region *</Label>
+                        <Select
+                          value={formData.region}
+                          onValueChange={(value) => handleInputChange('region', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="addis-ababa">Addis Ababa</SelectItem>
+                            <SelectItem value="oromia">Oromia</SelectItem>
+                            <SelectItem value="amhara">Amhara</SelectItem>
+                            <SelectItem value="snnpr">SNNPR</SelectItem>
+                            <SelectItem value="tigray">Tigray</SelectItem>
+                            <SelectItem value="afar">Afar</SelectItem>
+                            <SelectItem value="somali">Somali</SelectItem>
+                            <SelectItem value="benishangul-gumuz">Benishangul-Gumuz</SelectItem>
+                            <SelectItem value="gambela">Gambela</SelectItem>
+                            <SelectItem value="harari">Harari</SelectItem>
+                            <SelectItem value="diredawa">Dire Dawa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          type="submit"
+                          disabled={updating}
+                          className="flex items-center gap-2"
+                        >
+                          {updating ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4" />
+                              Update Product
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancel}
+                          disabled={updating}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </form>
+            </div>
+          </main>
         </div>
-
-        <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-6">
-          {/* Image Column */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Image</CardTitle>
-                <CardDescription>Update your product image</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="aspect-square border-2 border-dashed rounded-lg overflow-hidden flex items-center justify-center">
-                  {imagePreview ? (
-                    <img 
-                      src={imagePreview} 
-                      alt="Product preview" 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="image">Change Image</Label>
-                  <Input 
-                    id="image" 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageChange} 
-                    className="mt-1" 
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    JPG, PNG, WebP up to 5MB
-                  </p>
-                </div>
-                {newImage && (
-                  <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
-                    New image selected: {newImage.name}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Form Column */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Information</CardTitle>
-                <CardDescription>Update your product details and pricing</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input 
-                    id="name" 
-                    value={formData.name} 
-                    onChange={(e) => handleInputChange('name', e.target.value)} 
-                    required 
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea 
-                    id="description" 
-                    value={formData.description} 
-                    onChange={(e) => handleInputChange('description', e.target.value)} 
-                    rows={4} 
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="price">Price (ETB) *</Label>
-                    <Input 
-                      id="price" 
-                      type="number" 
-                      step="0.01" 
-                      min="0" 
-                      value={formData.price} 
-                      onChange={(e) => handleInputChange('price', e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select 
-                      value={formData.category} 
-                      onValueChange={(value) => handleInputChange('category', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="quantityAvailable">Available Quantity *</Label>
-                  <Input
-                    id="quantityAvailable"
-                    type="number"
-                    min="0"
-                    value={formData.quantityAvailable}
-                    onChange={(e) => handleInputChange('quantityAvailable', e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button 
-                    type="submit" 
-                    disabled={updating}
-                    className="flex items-center gap-2"
-                  >
-                    {updating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Update Product
-                      </>
-                    )}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={handleCancel} 
-                    disabled={updating}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </form>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

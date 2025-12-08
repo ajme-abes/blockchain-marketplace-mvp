@@ -206,11 +206,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   const verifyEmail = async (token: string) => {
     try {
-      await apiService.verifyEmail(token);
+      console.log('🔧 Verifying email with token:', token);
+      const response = await apiService.verifyEmail(token);
+      console.log('✅ Verification response:', response);
+
+      // Check if verification was successful
+      if (response.status === 'success' || response.success) {
+        console.log('✅ Email verified successfully');
+        return response;
+      } else {
+        throw new Error(response.message || 'Email verification failed');
+      }
     } catch (error: any) {
-      const errorMessage = error.message || 'Email verification failed';
+      console.error('❌ Email verification error:', error);
+      const errorMessage = error.message || error.error || 'Email verification failed';
       setError(errorMessage);
-      throw error;
+      throw new Error(errorMessage);
     }
   };
 

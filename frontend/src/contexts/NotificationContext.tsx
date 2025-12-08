@@ -35,7 +35,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch('http://localhost:5000/api/notifications?limit=20', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications?limit=20`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -84,7 +84,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications/${id}/read`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -111,7 +111,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         try {
             const token = localStorage.getItem('authToken');
 
-            const response = await fetch('http://localhost:5000/api/notifications/read-all', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications/read-all`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,

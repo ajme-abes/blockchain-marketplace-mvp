@@ -55,14 +55,34 @@ const Register = () => {
       const response = await register(registerData);
 
       if (response?.status === 'success') {
-        if (response.data?.user?.verificationEmailSent) {
+        // Check if email verification was sent
+        const emailSent = response.data?.user?.verificationEmailSent || response.data?.verificationEmailSent;
+        const emailVerified = response.data?.user?.emailVerified;
+
+        console.log('🔧 Registration response:', { emailSent, emailVerified, response });
+
+        // If email verification is enabled and email was sent
+        if (emailSent === true) {
           toast.success('Registration successful! Please check your email for verification.');
           navigate('/verify-email-notice', {
             state: { email: formData.email }
           });
-        } else {
+        }
+        // If email verification is enabled but email failed to send
+        else if (emailSent === false && !emailVerified) {
+          toast.warning('Registration successful! Email verification is required but email service is not configured.');
+          navigate('/verify-email-notice', {
+            state: {
+              email: formData.email,
+              emailFailed: true,
+              verificationUrl: response.data?.verificationUrl
+            }
+          });
+        }
+        // If email is already verified or verification not required
+        else {
           toast.success('Registration successful! Welcome to EthioTrust.');
-          navigate(formData.role === 'PRODUCER' ? '/producer/dashboard' : '/buyer/dashboard');
+          navigate('/dashboard');
         }
       }
     } catch (error: any) {
@@ -93,11 +113,6 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-amber-50 to-green-50 dark:from-gray-900 dark:via-amber-900/20 dark:to-green-900/20 p-4">
       <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-3xl">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="flex justify-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-          </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
               Join EthioTrust
@@ -243,7 +258,6 @@ const Register = () => {
               {/* Role Selection */}
               <div className="space-y-1 col-span-2">
                 <Label htmlFor="role" className="text-xs font-medium flex items-center space-x-1">
-                  <Sparkles className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                   <span>I want to</span>
                 </Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -252,8 +266,8 @@ const Register = () => {
                     onClick={() => handleInputChange('role', 'BUYER')}
                     disabled={loading || authErrorData?.code === 'RATE_LIMIT_EXCEEDED'}
                     className={`h-9 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${formData.role === 'BUYER'
-                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 shadow-sm'
-                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-600'
+                      ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 shadow-sm'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-600'
                       }`}
                   >
                     👤 Buy Products
@@ -263,8 +277,8 @@ const Register = () => {
                     onClick={() => handleInputChange('role', 'PRODUCER')}
                     disabled={loading || authErrorData?.code === 'RATE_LIMIT_EXCEEDED'}
                     className={`h-9 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${formData.role === 'PRODUCER'
-                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 shadow-sm'
-                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-600'
+                      ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 shadow-sm'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-600'
                       }`}
                   >
                     🏭 Sell Products
@@ -281,8 +295,8 @@ const Register = () => {
             {/* Password Match Indicator */}
             {formData.confirmPassword && (
               <div className={`flex items-center justify-center space-x-2 p-2 rounded-lg text-xs ${passwordMatchStatus === 'match'
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                  : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
                 }`}>
                 {passwordMatchStatus === 'match' ? (
                   <CheckCircle className="h-3 w-3 flex-shrink-0" />
@@ -311,7 +325,6 @@ const Register = () => {
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="h-4 w-4" />
                   <span>Create Account</span>
                 </div>
               )}

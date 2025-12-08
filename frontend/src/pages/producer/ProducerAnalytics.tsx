@@ -63,7 +63,7 @@ const ProducerAnalytics = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      
+
       // FIX: Use 'authToken' instead of 'token'
       const token = localStorage.getItem('authToken');
       console.log('🔐 DEBUG - Token from localStorage:', token);
@@ -71,13 +71,13 @@ const ProducerAnalytics = () => {
       console.log('🔐 DEBUG - Token length:', token?.length);
       console.log('👤 DEBUG - User from context:', user);
       console.log('👤 DEBUG - User role:', user?.role);
-      
-      const BACKEND_URL = 'http://localhost:5000';
-      
+
+      const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
       const [overviewRes, salesRes, productsRes, customersRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/analytics/overview?timeframe=${timeframe}`, {
           method: 'GET',
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
@@ -85,7 +85,7 @@ const ProducerAnalytics = () => {
         }),
         fetch(`${BACKEND_URL}/api/analytics/sales-trends?timeframe=${timeframe}`, {
           method: 'GET',
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
@@ -93,7 +93,7 @@ const ProducerAnalytics = () => {
         }),
         fetch(`${BACKEND_URL}/api/analytics/product-performance?timeframe=${timeframe}`, {
           method: 'GET',
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
@@ -101,21 +101,21 @@ const ProducerAnalytics = () => {
         }),
         fetch(`${BACKEND_URL}/api/analytics/customer-insights?timeframe=${timeframe}`, {
           method: 'GET',
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           credentials: 'include'
         })
       ]);
-  
+
       console.log('📊 Backend responses:', {
         overview: { status: overviewRes.status, ok: overviewRes.ok },
         sales: { status: salesRes.status, ok: salesRes.ok },
         products: { status: productsRes.status, ok: productsRes.ok },
         customers: { status: customersRes.status, ok: customersRes.ok }
       });
-  
+
       // Check response bodies for error messages
       if (!overviewRes.ok) {
         const errorText = await overviewRes.text();
@@ -125,7 +125,7 @@ const ProducerAnalytics = () => {
         const errorText = await salesRes.text();
         console.error('❌ Sales error response:', errorText);
       }
-  
+
       if (overviewRes.ok) {
         const data = await overviewRes.json();
         setOverview(data.data);
@@ -142,7 +142,7 @@ const ProducerAnalytics = () => {
         const data = await customersRes.json();
         setCustomerInsights(data.data);
       }
-  
+
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
@@ -160,31 +160,32 @@ const ProducerAnalytics = () => {
     fetchAnalyticsData();
   };
 
-  // Stats cards data
+  // Stats cards data - FIXED: Show net earnings instead of gross sales
   const stats = overview ? [
-    { 
-      label: 'Total Revenue', 
-      value: `ETB ${overview.totalRevenue.toLocaleString()}`, 
-      icon: DollarSign, 
-      change: '+12%' // You can calculate this from trend data
+    {
+      label: 'Net Earnings',
+      value: `ETB ${overview.totalRevenue.toLocaleString()}`,
+      icon: DollarSign,
+      change: `After ${((overview.commission || 0) / (overview.grossSales || 1) * 100).toFixed(1)}% commission`,
+      subtitle: `Gross: ETB ${(overview.grossSales || 0).toLocaleString()}`
     },
-    { 
-      label: 'Total Orders', 
-      value: overview.totalOrders.toString(), 
-      icon: Package, 
-      change: '+8%' 
+    {
+      label: 'Total Orders',
+      value: overview.totalOrders.toString(),
+      icon: Package,
+      change: '+8%'
     },
-    { 
-      label: 'Customers', 
-      value: overview.totalCustomers.toString(), 
-      icon: Users, 
-      change: '+15%' 
+    {
+      label: 'Customers',
+      value: overview.totalCustomers.toString(),
+      icon: Users,
+      change: '+15%'
     },
-    { 
-      label: 'Avg Rating', 
-      value: `${overview.averageRating.average.toFixed(1)}/5`, 
-      icon: Star, 
-      change: `from ${overview.averageRating.count} reviews` 
+    {
+      label: 'Avg Rating',
+      value: `${overview.averageRating.average.toFixed(1)}/5`,
+      icon: Star,
+      change: `from ${overview.averageRating.count} reviews`
     },
   ] : [];
 
@@ -234,9 +235,9 @@ const ProducerAnalytics = () => {
                   <SelectItem value="yearly">Yearly</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleRefresh}
                 disabled={refreshing}
               >
@@ -285,13 +286,13 @@ const ProducerAnalytics = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="period" />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value) => [`ETB ${value}`, 'Revenue']}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#8884d8" 
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#8884d8"
                         strokeWidth={2}
                         dot={{ fill: '#8884d8' }}
                       />
@@ -346,14 +347,14 @@ const ProducerAnalytics = () => {
                       <Tooltip formatter={(value) => [`ETB ${value}`, 'Revenue']} />
                     </PieChart>
                   </ResponsiveContainer>
-                  
+
                   {/* Product Performance List */}
                   <div className="space-y-4">
                     {productPerformance.slice(0, 5).map((product, index) => (
                       <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center gap-3">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
+                          <div
+                            className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: COLORS[index] }}
                           />
                           <div>
@@ -395,7 +396,7 @@ const ProducerAnalytics = () => {
                       <div className="text-sm text-muted-foreground">Repeat Rate</div>
                     </div>
                   </div>
-                  
+
                   {/* Region Distribution */}
                   {customerInsights.regionDistribution.length > 0 && (
                     <div className="mt-6">
@@ -406,8 +407,8 @@ const ProducerAnalytics = () => {
                             <span>{region.region}</span>
                             <div className="flex items-center gap-2">
                               <div className="w-32 bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-blue-600 h-2 rounded-full" 
+                                <div
+                                  className="bg-blue-600 h-2 rounded-full"
                                   style={{ width: `${region.percentage}%` }}
                                 />
                               </div>

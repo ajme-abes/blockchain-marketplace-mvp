@@ -97,13 +97,19 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: function (origin, callback) {
+    // Get allowed origins from environment variable or use defaults
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+      : [];
+
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:8080',
       'http://localhost:8081',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
-      'http://127.0.0.1:8081'
+      'http://127.0.0.1:8081',
+      ...envOrigins // Add production origins from environment
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -112,6 +118,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.warn(`CORS blocked origin: ${origin}. Allowed origins:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -238,6 +245,9 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/producers', require('./routes/producer'));
+app.use('/api/testimonials', require('./routes/testimonials'));
+app.use('/api/stats', require('./routes/stats'));
+app.use('/api/contact', require('./routes/contact'));
 
 // ==================== UPLOAD / MULTER ERROR HANDLER ====================
 // Handle common multer / busboy errors so they don't bubble as 500s with obscure stack traces
@@ -316,6 +326,14 @@ const startServer = async () => {
     // Start background jobs
     jobService.startJobs();
     console.log('✅ Background jobs initialized');
+
+    // Auto-create admin from environment variables
+    try {
+      const { autoCreateAdmin } = require('./utils/autoCreateAdmin');
+      await autoCreateAdmin();
+    } catch (error) {
+      console.warn('⚠️  Auto-create admin skipped:', error.message);
+    }
 
     // ✅ FIX: Use server.listen instead of app.listen
     server.listen(PORT, () => {

@@ -38,15 +38,19 @@ const xssProtection = xss();
 const preventParameterPollution = hpp();
 
 // CORS configuration
-const corsOptions = {
-  origin: [
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
     'http://localhost:3000',
-    'http://localhost:8080', 
-    'http://localhost:8081', // ADD YOUR FRONTEND PORT
+    'http://localhost:8080',
+    'http://localhost:8081',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:8080',
-    'http://127.0.0.1:8081'  // ADD YOUR FRONTEND PORT
-  ],
+    'http://127.0.0.1:8081'
+  ];
+
+const corsOptions = {
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -54,10 +58,10 @@ const corsOptions = {
 // Audit logging middleware
 const auditMiddleware = (req, res, next) => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
-    
+
     // Log important requests for audit
     if (req.method !== 'GET' || req.path.includes('/api/')) {
       console.log('🔐 Audit:', {
@@ -71,7 +75,7 @@ const auditMiddleware = (req, res, next) => {
       });
     }
   });
-  
+
   next();
 };
 

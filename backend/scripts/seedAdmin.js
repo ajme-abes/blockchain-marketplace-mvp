@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function seedAdmin() {
   try {
     console.log('🌱 Seeding admin user...');
-    const adminEmail = 'admin@ethiotrust.com';
-    const adminPassword = 'Admin123!93'; 
+    const adminEmail = '';
+    const adminPassword = ''; 
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
     const existingAdmin = await prisma.user.findUnique({

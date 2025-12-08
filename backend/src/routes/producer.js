@@ -220,3 +220,76 @@ router.put('/update-profile', async (req, res) => {
 });
 
 module.exports = router;
+
+
+// PUBLIC ROUTE - Get producer public profile (no auth required)
+router.get('/:id/profile', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const producer = await prisma.producer.findUnique({
+            where: { id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        registrationDate: true
+                    }
+                },
+                products: {
+                    where: { status: 'ACTIVE' },
+                    select: {
+                        id: true,
+                        name: true,
+                        price: true,
+                        category: true,
+                        imageUrl: true,
+                        unit: true,
+                        quantityAvailable: true,
+                        status: true
+                    },
+                    orderBy: { listingDate: 'desc' }
+                }
+            }
+        });
+
+        if (!producer) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Producer not found'
+            });
+        }
+
+        // Calculate stats
+        const stats = {
+            totalProducts: producer.products.length,
+            activeProducts: producer.products.filter(p => p.status === 'ACTIVE').length,
+            averageRating: 0, // TODO: Calculate from reviews
+            totalReviews: 0 // TODO: Count from reviews
+        };
+
+        // Format products
+        const formattedProducts = producer.products.map(p => ({
+            ...p,
+            stock: p.quantityAvailable
+        }));
+
+        res.json({
+            status: 'success',
+            data: {
+                ...producer,
+                products: formattedProducts,
+                stats
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching producer profile:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch producer profile'
+        });
+    }
+});

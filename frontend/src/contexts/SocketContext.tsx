@@ -46,7 +46,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     console.log('🔌 Initializing WebSocket connection...');
 
     // Create socket connection
-    const newSocket = io('http://localhost:5000', {
+    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const newSocket = io(SOCKET_URL, {
       auth: {
         token: localStorage.getItem('authToken'),
       },
@@ -56,7 +57,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     newSocket.on('connect', () => {
       console.log('✅ WebSocket connected successfully');
       setIsConnected(true);
-      
+
       toast({
         title: "Connected",
         description: "Real-time chat is now active",
@@ -67,7 +68,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     newSocket.on('disconnect', () => {
       console.log('❌ WebSocket disconnected');
       setIsConnected(false);
-      
+
       toast({
         title: "Disconnected",
         description: "Real-time features temporarily unavailable",

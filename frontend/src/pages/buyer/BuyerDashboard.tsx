@@ -187,18 +187,6 @@ const BuyerDashboard = () => {
           <PageHeader 
             title="Buyer Dashboard" 
             description="Track your orders and shopping activity"
-            action={
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => navigate('/my-orders')}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  View All Orders
-                </Button>
-                <Button onClick={() => navigate('/marketplace')}>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Continue Shopping
-                </Button>
-              </div>
-            }
           />
 
           <main className="flex-1 p-6">

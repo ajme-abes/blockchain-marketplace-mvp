@@ -1,22 +1,27 @@
+// Categories that exist in the database (case-insensitive)
 export const categories = [
   'Coffee',
-  'Teff',
-  'Honey',
-  'Sesame',
-  'Spices',
-  'Vegetables',
   'Fruits',
   'Grains',
+  'Vegetables',
+  'Spices',
+  'Honey',
+  'Teff',
+  'Sesame',
+  'Other',
 ] as const;
 
 export const regions = [
   'Addis Ababa',
   'Oromia',
+  'Oromia, Ethiopia',
   'Amhara',
   'Tigray',
   'SNNPR',
   'Sidama',
   'Harar',
+  'Mechara',
+  'dadar',
 ] as const;
 
 export interface Product {
@@ -201,29 +206,5 @@ export const mockProducers: Producer[] = [
   },
 ];
 
-export const mockTestimonials: Testimonial[] = [
-  {
-    id: 't1',
-    name: 'Mekdes Alemu',
-    role: 'Buyer',
-    message: 'The quality of products here is exceptional! I can directly connect with farmers and know exactly where my food comes from.',
-    photo: 'https://i.pravatar.cc/150?img=5',
-    rating: 5,
-  },
-  {
-    id: 't2',
-    name: 'Getachew Tadesse',
-    role: 'Producer',
-    message: 'This platform has transformed my business. I can reach buyers directly and get fair prices for my coffee.',
-    photo: 'https://i.pravatar.cc/150?img=12',
-    rating: 5,
-  },
-  {
-    id: 't3',
-    name: 'Sara Mohammed',
-    role: 'Buyer',
-    message: 'Love the blockchain verification! I can trust every transaction and the payment process is seamless.',
-    photo: 'https://i.pravatar.cc/150?img=9',
-    rating: 5,
-  },
-];
+// Testimonials are now fetched from the backend API
+// No mock data needed

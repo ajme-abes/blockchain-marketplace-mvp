@@ -163,20 +163,26 @@ const SystemSettings = () => {
 
       // Fetch real data from backend
       const [dashboardResponse, healthResponse] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/dashboard/stats', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        }),
-        fetch('http://localhost:5000/api/admin/system/health', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        })
+        fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/dashboard/stats`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          }
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/system/health`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          }
+        )
       ]);
 
       if (dashboardResponse.ok && healthResponse.ok) {
@@ -299,7 +305,7 @@ const SystemSettings = () => {
       handleSettingChange('general', 'maintenanceMode', true);
 
       // TODO: Implement backend API call
-      // await fetch('http://localhost:5000/api/admin/settings/maintenance', {
+      // await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/settings/maintenance', {
       //   method: 'POST',
       //   headers: { 
       //     'Authorization': `Bearer ${token}`,

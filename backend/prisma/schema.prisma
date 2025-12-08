@@ -50,6 +50,8 @@ model User {
   disputeEvidences DisputeEvidence[]
   disputeMessages  DisputeMessage[]
   blockchainIdentifiers BlockchainIdentifier[]
+  testimonials     Testimonial[]
+  contactMessages  ContactMessage[]
 
   @@index([email])
   @@index([role])
@@ -143,10 +145,13 @@ model Product {
   quantityAvailable Int
   description       String?
   imageUrl          String?
+  unit              String?       @default("unit") // kg, piece, liter, bundle, dozen, etc.
+  region            String?       // Product origin region
   status            ProductStatus @default(ACTIVE)
   listingDate       DateTime      @default(now())
   averageRating     Float?        @default(0)
   reviewCount       Int?          @default(0)
+  updatedAt         DateTime      @default(now()) @updatedAt
 
   // Relations
   producerId String
@@ -770,4 +775,59 @@ enum DisputeMessageType {
   INTERNAL_NOTE
   RESOLUTION_UPDATE
   STATUS_CHANGE
+}
+
+model Testimonial {
+  id          String            @id @default(uuid())
+  name        String
+  role        TestimonialRole   @default(BUYER)
+  message     String
+  rating      Int               @default(5) // 1-5 stars
+  photo       String?
+  isApproved  Boolean           @default(false) // Admin approval required
+  isPublished Boolean           @default(false)
+  userId      String?
+  user        User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([isApproved])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("testimonials")
+}
+
+enum TestimonialRole {
+  BUYER
+  PRODUCER
+  ADMIN
+}
+
+model ContactMessage {
+  id          String              @id @default(uuid())
+  name        String
+  email       String
+  subject     String
+  message     String
+  status      ContactMessageStatus @default(UNREAD)
+  userId      String?
+  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminNotes  String?
+  respondedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+  @@index([userId])
+  @@map("contact_messages")
+}
+
+enum ContactMessageStatus {
+  UNREAD
+  READ
+  RESPONDED
+  ARCHIVED
 }

@@ -1,5 +1,8 @@
 const { prisma } = require('../config/database');
 const nodemailer = require('nodemailer');
+const resendEmailService = require('./resendEmailService');
+const mailgunEmailService = require('./mailgunEmailService');
+const brevoEmailService = require('./brevoEmailService');
 
 class NotificationService {
   constructor() {
@@ -7,19 +10,37 @@ class NotificationService {
     this.initEmailTransporter();
   }
 
-    // === ADD THIS NEW METHOD RIGHT HERE ===
+  // === UPDATED METHOD TO USE MAILGUN ===
   async sendEmail(emailData) {
     try {
       const { to, subject, html, text } = emailData;
-      
-      if (!this.isEmailConfigured) {
-        return { 
-          success: false, 
-          error: 'Email not configured',
-          note: 'Set EMAIL_USER and EMAIL_PASSWORD in .env'
-        };
+
+      // Try Brevo first (HTTP API - works perfectly on Render)
+      if (process.env.BREVO_API_KEY) {
+        console.log('🔧 Using Brevo for email...');
+        return await brevoEmailService.sendEmail({ to, subject, html, text });
       }
 
+      // Try Mailgun second
+      if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+        console.log('🔧 Using Mailgun for email...');
+        return await mailgunEmailService.sendEmail({ to, subject, html, text });
+      }
+
+      // Try Resend third
+      if (process.env.RESEND_API_KEY) {
+        console.log('🔧 Using Resend for email...');
+        return await resendEmailService.sendEmail({ to, subject, html, text });
+      }
+
+      // No email service configured
+      return {
+        success: false,
+        error: 'No email service configured',
+        note: 'Set EMAIL_USER/EMAIL_PASSWORD, MAILGUN_API_KEY, or RESEND_API_KEY'
+      };
+
+      console.log('🔧 Using nodemailer for email...');
       const mailOptions = {
         from: process.env.EMAIL_FROM || `"Blockchain Marketplace" <${process.env.EMAIL_USER}>`,
         to: to,
@@ -30,16 +51,16 @@ class NotificationService {
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log(`📧 Email sent to ${to}: ${subject}`);
-      
-      return { 
-        success: true, 
-        messageId: result.messageId 
+
+      return {
+        success: true,
+        messageId: result.messageId
       };
     } catch (error) {
       console.error('❌ Email sending error:', error);
-      return { 
-        success: false, 
-        error: error.message 
+      return {
+        success: false,
+        error: error.message
       };
     }
   }
@@ -62,12 +83,20 @@ class NotificationService {
 
     // Create email transporter with better configuration
     this.transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // Use STARTTLS
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD
       },
+      tls: {
+        rejectUnauthorized: false // For development/testing
+      },
       // Better timeout and error handling
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
       pool: true,
       maxConnections: 1,
       maxMessages: 5
@@ -89,7 +118,7 @@ class NotificationService {
     }
   }
 
-  
+
 
   // ==================== CORE NOTIFICATION METHODS ====================
 
@@ -133,8 +162,8 @@ class NotificationService {
       // Get user email and preferences
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { 
-          email: true, 
+        select: {
+          email: true,
           name: true,
           // Add user preferences here if you have them
         }
@@ -146,7 +175,7 @@ class NotificationService {
 
       const subject = this.getEmailSubject(type);
       const htmlContent = this.generateEmailTemplate(message, type, user.name);
-      
+
       const mailOptions = {
         from: process.env.EMAIL_FROM || `"Blockchain Marketplace" <${process.env.EMAIL_USER}>`,
         to: user.email,
@@ -158,16 +187,16 @@ class NotificationService {
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log(`📧 Email sent to ${user.email}: ${subject}`);
-      
-      return { 
-        success: true, 
-        messageId: result.messageId 
+
+      return {
+        success: true,
+        messageId: result.messageId
       };
     } catch (error) {
       console.error('❌ Email notification error:', error);
-      return { 
-        success: false, 
-        error: error.message 
+      return {
+        success: false,
+        error: error.message
       };
     }
   }
@@ -182,10 +211,10 @@ class NotificationService {
           buyer: {
             include: {
               user: {
-                select: { 
-                  id: true, 
-                  name: true, 
-                  email: true 
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
                 }
               }
             }
@@ -223,10 +252,10 @@ class NotificationService {
           buyer: {
             include: {
               user: {
-                select: { 
-                  id: true, 
-                  name: true, 
-                  email: true 
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
                 }
               }
             }
@@ -269,10 +298,10 @@ class NotificationService {
           buyer: {
             include: {
               user: {
-                select: { 
-                  id: true, 
-                  name: true, 
-                  email: true 
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
                 }
               }
             }
@@ -311,10 +340,10 @@ class NotificationService {
                   producer: {
                     include: {
                       user: {
-                        select: { 
-                          id: true, 
-                          name: true, 
-                          email: true 
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true
                         }
                       }
                     }
@@ -343,7 +372,7 @@ class NotificationService {
       const results = [];
       for (const [producerUserId, producer] of producers) {
         const message = `🎊 New Order! You have received a new order #${order.id.substring(0, 8)}. Please check your dashboard for details.`;
-        
+
         const result = await this.createNotification(
           producerUserId,
           message,
@@ -379,13 +408,13 @@ class NotificationService {
       }
 
       // Notify the other party (if buyer raised dispute, notify producer and admin, and vice versa)
-      const targetUserId = raisedByUserId === order.buyer.userId ? 
+      const targetUserId = raisedByUserId === order.buyer.userId ?
         // TODO: Get producer user ID - you might need to adjust this based on your schema
         null : order.buyer.userId;
 
       if (targetUserId) {
         const message = `⚠️ Dispute Alert: A dispute has been raised for order #${order.id.substring(0, 8)}. Reason: ${disputeReason}`;
-        
+
         return await this.createNotification(
           targetUserId,
           message,
@@ -424,9 +453,9 @@ class NotificationService {
           where: { userId }
         }),
         prisma.notification.count({
-          where: { 
-            userId, 
-            status: 'UNREAD' 
+          where: {
+            userId,
+            status: 'UNREAD'
           }
         })
       ]);
@@ -499,9 +528,9 @@ class NotificationService {
 
       console.log(`✅ Marked ${result.count} notifications as read for user ${userId}`);
 
-      return { 
+      return {
         success: true,
-        markedCount: result.count 
+        markedCount: result.count
       };
     } catch (error) {
       console.error('Mark all as read error:', error);
@@ -515,9 +544,9 @@ class NotificationService {
   async getUnreadCount(userId) {
     try {
       const count = await prisma.notification.count({
-        where: { 
-          userId, 
-          status: 'UNREAD' 
+        where: {
+          userId,
+          status: 'UNREAD'
         }
       });
 

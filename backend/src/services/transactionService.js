@@ -308,7 +308,8 @@ class TransactionService {
             orderId: order.id,
             buyerName: order.buyer.user.name,
             type: 'sale',
-            amount: totalAmount,
+            amount: totalAmount, // Gross amount
+            netAmount: orderProducer?.producerAmount || 0, // Net earnings after commission
             status: order.paymentStatus.toLowerCase(),
             date: order.orderDate,
             items: producerItems.map(item => ({
@@ -330,15 +331,25 @@ class TransactionService {
         })
       );
 
-      // Calculate sales statistics
+      // Calculate sales statistics - FIXED: Use net earnings instead of gross sales
       const confirmedOrders = orders.filter(o => o.paymentStatus === 'CONFIRMED');
+
+      // Get actual producer earnings from OrderProducer table - ONLY when payout is completed
+      const earningsResult = await prisma.orderProducer.aggregate({
+        where: {
+          producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
+          order: {
+            paymentStatus: 'CONFIRMED'
+          }
+        },
+        _sum: {
+          producerAmount: true // Net earnings after commission
+        }
+      });
+
       const stats = {
-        totalRevenue: confirmedOrders.reduce((sum, order) => {
-          const producerItems = order.orderItems.filter(item =>
-            productIds.includes(item.productId)
-          );
-          return sum + producerItems.reduce((itemSum, item) => itemSum + item.subtotal, 0);
-        }, 0),
+        totalRevenue: earningsResult._sum.producerAmount || 0, // Net earnings
         totalSales: total,
         completedSales: confirmedOrders.length,
         pendingSales: orders.filter(o => o.paymentStatus === 'PENDING').length
@@ -451,19 +462,67 @@ class TransactionService {
         revenueData[key] += orderRevenue;
       });
 
-      // Product performance
+      // Product performance - FIXED: Use net earnings instead of gross sales
       const productPerformance = {};
-      orders.forEach(order => {
-        order.orderItems.forEach(item => {
+
+      // Get OrderProducer data to calculate net earnings per product - ONLY when payout is completed
+      const orderProducers = await prisma.orderProducer.findMany({
+        where: {
+          producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
+          order: {
+            paymentStatus: 'CONFIRMED',
+            orderDate: {
+              gte: startDate
+            }
+          }
+        },
+        include: {
+          order: {
+            include: {
+              orderItems: {
+                where: {
+                  productId: { in: productIds }
+                },
+                include: {
+                  product: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      orderProducers.forEach(orderProducer => {
+        orderProducer.order.orderItems.forEach(item => {
           if (!productPerformance[item.product.name]) {
             productPerformance[item.product.name] = {
               revenue: 0,
               quantity: 0
             };
           }
-          productPerformance[item.product.name].revenue += item.subtotal;
+          // Calculate net earnings per item (proportional to the producer's share)
+          const itemNetEarnings = (item.subtotal / orderProducer.subtotal) * orderProducer.producerAmount;
+          productPerformance[item.product.name].revenue += itemNetEarnings;
           productPerformance[item.product.name].quantity += item.quantity;
         });
+      });
+
+      // Calculate total net earnings for the period - ONLY when payout is completed
+      const totalNetEarnings = await prisma.orderProducer.aggregate({
+        where: {
+          producerId: producerId,
+          payoutStatus: 'COMPLETED', // Only count when admin has made the payout
+          order: {
+            paymentStatus: 'CONFIRMED',
+            orderDate: {
+              gte: startDate
+            }
+          }
+        },
+        _sum: {
+          producerAmount: true
+        }
       });
 
       return {
@@ -475,7 +534,7 @@ class TransactionService {
             quantity: data.quantity
           }))
           .sort((a, b) => b.revenue - a.revenue),
-        totalRevenue: Object.values(revenueData).reduce((sum, revenue) => sum + revenue, 0),
+        totalRevenue: totalNetEarnings._sum.producerAmount || 0, // Net earnings
         totalOrders: orders.length
       };
 

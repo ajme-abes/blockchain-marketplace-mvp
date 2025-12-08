@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import api from '@/services/api';
 import heroImage1 from '@/assets/hero-carousel-1.jpeg';
 import heroImage2 from '@/assets/hero-carousel-2.jpeg';
 import heroImage3 from '@/assets/hero-carousel-3.jpeg';
@@ -10,9 +11,9 @@ import heroImage3 from '@/assets/hero-carousel-3.jpeg';
 const slides = [
   {
     image: heroImage1,
-    caption: { 
-      en: 'Direct from Ethiopian Coffee Farmers', 
-      amh: 'በቀጥታ ከኢትዮጵያ የቡና አምራቾች' 
+    caption: {
+      en: 'Direct from Ethiopian Coffee Farmers',
+      amh: 'በቀጥታ ከኢትዮጵያ የቡና አምራቾች'
     },
     subtitle: {
       en: 'Premium coffee beans sourced directly from local farmers',
@@ -23,9 +24,9 @@ const slides = [
   },
   {
     image: heroImage2,
-    caption: { 
-      en: 'Fresh Produce from Local Markets', 
-      amh: 'ከአካባቢያዊ ገበያዎች ትኩስ ምርት' 
+    caption: {
+      en: 'Fresh Produce from Local Markets',
+      amh: 'ከአካባቢያዊ ገበያዎች ትኩስ ምርት'
     },
     subtitle: {
       en: 'Farm-fresh vegetables and fruits delivered to your doorstep',
@@ -35,9 +36,9 @@ const slides = [
   },
   {
     image: heroImage3,
-    caption: { 
-      en: 'Pure Ethiopian Honey Direct from Beekeepers', 
-      amh: 'ንፁህ የኢትዮጵያ ማር በቀጥታ ከንብ አራቢዎች' 
+    caption: {
+      en: 'Pure Ethiopian Honey Direct from Beekeepers',
+      amh: 'ንፁህ የኢትዮጵያ ማር በቀጥታ ከንብ አራቢዎች'
     },
     subtitle: {
       en: '100% natural honey from sustainable beekeeping practices',
@@ -47,15 +48,47 @@ const slides = [
   }
 ];
 
+interface HeroStats {
+  verifiedProducers: number;
+  totalUsers: number;
+  satisfactionRate: number;
+}
+
 export const HeroCarousel = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState<{ [key: number]: boolean }>({});
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const { language, t } = useLanguage(); 
+  const [stats, setStats] = useState<HeroStats>({
+    verifiedProducers: 500,
+    totalUsers: 10000,
+    satisfactionRate: 98
+  });
+  const { language, t } = useLanguage();
 
   const memoizedSlides = useMemo(() => slides, []);
+
+  // Fetch real statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await api.getHeroStats();
+        if (response.status === 'success' && response.data) {
+          setStats({
+            verifiedProducers: response.data.verifiedProducers,
+            totalUsers: response.data.totalUsers,
+            satisfactionRate: response.data.satisfactionRate
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching hero stats:', error);
+        // Keep default values on error
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const nextSlide = useCallback(() => {
     setCurrentSlide((prev) => (prev + 1) % memoizedSlides.length);
@@ -103,15 +136,15 @@ export const HeroCarousel = () => {
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!touchStart) return;
-    
+
     const touchEnd = e.changedTouches[0].clientX;
     const diff = touchStart - touchEnd;
-    
+
     if (Math.abs(diff) > 50) {
       if (diff > 0) nextSlide();
       else prevSlide();
     }
-    
+
     setTouchStart(null);
   };
 
@@ -120,7 +153,7 @@ export const HeroCarousel = () => {
   };
 
   return (
-    <section 
+    <section
       className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -131,18 +164,16 @@ export const HeroCarousel = () => {
       {memoizedSlides.map((slide, index) => (
         <div
           key={index}
-          className={`absolute inset-0 transition-all duration-1000 ease-out ${
-            index === currentSlide 
-              ? 'opacity-100 scale-100' 
-              : 'opacity-0 scale-105'
-          }`}
+          className={`absolute inset-0 transition-all duration-1000 ease-out ${index === currentSlide
+            ? 'opacity-100 scale-100'
+            : 'opacity-0 scale-105'
+            }`}
         >
           <img
             src={slide.image}
             alt={slide.caption[language]}
-            className={`w-full h-full object-cover transition-opacity duration-1000 ${
-              imagesLoaded[index] ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`w-full h-full object-cover transition-opacity duration-1000 ${imagesLoaded[index] ? 'opacity-100' : 'opacity-0'
+              }`}
             onLoad={() => handleImageLoad(index)}
             loading={index === 0 ? 'eager' : 'lazy'}
             fetchPriority={index === 0 ? 'high' : 'auto'}
@@ -157,7 +188,7 @@ export const HeroCarousel = () => {
       <div className="container mx-auto px-4 relative z-20">
         <div className="max-w-2xl animate-in fade-in duration-1000">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 mt-6 rounded-full bg-primary/10 border border-primary/20 mb-8">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
             <span className="text-sm font-medium text-primary">Ethiopia's Trusted Marketplace</span>
           </div>
@@ -182,9 +213,9 @@ export const HeroCarousel = () => {
           {/* CTA Buttons */}
           <div className="flex flex-wrap gap-4 animate-in slide-in-from-bottom-8 delay-500">
             <Link to="/marketplace">
-              <Button 
-                size="lg" 
-                variant="hero" 
+              <Button
+                size="lg"
+                variant="hero"
                 className="rounded-full px-8 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
               >
                 {memoizedSlides[currentSlide].cta[language]}
@@ -192,9 +223,9 @@ export const HeroCarousel = () => {
               </Button>
             </Link>
             <Link to="/about">
-              <Button 
-                size="lg" 
-                variant="outline" 
+              <Button
+                size="lg"
+                variant="outline"
                 className="rounded-full px-8 py-6 text-lg font-semibold border-2 hover:border-primary/50 transition-all duration-300"
               >
                 {t('common.learnMore')}
@@ -202,18 +233,28 @@ export const HeroCarousel = () => {
             </Link>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - Real Data */}
           <div className="flex flex-wrap gap-6 mt-12 animate-in fade-in delay-700">
-            {[
-              { number: '500+', label: 'Verified Producers' },
-              { number: '10K+', label: 'Happy Customers' },
-              { number: '98%', label: 'Satisfaction Rate' }
-            ].map((stat, index) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-2xl font-bold text-primary">{stat.number}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {stats.verifiedProducers}+
               </div>
-            ))}
+              <div className="text-sm text-muted-foreground">Verified Producers</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {stats.totalUsers >= 1000
+                  ? `${Math.floor(stats.totalUsers / 1000)}K+`
+                  : `${stats.totalUsers}+`}
+              </div>
+              <div className="text-sm text-muted-foreground">Happy Customers</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {stats.satisfactionRate}%
+              </div>
+              <div className="text-sm text-muted-foreground">Satisfaction Rate</div>
+            </div>
           </div>
         </div>
       </div>
@@ -226,17 +267,15 @@ export const HeroCarousel = () => {
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`relative transition-all duration-300 ${
-                index === currentSlide ? 'w-8' : 'w-2'
-              }`}
+              className={`relative transition-all duration-300 ${index === currentSlide ? 'w-8' : 'w-2'
+                }`}
               aria-label={`Go to slide ${index + 1}`}
             >
               <div
-                className={`h-2 rounded-full transition-all duration-500 ${
-                  index === currentSlide 
-                    ? 'bg-primary shadow-lg shadow-primary/50' 
-                    : 'bg-background/60 hover:bg-background/80'
-                }`}
+                className={`h-2 rounded-full transition-all duration-500 ${index === currentSlide
+                  ? 'bg-primary shadow-lg shadow-primary/50'
+                  : 'bg-background/60 hover:bg-background/80'
+                  }`}
               />
               {index === currentSlide && (
                 <div className="absolute -inset-1 bg-primary/20 rounded-full animate-ping" />
@@ -267,7 +306,7 @@ export const HeroCarousel = () => {
       >
         <ChevronLeft className="h-6 w-6 group-hover:-translate-x-0.5 transition-transform" />
       </button>
-      
+
       <button
         onClick={nextSlide}
         className="absolute right-8 top-1/2 -translate-y-1/2 z-30 p-4 rounded-2xl bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-background hover:scale-110 transition-all duration-300 group"

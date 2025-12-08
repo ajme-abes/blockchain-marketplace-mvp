@@ -62,30 +62,38 @@ const ProducerDashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch producer orders and products in parallel
-      const [ordersResponse, productsResponse] = await Promise.all([
+      // Fetch producer orders, products, and earnings in parallel
+      const [ordersResponse, productsResponse, earningsResponse] = await Promise.all([
         orderService.getProducerOrders(),
-        orderService.getProducerProducts() // Use orderService since we moved the method
+        orderService.getProducerProducts(), // Use orderService since we moved the method
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/payouts/my-earnings`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+          }
+        }).then(res => res.json()).catch(() => ({ earnings: { total: 0 } }))
       ]);
 
       console.log('🔧 Orders response:', ordersResponse);
       console.log('🔧 Products response:', productsResponse);
+      console.log('🔧 Earnings response:', earningsResponse);
 
       // Extract data based on your backend response structure
       const orders = ordersResponse?.orders || ordersResponse?.data?.orders || [];
       const products = productsResponse?.products || productsResponse?.data?.products || [];
+      const earnings = earningsResponse?.earnings || { total: 0, pending: 0, completed: 0 };
 
       console.log('🔧 Extracted orders:', orders);
       console.log('🔧 Extracted products:', products);
+      console.log('🔧 Extracted earnings:', earnings);
 
       // Calculate stats
       const pendingOrders = orders.filter(order =>
         ['PENDING', 'CONFIRMED'].includes(order.deliveryStatus)
       ).length;
 
-      const totalEarnings = orders
-        .filter(order => order.paymentStatus === 'CONFIRMED')
-        .reduce((sum, order) => sum + order.totalAmount, 0);
+      // FIXED: Use actual producer earnings from backend
+      const totalEarnings = earnings.total || 0;
 
       const growthPercentage = orders.length > 0 ? 12 : 0;
 
@@ -93,7 +101,10 @@ const ProducerDashboard = () => {
         totalProducts: products.length,
         pendingOrders,
         totalEarnings,
-        growthPercentage
+        growthPercentage,
+        // Add additional earnings info for transparency
+        pendingEarnings: earnings.pending || 0,
+        completedEarnings: earnings.completed || 0
       });
 
       // Get recent orders (last 5)
@@ -149,11 +160,11 @@ const ProducerDashboard = () => {
       description: t('producer.dashboard.awaitingProcessing')
     },
     {
-      title: t('producer.dashboard.totalEarnings'),
+      title: 'Paid Earnings',
       value: formatPrice(stats.totalEarnings),
       icon: DollarSign,
       color: 'text-green-600',
-      description: t('producer.dashboard.allTimeRevenue')
+      description: 'Only when admin pays out'
     },
     {
       title: t('producer.dashboard.growth'),

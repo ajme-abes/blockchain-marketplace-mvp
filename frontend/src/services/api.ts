@@ -1,5 +1,5 @@
 // src/services/api.ts - ENHANCED ERROR HANDLING
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -168,10 +168,117 @@ class ApiService {
     });
   }
 
-  async resendVerificationEmail(): Promise<any> {
+  async resendVerificationEmail(email?: string): Promise<any> {
     return this.request('/email-verification/resend', {
       method: 'POST',
+      data: email ? { email } : {},
     });
+  }
+
+  // Product methods
+  async getProducts(params?: {
+    category?: string;
+    search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    const queryString = queryParams.toString();
+    return this.request(`/products${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getProductById(id: string): Promise<any> {
+    return this.request(`/products/${id}`);
+  }
+
+  async createProduct(productData: FormData): Promise<any> {
+    return this.request('/products', {
+      method: 'POST',
+      headers: {}, // Let browser set Content-Type for FormData
+      body: productData,
+    });
+  }
+
+  async updateProduct(id: string, productData: FormData): Promise<any> {
+    return this.request(`/products/${id}`, {
+      method: 'PUT',
+      headers: {}, // Let browser set Content-Type for FormData
+      body: productData,
+    });
+  }
+
+  async deleteProduct(id: string): Promise<any> {
+    return this.request(`/products/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Testimonial methods
+  async getPublishedTestimonials(limit?: number): Promise<any> {
+    const queryParams = limit ? `?limit=${limit}` : '';
+    return this.request(`/testimonials/published${queryParams}`);
+  }
+
+  async createTestimonial(testimonialData: {
+    name: string;
+    role: string;
+    message: string;
+    rating?: number;
+  }): Promise<any> {
+    return this.request('/testimonials', {
+      method: 'POST',
+      data: testimonialData,
+    });
+  }
+
+  // Stats methods
+  async getHeroStats(): Promise<any> {
+    return this.request('/stats/hero');
+  }
+
+  async getAboutStats(): Promise<any> {
+    return this.request('/stats/about');
+  }
+
+  // Contact methods
+  async sendContactMessage(messageData: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<any> {
+    return this.request('/contact', {
+      method: 'POST',
+      data: messageData,
+    });
+  }
+
+  async getContactMessages(filters?: any): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    const queryString = queryParams.toString();
+    return this.request(`/contact${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getUnreadContactCount(): Promise<any> {
+    return this.request('/contact/unread-count');
   }
 }
 

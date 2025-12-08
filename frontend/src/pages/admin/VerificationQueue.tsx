@@ -109,13 +109,16 @@ const VerificationQueue = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/admin/producers/verification-queue', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/verification-queue`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -137,21 +140,29 @@ const VerificationQueue = () => {
     }
   };
 
-  const handleVerificationAction = async (action: string, producerId: string, reason?: string) => {
+  // Handles verification or rejection of a producer
+  const handleVerificationAction = async (
+    action: 'verify' | 'reject',
+    producerId: string,
+    reason?: string
+  ) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/admin/producers/${producerId}/verify`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          status: action === 'verify' ? 'VERIFIED' : 'REJECTED',
-          reason: action === 'reject' ? reason : undefined
-        })
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/${producerId}/verify`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            status: action === 'verify' ? 'VERIFIED' : 'REJECTED',
+            reason: action === 'reject' ? reason : undefined
+          })
+        }
+      );
 
       if (response.ok) {
         const actionText = action === 'verify' ? 'verified' : 'rejected';

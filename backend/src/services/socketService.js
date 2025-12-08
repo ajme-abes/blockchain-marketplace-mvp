@@ -9,9 +9,14 @@ class SocketService {
   }
 
   initialize(server) {
+    // Get allowed origins from environment variable or use defaults
+    const allowedOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+      : ['http://localhost:8080', 'http://localhost:3000'];
+
     this.io = new Server(server, {
       cors: {
-        origin: ['http://localhost:8080', 'http://localhost:3000'],
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true
       }
@@ -28,7 +33,7 @@ class SocketService {
   async authenticateSocket(socket, next) {
     try {
       const token = socket.handshake.auth.token;
-      
+
       if (!token) {
         return next(new Error('Authentication error: No token provided'));
       }
@@ -36,7 +41,7 @@ class SocketService {
       // Verify JWT token (you can reuse your auth middleware logic)
       const authService = require('./authService');
       const user = await authService.verifyToken(token);
-      
+
       if (!user) {
         return next(new Error('Authentication error: Invalid token'));
       }
@@ -56,7 +61,7 @@ class SocketService {
 
     // Store user connection
     this.connectedUsers.set(socket.userId, socket.id);
-    
+
     // Join user to their personal room for notifications
     socket.join(`user_${socket.userId}`);
 
@@ -86,9 +91,9 @@ class SocketService {
     socket.on('send_message', async (data) => {
       try {
         console.log('💬 New message via socket:', data);
-        
+
         const { chatId, content, messageType = 'TEXT', attachments = [] } = data;
-        
+
         // Verify user is participant in this chat
         const chat = await chatService.getChatById(chatId, socket.userId);
         if (!chat) {
@@ -131,7 +136,7 @@ class SocketService {
       try {
         const { chatId, messageIds } = data;
         await chatService.markMessagesAsRead(chatId, socket.userId, messageIds);
-        
+
         // Notify other participants that messages were read
         this.io.to(`chat_${chatId}`).emit('messages_read', {
           chatId,

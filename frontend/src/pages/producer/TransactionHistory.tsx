@@ -142,18 +142,19 @@ const ProducerTransactionHistory = () => {
         <div className="flex-1 flex flex-col">
           <PageHeader
             title="Transaction History"
-            description="View your sales history and payout status"
+            description="View your sales history and earnings (counted only when admin completes payout)"
           />
 
           <main className="flex-1 p-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                      <p className="text-2xl font-bold">{stats.totalRevenue || 0} ETB</p>
+                      <p className="text-sm font-medium text-muted-foreground">Paid Earnings</p>
+                      <p className="text-2xl font-bold text-green-600">{stats.totalRevenue || 0} ETB</p>
+                      <p className="text-xs text-muted-foreground">Only when admin pays out</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-green-500" />
                   </div>
@@ -178,6 +179,17 @@ const ProducerTransactionHistory = () => {
                       <p className="text-2xl font-bold">{stats.pendingSales || 0}</p>
                     </div>
                     <Filter className="h-8 w-8 text-orange-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Sales</p>
+                      <p className="text-2xl font-bold">{stats.totalSales || 0}</p>
+                    </div>
+                    <Filter className="h-8 w-8 text-gray-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -240,7 +252,7 @@ const ProducerTransactionHistory = () => {
                       <TableHead>Order ID</TableHead>
                       <TableHead>Buyer</TableHead>
                       <TableHead>Products</TableHead>
-                      <TableHead>Amount</TableHead>
+                      <TableHead>Gross / Net</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead>Payout</TableHead>
@@ -263,7 +275,12 @@ const ProducerTransactionHistory = () => {
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell>{transaction.amount} ETB</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="text-gray-500">{transaction.amount} ETB</div>
+                            <div className="font-medium text-green-600">{(transaction as any).netAmount || 0} ETB</div>
+                          </div>
+                        </TableCell>
                         <TableCell>{formatDate(transaction.date)}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(transaction.status)}>

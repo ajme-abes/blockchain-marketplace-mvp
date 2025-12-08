@@ -1,7 +1,9 @@
 // backend/src/services/authService.js
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const prisma = require('../config/database'); // FIXED: Import at top level
+
+// Use crypto.randomUUID() instead of uuid package (Node 18+ built-in)
+const { randomUUID } = require('crypto');
 
 class AuthService {
   generateAccessToken(user) {
@@ -12,7 +14,7 @@ class AuthService {
         role: user.role
       },
       process.env.JWT_SECRET,
-      { 
+      {
         expiresIn: process.env.JWT_EXPIRES_IN || '24h',
         issuer: 'blockchain-marketplace',
         subject: user.id
@@ -21,7 +23,7 @@ class AuthService {
   }
 
   generateRefreshToken() {
-    return uuidv4();
+    return randomUUID();
   }
 
   verifyToken(token) {
@@ -35,8 +37,8 @@ class AuthService {
   async createSession(userId, ipAddress = null, userAgent = null) {
     try {
       console.log('🔧 Creating session for user:', userId);
-      
-        
+
+
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, email: true, role: true }

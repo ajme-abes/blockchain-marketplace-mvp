@@ -9,10 +9,14 @@ const loginAttemptService = require('../services/loginAttemptService');
 const sessionService = require('../services/sessionService');
 const twoFactorService = require('../services/twoFactorService');
 const {
-  loginLimiter,
   passwordResetLimiter,
   emailVerificationLimiter
 } = require('../middleware/rateLimiter');
+const {
+  loginByEmailLimiter,
+  recordFailedLogin,
+  resetLoginAttempts
+} = require('../middleware/emailRateLimiter');
 // FIX: Check the correct path to database config
 let prisma;
 try {
@@ -32,8 +36,8 @@ try {
 
 const router = express.Router();
 
-// Login (with rate limiting)
-router.post('/login', loginLimiter, async (req, res) => {
+// Login (with email-based rate limiting)
+router.post('/login', loginByEmailLimiter, async (req, res) => {
   try {
     // Check if prisma is available
     if (!prisma) {
@@ -88,8 +92,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!user) {
       console.log('❌ User not found for email:', normalizedEmail);
 
-      // Record failed attempt
+      // Record failed attempt (both systems)
       const attemptInfo = await loginAttemptService.recordFailedAttempt(normalizedEmail, req.ip);
+      recordFailedLogin(normalizedEmail);
 
       return res.status(401).json({
         error: 'Invalid email or password',
@@ -107,8 +112,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!isValidPassword) {
       console.log('❌ Invalid password for user:', user.id);
 
-      // Record failed attempt
+      // Record failed attempt (both systems)
       const attemptInfo = await loginAttemptService.recordFailedAttempt(normalizedEmail, req.ip);
+      recordFailedLogin(normalizedEmail);
 
       return res.status(401).json({
         error: 'Invalid email or password',
@@ -146,8 +152,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     // ✅ User is verified, proceed with login
     console.log('✅ Login successful for verified user:', user.email);
 
-    // Clear failed login attempts
+    // Clear failed login attempts (both systems)
     await loginAttemptService.clearFailedAttempts(normalizedEmail);
+    resetLoginAttempts(normalizedEmail);
 
     // Create session with access and refresh tokens
     console.log('🔧 Creating session for verified user...');

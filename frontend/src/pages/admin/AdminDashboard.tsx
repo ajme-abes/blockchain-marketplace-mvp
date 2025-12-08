@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Users, Package, AlertCircle, DollarSign, TrendingUp, 
-  ShoppingCart, ShieldCheck, RefreshCw, Eye, ArrowUp, 
+import {
+  Users, Package, AlertCircle, DollarSign, TrendingUp,
+  ShoppingCart, ShieldCheck, RefreshCw, Eye, ArrowUp,
   ArrowDown, BarChart3, Activity, Settings, Download,
   Calendar
 } from 'lucide-react';
@@ -28,6 +28,10 @@ interface AdminOverview {
   totalRevenue: number;
   userGrowth: number;
   revenueGrowth: number;
+  orderGrowth: number;
+  productGrowth: number;
+  disputeChange: number;
+  paymentChange: number;
   recentActivity: Array<{
     id: string;
     action: string;
@@ -69,7 +73,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [timeRange, setTimeRange] = useState('today');
+  const [timeRange, setTimeRange] = useState('month'); // Changed from 'today' to 'month'
 
   // Fetch admin overview data
   // UPDATE THIS FUNCTION IN YOUR AdminDashboard.tsx
@@ -77,25 +81,25 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      
+
       console.log('🔐 Fetching admin data with token:', token ? 'Present' : 'Missing');
-      
-      const response = await fetch(`http://localhost:5000/api/admin/overview?range=${timeRange}`, {
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/overview?range=${timeRange}`, {
         method: 'GET',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         credentials: 'include'
       });
-  
+
       console.log('📊 Response status:', response.status);
       console.log('📊 Response ok:', response.ok);
-  
+
       if (response.ok) {
         const result = await response.json();
         console.log('✅ REAL Admin data received:', result);
-        
+
         if (result.status === 'success') {
           setOverview(result.data);
         } else {
@@ -122,7 +126,7 @@ const AdminDashboard = () => {
       setRefreshing(false);
     }
   };
-  
+
   // Fallback data function (only used when backend fails)
   const getFallbackData = () => {
     console.warn('⚠️ Using fallback data - Backend connection failed');
@@ -138,22 +142,22 @@ const AdminDashboard = () => {
       userGrowth: 0,
       revenueGrowth: 0,
       recentActivity: [
-        { 
-          id: 'fallback-1', 
-          action: 'Backend Connection Required', 
-          user: 'System', 
-          entityId: 'connection', 
-          timestamp: new Date().toISOString(), 
-          type: 'USER_REGISTERED' 
+        {
+          id: 'fallback-1',
+          action: 'Backend Connection Required',
+          user: 'System',
+          entityId: 'connection',
+          timestamp: new Date().toISOString(),
+          type: 'USER_REGISTERED'
         }
       ],
       systemAlertsList: [
-        { 
-          id: 'connection-alert', 
-          title: 'Backend Connection Required', 
-          description: 'Connect to backend to see real data', 
-          severity: 'HIGH', 
-          timestamp: new Date().toISOString() 
+        {
+          id: 'connection-alert',
+          title: 'Backend Connection Required',
+          description: 'Connect to backend to see real data',
+          severity: 'HIGH',
+          timestamp: new Date().toISOString()
         }
       ]
     };
@@ -195,76 +199,80 @@ const AdminDashboard = () => {
 
   // KPI data from real backend or fallback to mock
   const kpis = overview ? [
-    { 
-      title: 'Total Users', 
-      value: overview.totalUsers.toLocaleString(), 
-      change: `${overview.userGrowth > 0 ? '+' : ''}${overview.userGrowth}%`, 
-      icon: Users, 
+    {
+      title: 'Total Users',
+      value: overview.totalUsers.toLocaleString(),
+      change: `${overview.userGrowth > 0 ? '+' : ''}${overview.userGrowth}%`,
+      icon: Users,
       color: 'text-blue-600',
-      trend: overview.userGrowth > 0 ? 'up' : 'down',
+      trend: overview.userGrowth > 0 ? 'up' : overview.userGrowth < 0 ? 'down' : 'neutral',
       description: 'Registered platform users'
     },
-    { 
-      title: 'Verified Producers', 
-      value: overview.verifiedProducers.toString(), 
-      change: '+5%', 
-      icon: ShieldCheck, 
+    {
+      title: 'Verified Producers',
+      value: overview.verifiedProducers.toString(),
+      change: overview.verifiedProducers > 0 ? `${overview.verifiedProducers} total` : 'No data',
+      icon: ShieldCheck,
       color: 'text-green-600',
-      trend: 'up',
+      trend: 'neutral',
       description: 'Approved business accounts'
     },
-    { 
-      title: 'Active Listings', 
-      value: overview.activeProducts.toLocaleString(), 
-      change: '+18%', 
-      icon: Package, 
+    {
+      title: 'Active Listings',
+      value: overview.activeProducts.toLocaleString(),
+      change: `${overview.productGrowth > 0 ? '+' : ''}${overview.productGrowth}%`,
+      icon: Package,
       color: 'text-purple-600',
-      trend: 'up',
+      trend: overview.productGrowth > 0 ? 'up' : overview.productGrowth < 0 ? 'down' : 'neutral',
       description: 'Products available for sale'
     },
-    { 
-      title: 'Orders Today', 
-      value: overview.ordersToday.toString(), 
-      change: '+23%', 
-      icon: ShoppingCart, 
+    {
+      title: `Orders (${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)})`,
+      value: overview.ordersToday.toString(),
+      change: `${overview.orderGrowth > 0 ? '+' : ''}${overview.orderGrowth}%`,
+      icon: ShoppingCart,
       color: 'text-orange-600',
-      trend: 'up',
-      description: 'Transactions in last 24h'
+      trend: overview.orderGrowth > 0 ? 'up' : overview.orderGrowth < 0 ? 'down' : 'neutral',
+      description: `Transactions in selected period`
     },
-    { 
-      title: 'Open Disputes', 
-      value: overview.openDisputes.toString(), 
-      change: '-2', 
-      icon: AlertCircle, 
+    {
+      title: 'Open Disputes',
+      value: overview.openDisputes.toString(),
+      change: overview.disputeChange !== 0 ? `${overview.disputeChange > 0 ? '+' : ''}${overview.disputeChange}` : 'No change',
+      icon: AlertCircle,
       color: 'text-red-600',
-      trend: 'down',
+      trend: overview.disputeChange < 0 ? 'up' : overview.disputeChange > 0 ? 'down' : 'neutral',
       description: 'Requiring resolution'
     },
-    { 
-      title: 'Pending Payments', 
-      value: overview.pendingPayments.toString(), 
-      change: '+4', 
-      icon: DollarSign, 
+    {
+      title: 'Pending Payments',
+      value: overview.pendingPayments.toString(),
+      change: overview.paymentChange !== 0 ? `${overview.paymentChange > 0 ? '+' : ''}${overview.paymentChange}` : 'No change',
+      icon: DollarSign,
       color: 'text-yellow-600',
-      trend: 'up',
+      trend: overview.paymentChange > 0 ? 'down' : overview.paymentChange < 0 ? 'up' : 'neutral',
       description: 'Awaiting confirmation'
     },
-    { 
-      title: 'System Alerts', 
-      value: overview.systemAlerts.toString(), 
-      change: '0', 
-      icon: AlertCircle, 
+    {
+      title: 'System Alerts',
+      value: overview.systemAlerts.toString(),
+      change: overview.systemAlerts > 0 ? 'Needs attention' : 'All clear',
+      icon: AlertCircle,
       color: overview.systemAlerts > 0 ? 'text-red-600' : 'text-gray-600',
       trend: 'neutral',
       description: 'Active system notifications'
     },
-    { 
-      title: 'Transaction Volume', 
-      value: `ETB ${(overview.totalRevenue / 1000000).toFixed(1)}M`, 
-      change: `${overview.revenueGrowth > 0 ? '+' : ''}${overview.revenueGrowth}%`, 
-      icon: TrendingUp, 
+    {
+      title: 'Transaction Volume',
+      value: overview.totalRevenue >= 1000000
+        ? `ETB ${(overview.totalRevenue / 1000000).toFixed(1)}M`
+        : overview.totalRevenue >= 1000
+          ? `ETB ${(overview.totalRevenue / 1000).toFixed(1)}K`
+          : `ETB ${overview.totalRevenue.toLocaleString()}`,
+      change: `${overview.revenueGrowth > 0 ? '+' : ''}${overview.revenueGrowth}%`,
+      icon: TrendingUp,
       color: 'text-emerald-600',
-      trend: overview.revenueGrowth > 0 ? 'up' : 'down',
+      trend: overview.revenueGrowth > 0 ? 'up' : overview.revenueGrowth < 0 ? 'down' : 'neutral',
       description: 'Total marketplace transactions'
     },
   ] : [];
@@ -323,21 +331,13 @@ const AdminDashboard = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Admin Dashboard" 
+          <PageHeader
+            title="Admin Dashboard"
             action={
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleExportData}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleRefresh}
                   disabled={refreshing}
                 >
@@ -354,13 +354,13 @@ const AdminDashboard = () => {
               <div>
                 <h2 className="text-3xl font-bold mb-2">Welcome, {user?.name || 'Administrator'} 👋</h2>
                 <p className="text-muted-foreground max-w-2xl">
-                  {overview ? 
+                  {overview ?
                     `Managing ${overview.totalUsers.toLocaleString()} users, ${overview.activeProducts.toLocaleString()} products, and ${formatCurrency(overview.totalRevenue)} in transaction volume` :
                     'Comprehensive overview of the EthioTrust marketplace platform'
                   }
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
                 {['today', 'week', 'month', 'quarter'].map((range) => (
                   <Button
@@ -420,11 +420,10 @@ const AdminDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">{kpi.value}</div>
-                        <p className={`text-xs mt-1 ${
-                          kpi.trend === 'up' ? 'text-green-600' : 
-                          kpi.trend === 'down' ? 'text-red-600' : 
-                          'text-muted-foreground'
-                        }`}>
+                        <p className={`text-xs mt-1 ${kpi.trend === 'up' ? 'text-green-600' :
+                          kpi.trend === 'down' ? 'text-red-600' :
+                            'text-muted-foreground'
+                          }`}>
                           {kpi.change} from last period
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">{kpi.description}</p>
@@ -442,32 +441,32 @@ const AdminDashboard = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 gap-3">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-20 flex-col gap-2 hover:bg-blue-50 hover:border-blue-200"
                           onClick={() => handleQuickAction('users')}
                         >
                           <Users className="h-6 w-6 text-blue-600" />
                           <span className="text-sm font-medium">Manage Users</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-20 flex-col gap-2 hover:bg-purple-50 hover:border-purple-200"
                           onClick={() => handleQuickAction('products')}
                         >
                           <Package className="h-6 w-6 text-purple-600" />
                           <span className="text-sm font-medium">Products</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-20 flex-col gap-2 hover:bg-red-50 hover:border-red-200"
                           onClick={() => handleQuickAction('disputes')}
                         >
                           <AlertCircle className="h-6 w-6 text-red-600" />
                           <span className="text-sm font-medium">Disputes</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-20 flex-col gap-2 hover:bg-green-50 hover:border-green-200"
                           onClick={() => handleQuickAction('analytics')}
                         >
@@ -489,8 +488,8 @@ const AdminDashboard = () => {
                     <CardContent>
                       <div className="space-y-3 max-h-96 overflow-y-auto">
                         {overview?.recentActivity?.map((activity) => (
-                          <div 
-                            key={activity.id} 
+                          <div
+                            key={activity.id}
                             className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group"
                           >
                             <div className="flex-shrink-0 mt-1">
@@ -512,12 +511,12 @@ const AdminDashboard = () => {
                             </div>
                           </div>
                         )) || (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                            <p className="font-medium">No recent activity</p>
-                            <p className="text-sm">Platform activity will appear here</p>
-                          </div>
-                        )}
+                            <div className="text-center py-8 text-muted-foreground">
+                              <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                              <p className="font-medium">No recent activity</p>
+                              <p className="text-sm">Platform activity will appear here</p>
+                            </div>
+                          )}
                       </div>
                     </CardContent>
                   </Card>
@@ -538,8 +537,8 @@ const AdminDashboard = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {overview?.systemAlertsList?.map((alert) => (
-                        <div 
-                          key={alert.id} 
+                        <div
+                          key={alert.id}
                           className={`flex items-start gap-4 p-4 rounded-lg border-2 transition-all hover:scale-[1.02] ${getSeverityColor(alert.severity)}`}
                         >
                           <div className="flex-shrink-0">
@@ -548,14 +547,13 @@ const AdminDashboard = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2">
                               <p className="font-semibold text-base">{alert.title}</p>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs capitalize ${
-                                  alert.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
+                              <Badge
+                                variant="outline"
+                                className={`text-xs capitalize ${alert.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
                                   alert.severity === 'HIGH' ? 'bg-orange-100 text-orange-800' :
-                                  alert.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-blue-100 text-blue-800'
-                                }`}
+                                    alert.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-blue-100 text-blue-800'
+                                  }`}
                               >
                                 {alert.severity.toLowerCase()}
                               </Badge>
@@ -571,13 +569,13 @@ const AdminDashboard = () => {
                           </Button>
                         </div>
                       )) || (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <ShieldCheck className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-medium text-foreground">All Systems Operational</p>
-                          <p className="text-sm">No active alerts or issues detected</p>
-                          <p className="text-xs mt-2">Last checked: {new Date().toLocaleString()}</p>
-                        </div>
-                      )}
+                          <div className="text-center py-12 text-muted-foreground">
+                            <ShieldCheck className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                            <p className="text-lg font-medium text-foreground">All Systems Operational</p>
+                            <p className="text-sm">No active alerts or issues detected</p>
+                            <p className="text-xs mt-2">Last checked: {new Date().toLocaleString()}</p>
+                          </div>
+                        )}
                     </div>
                   </CardContent>
                 </Card>
@@ -585,97 +583,97 @@ const AdminDashboard = () => {
 
               {/* Insights Tab */}
               <TabsContent value="insights">
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <Card>
-      <CardHeader>
-        <CardTitle>Platform Performance</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-            <div>
-              <span className="font-medium">Revenue Growth</span>
-              <p className="text-sm text-muted-foreground">This month vs last month</p>
-            </div>
-            <Badge variant={overview?.insights?.revenueGrowth >= 0 ? "default" : "destructive"}>
-              {overview?.insights?.revenueGrowth >= 0 ? '+' : ''}{overview?.insights?.revenueGrowth || 0}%
-            </Badge>
-          </div>
-          
-          <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-            <div>
-              <span className="font-medium">Order Growth</span>
-              <p className="text-sm text-muted-foreground">This month vs last month</p>
-            </div>
-            <Badge variant={overview?.insights?.orderGrowth >= 0 ? "default" : "destructive"}>
-              {overview?.insights?.orderGrowth >= 0 ? '+' : ''}{overview?.insights?.orderGrowth || 0}%
-            </Badge>
-          </div>
-          
-          <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-            <div>
-              <span className="font-medium">Average Order Value</span>
-              <p className="text-sm text-muted-foreground">Current month average</p>
-            </div>
-            <Badge variant="default">
-              {overview?.insights ? formatCurrency(overview.insights.averageOrderValue) : 'ETB 0'}
-            </Badge>
-          </div>
-          
-          <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-            <div>
-              <span className="font-medium">Payment Success Rate</span>
-              <p className="text-sm text-muted-foreground">Successful transactions</p>
-            </div>
-            <Badge variant="default">
-              {overview?.insights?.paymentSuccessRate || 0}%
-            </Badge>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Platform Performance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                          <div>
+                            <span className="font-medium">Revenue Growth</span>
+                            <p className="text-sm text-muted-foreground">This month vs last month</p>
+                          </div>
+                          <Badge variant={overview?.insights?.revenueGrowth >= 0 ? "default" : "destructive"}>
+                            {overview?.insights?.revenueGrowth >= 0 ? '+' : ''}{overview?.insights?.revenueGrowth || 0}%
+                          </Badge>
+                        </div>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>User & Product Insights</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
-            <div>
-              <span className="font-medium">New Users This Month</span>
-              <p className="text-sm text-muted-foreground">Current month registrations</p>
-            </div>
-            <Badge variant="default">
-              {overview?.insights?.newUsersThisMonth || 0}
-            </Badge>
-          </div>
-          
-          {/* Top Products */}
-          <div>
-            <h4 className="font-medium mb-3">Top Performing Products</h4>
-            <div className="space-y-2">
-              {overview?.insights?.topProducts?.slice(0, 3).map((product, index) => (
-                <div key={index} className="flex justify-between items-center p-2 bg-muted/30 rounded">
-                  <span className="text-sm truncate flex-1 mr-2">{product.name}</span>
-                  <div className="flex gap-2 text-xs">
-                    <Badge variant="outline">{product.orders} orders</Badge>
-                    <Badge variant="secondary">{formatCurrency(product.revenue)}</Badge>
-                  </div>
+                        <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                          <div>
+                            <span className="font-medium">Order Growth</span>
+                            <p className="text-sm text-muted-foreground">This month vs last month</p>
+                          </div>
+                          <Badge variant={overview?.insights?.orderGrowth >= 0 ? "default" : "destructive"}>
+                            {overview?.insights?.orderGrowth >= 0 ? '+' : ''}{overview?.insights?.orderGrowth || 0}%
+                          </Badge>
+                        </div>
+
+                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                          <div>
+                            <span className="font-medium">Average Order Value</span>
+                            <p className="text-sm text-muted-foreground">Current month average</p>
+                          </div>
+                          <Badge variant="default">
+                            {overview?.insights ? formatCurrency(overview.insights.averageOrderValue) : 'ETB 0'}
+                          </Badge>
+                        </div>
+
+                        <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                          <div>
+                            <span className="font-medium">Payment Success Rate</span>
+                            <p className="text-sm text-muted-foreground">Successful transactions</p>
+                          </div>
+                          <Badge variant="default">
+                            {overview?.insights?.paymentSuccessRate || 0}%
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>User & Product Insights</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
+                          <div>
+                            <span className="font-medium">New Users This Month</span>
+                            <p className="text-sm text-muted-foreground">Current month registrations</p>
+                          </div>
+                          <Badge variant="default">
+                            {overview?.insights?.newUsersThisMonth || 0}
+                          </Badge>
+                        </div>
+
+                        {/* Top Products */}
+                        <div>
+                          <h4 className="font-medium mb-3">Top Performing Products</h4>
+                          <div className="space-y-2">
+                            {overview?.insights?.topProducts?.slice(0, 3).map((product, index) => (
+                              <div key={index} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                                <span className="text-sm truncate flex-1 mr-2">{product.name}</span>
+                                <div className="flex gap-2 text-xs">
+                                  <Badge variant="outline">{product.orders} orders</Badge>
+                                  <Badge variant="secondary">{formatCurrency(product.revenue)}</Badge>
+                                </div>
+                              </div>
+                            )) || (
+                                <div className="text-center py-4 text-muted-foreground">
+                                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">No product data available</p>
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              )) || (
-                <div className="text-center py-4 text-muted-foreground">
-                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No product data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-</TabsContent>
+              </TabsContent>
             </Tabs>
 
             {/* Platform Summary Footer */}
@@ -695,7 +693,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="text-center">
                       <div className="font-bold text-2xl text-green-600">{overview?.ordersToday || 0}</div>
-                      <div className="text-muted-foreground">Today's Orders</div>
+                      <div className="text-muted-foreground">Total Orders</div>
                     </div>
                     <div className="text-center">
                       <div className="font-bold text-2xl text-purple-600">

@@ -584,7 +584,7 @@ class PayoutService {
      */
     async getProducerEarnings(producerId) {
         try {
-            const [pending, completed, total] = await Promise.all([
+            const [pending, completed] = await Promise.all([
                 // Pending earnings
                 prisma.orderProducer.aggregate({
                     where: {
@@ -593,27 +593,25 @@ class PayoutService {
                     },
                     _sum: { producerAmount: true }
                 }),
-                // Completed payouts
-                prisma.producerPayout.aggregate({
+                // Completed payouts - FIXED: Only count completed payouts
+                prisma.orderProducer.aggregate({
                     where: {
                         producerId,
-                        status: 'COMPLETED'
+                        payoutStatus: 'COMPLETED' // Only count when admin has made the payout
                     },
-                    _sum: { netAmount: true }
-                }),
-                // Total earnings (all time)
-                prisma.orderProducer.aggregate({
-                    where: { producerId },
                     _sum: { producerAmount: true }
                 })
             ]);
 
+            const completedEarnings = completed._sum.producerAmount || 0;
+            const pendingEarnings = pending._sum.producerAmount || 0;
+
             return {
                 success: true,
                 earnings: {
-                    pending: pending._sum.producerAmount || 0,
-                    completed: completed._sum.netAmount || 0,
-                    total: total._sum.producerAmount || 0
+                    pending: pendingEarnings,
+                    completed: completedEarnings,
+                    total: completedEarnings // Total = only completed payouts
                 }
             };
 

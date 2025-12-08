@@ -13,67 +13,121 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Search, 
-  Send, 
-  Paperclip, 
-  Smile, 
-  Loader2, 
-  MessageSquare, 
-  Wifi, 
-  WifiOff, 
-  Circle 
+import {
+  Search,
+  Send,
+  Paperclip,
+  Smile,
+  Loader2,
+  MessageSquare,
+  Wifi,
+  WifiOff,
+  Circle
 } from 'lucide-react';
 
 const Chats: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
-  const { 
-    chats, 
-    currentChat, 
-    messages, 
-    loading, 
+  const {
+    chats,
+    currentChat,
+    messages,
+    loading,
     error,
     unreadCount,
-    loadUserChats, 
-    loadChat, 
+    loadUserChats,
+    loadChat,
     sendMessage,
     setCurrentChat,
     markMessagesAsRead
   } = useChat();
   const { isConnected } = useSocket();
-  
+
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const previousMessagesLength = useRef(0);
 
   // Load chats on component mount
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadChatsOnce = async () => {
       if (isAuthenticated && isMounted) {
         console.log('🔧 Loading chats once');
         await loadUserChats();
       }
     };
-  
+
     loadChatsOnce();
-  
+
     return () => {
       isMounted = false;
     };
   }, [isAuthenticated]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Check if user is at the bottom of the chat
+  const isAtBottom = () => {
+    if (!messagesContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    return distanceFromBottom < 50; // Within 50px of bottom
   };
 
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth', force: boolean = false) => {
+    // Only scroll if user is at bottom OR if forced (e.g., opening chat, sending message)
+    if (!force && !isAtBottom()) {
+      console.log('🚫 User is reading old messages, not auto-scrolling');
+      return;
+    }
+
+    // Use setTimeout to ensure DOM has updated
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior });
+      }
+      // Fallback: scroll the container directly
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+    }, 100);
+  };
+
+  // Handle user scrolling
+  const handleScroll = () => {
+    if (isAtBottom()) {
+      setIsUserScrolling(false);
+    } else {
+      setIsUserScrolling(true);
+    }
+  };
+
+  // Smart scroll: Only auto-scroll if user is at bottom
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) {
+      // If new message arrived (length increased)
+      const isNewMessage = messages.length > previousMessagesLength.current;
+      previousMessagesLength.current = messages.length;
+
+      if (isNewMessage) {
+        // Only scroll if user is at bottom (not reading old messages)
+        scrollToBottom('smooth', false);
+      }
+    }
   }, [messages]);
+
+  // Always scroll to bottom when opening a chat (force scroll)
+  useEffect(() => {
+    if (currentChat && messages.length > 0) {
+      previousMessagesLength.current = messages.length;
+      scrollToBottom('auto', true); // Force instant scroll when opening chat
+      setIsUserScrolling(false);
+    }
+  }, [currentChat?.id]);
 
   // Mark messages as read when chat is opened
   useEffect(() => {
@@ -87,15 +141,18 @@ const Chats: React.FC = () => {
       try {
         setSendingMessage(true);
         const startTime = new Date();
-        
+
         await sendMessage(currentChat.id, newMessage);
         setNewMessage('');
         setLastMessageTime(new Date());
-        
+
         const endTime = new Date();
         const duration = endTime.getTime() - startTime.getTime();
         console.log(`✅ Message delivered in ${duration}ms via ${isConnected ? 'WebSocket' : 'HTTP'}`);
-        
+
+        // Always scroll to bottom after sending message (force scroll)
+        scrollToBottom('smooth', true);
+
       } catch (error) {
         console.error('Failed to send message:', error);
       } finally {
@@ -115,6 +172,8 @@ const Chats: React.FC = () => {
     try {
       await loadChat(chat.id);
       setCurrentChat(chat);
+      // Force scroll to bottom after loading chat (with delay to ensure messages are rendered)
+      setTimeout(() => scrollToBottom('auto', true), 200);
     } catch (error) {
       console.error('Failed to load chat:', error);
     }
@@ -122,7 +181,7 @@ const Chats: React.FC = () => {
 
   const getOtherParticipant = (chat: Chat) => {
     if (!user) return null;
-    
+
     const otherParticipant = chat.participants.find(p => p.user.id !== user.id);
     return otherParticipant?.user || null;
   };
@@ -133,14 +192,14 @@ const Chats: React.FC = () => {
 
   const getUnreadCountForChat = (chat: Chat) => {
     if (!user) return 0;
-    
+
     const userParticipant = chat.participants.find(p => p.user.id === user.id);
     if (!userParticipant || !chat.messages || chat.messages.length === 0) return 0;
 
     const lastMessage = chat.messages[0];
     const lastReadTime = userParticipant.lastReadAt ? new Date(userParticipant.lastReadAt) : new Date(0);
     const messageTime = new Date(lastMessage.createdAt);
-    
+
     // Count as unread if message is newer than last read time and not sent by user
     return messageTime > lastReadTime && lastMessage.sender.id !== user.id ? 1 : 0;
   };
@@ -149,7 +208,7 @@ const Chats: React.FC = () => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     } else {
@@ -184,12 +243,12 @@ const Chats: React.FC = () => {
   const filteredChats = chats.filter(chat => {
     // Add null checks
     if (!chat) return false;
-    
+
     const otherUser = getOtherParticipant(chat);
     const lastMessage = getLastMessage(chat);
-    
+
     const searchTerm = searchQuery.toLowerCase();
-    
+
     return (
       (otherUser?.name && otherUser.name.toLowerCase().includes(searchTerm)) ||
       (getChatTitle(chat) && getChatTitle(chat).toLowerCase().includes(searchTerm)) ||
@@ -198,13 +257,13 @@ const Chats: React.FC = () => {
   });
 
   const content = (
-    <main className="container mx-auto px-4 py-8">
-      <div className="mb-8">
+    <main className="container mx-auto px-4 py-8 h-screen flex flex-col overflow-hidden">
+      <div className="mb-6 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">Messages</h1>
             <p className="text-muted-foreground">
-              {unreadCount > 0 
+              {unreadCount > 0
                 ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`
                 : 'Communicate with buyers and producers'
               }
@@ -225,13 +284,13 @@ const Chats: React.FC = () => {
                 </>
               )}
             </Badge>
-            
+
             {lastMessageTime && (
               <Badge variant="outline" className="text-xs">
                 Last: {formatTime(lastMessageTime.toISOString())}
               </Badge>
             )}
-            
+
             <Button variant="outline" onClick={loadUserChats} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
             </Button>
@@ -240,15 +299,15 @@ const Chats: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-destructive/10 border border-destructive rounded-lg">
+        <div className="mb-4 p-4 bg-destructive/10 border border-destructive rounded-lg flex-shrink-0">
           <p className="text-destructive">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 overflow-hidden min-h-0">
         {/* Conversations List */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
+        <Card className="lg:col-span-1 flex flex-col overflow-hidden h-full">
+          <CardHeader className="pb-3 flex-shrink-0">
             <CardTitle>Conversations</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -260,8 +319,8 @@ const Chats: React.FC = () => {
               />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="space-y-1 max-h-[500px] overflow-y-auto">
+          <CardContent className="p-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            <div className="space-y-1 pb-2">
               {loading && chats.length === 0 ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -280,15 +339,14 @@ const Chats: React.FC = () => {
                   const lastMessage = getLastMessage(chat);
                   const unreadCountForChat = getUnreadCountForChat(chat);
                   const isActive = currentChat?.id === chat.id;
-                  
+
                   if (!otherUser) return null;
-                  
+
                   return (
                     <div
                       key={chat.id}
-                      className={`p-4 cursor-pointer hover:bg-accent transition-colors ${
-                        isActive ? 'bg-accent border-l-4 border-primary' : ''
-                      }`}
+                      className={`p-4 cursor-pointer hover:bg-accent transition-colors ${isActive ? 'bg-accent border-l-4 border-primary' : ''
+                        }`}
                       onClick={() => handleSelectChat(chat)}
                     >
                       <div className="flex items-start gap-3">
@@ -340,7 +398,7 @@ const Chats: React.FC = () => {
         </Card>
 
         {/* Chat Area */}
-        <Card className="lg:col-span-3 flex flex-col">
+        <Card className="lg:col-span-3 flex flex-col overflow-hidden h-full">
           {currentChat ? (
             <>
               <CardHeader className="pb-3 border-b">
@@ -376,9 +434,13 @@ const Chats: React.FC = () => {
                 </div>
               </CardHeader>
 
-              <CardContent className="flex-1 p-0">
+              <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
                 {/* Messages Area */}
-                <div className="h-[400px] overflow-y-auto p-4 space-y-4">
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-4"
+                  onScroll={handleScroll}
+                >
                   {messages.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -388,18 +450,17 @@ const Chats: React.FC = () => {
                   ) : (
                     [...messages].reverse().map((message) => {
                       const isOwnMessage = message.sender.id === user?.id;
-                      
+
                       return (
                         <div
                           key={message.id}
                           className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[70%] rounded-lg p-3 ${
-                              isOwnMessage
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
-                            }`}
+                            className={`max-w-[70%] rounded-lg p-3 ${isOwnMessage
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                              }`}
                           >
                             {!isOwnMessage && (
                               <div className="text-xs font-medium mb-1">
@@ -408,9 +469,8 @@ const Chats: React.FC = () => {
                             )}
                             <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                             <div
-                              className={`text-xs mt-1 flex items-center gap-2 ${
-                                isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                              }`}
+                              className={`text-xs mt-1 flex items-center gap-2 ${isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                }`}
                             >
                               {formatTime(message.createdAt)}
                               {isOwnMessage && message.readBy.length > 0 && (
@@ -429,7 +489,7 @@ const Chats: React.FC = () => {
                 </div>
 
                 {/* Message Input */}
-                <div className="border-t p-4">
+                <div className="border-t p-4 flex-shrink-0">
                   <div className="flex gap-2 items-center">
                     <Button variant="ghost" size="icon">
                       <Paperclip className="h-4 w-4" />
@@ -437,7 +497,7 @@ const Chats: React.FC = () => {
                     <Button variant="ghost" size="icon">
                       <Smile className="h-4 w-4" />
                     </Button>
-                    
+
                     <div className="flex-1 relative">
                       <Input
                         placeholder={isConnected ? "Type your message (real-time)..." : "Type your message (offline mode)..."}
@@ -447,15 +507,15 @@ const Chats: React.FC = () => {
                         className="pr-10"
                         disabled={sendingMessage}
                       />
-                      
+
                       {sendingMessage && (
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         </div>
                       )}
                     </div>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleSendMessage}
                       disabled={!newMessage.trim() || sendingMessage}
                       className="min-w-[80px]"
@@ -470,7 +530,7 @@ const Chats: React.FC = () => {
                       )}
                     </Button>
                   </div>
-                  
+
                   {/* Connection Status Info */}
                   <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
                     {isConnected ? (

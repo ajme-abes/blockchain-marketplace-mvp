@@ -1,10 +1,14 @@
 // backend/src/middleware/rateLimiter.js
 const rateLimit = require('express-rate-limit');
 
+// Check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Strict rate limiter for login attempts
+// More lenient in development for testing
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts per window
+    max: isDevelopment ? 50 : 5, // 50 (dev) or 5 (prod) attempts per window
     message: {
         error: 'Too many login attempts from this IP, please try again after 15 minutes',
         code: 'RATE_LIMIT_EXCEEDED',
@@ -15,7 +19,7 @@ const loginLimiter = rateLimit({
     skipSuccessfulRequests: false, // Count successful requests
     skipFailedRequests: false, // Count failed requests
     handler: (req, res) => {
-        console.log(`🚫 Rate limit exceeded for IP: ${req.ip}`);
+        console.log(`🚫 Rate limit exceeded for IP: ${req.ip} (${isDevelopment ? 'DEV' : 'PROD'} mode)`);
         res.status(429).json({
             error: 'Too many login attempts from this IP, please try again after 15 minutes',
             code: 'RATE_LIMIT_EXCEEDED',
@@ -25,22 +29,24 @@ const loginLimiter = rateLimit({
 });
 
 // Moderate rate limiter for registration
+// More lenient in development, reasonable in production
 const registerLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 registrations per hour per IP
+    windowMs: 5 * 60 * 1000, // 5 minutes for both dev and prod
+    max: isDevelopment ? 20 : 10, // 20 (dev) or 10 (prod) registrations per 5 minutes
     message: {
-        error: 'Too many accounts created from this IP, please try again after an hour',
+        error: 'Too many registration attempts from this IP, please try again after 5 minutes',
         code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: 60 * 60
+        retryAfter: 5 * 60 // 5 minutes in seconds
     },
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
-        console.log(`🚫 Registration rate limit exceeded for IP: ${req.ip}`);
+        const retryAfter = 5 * 60; // 5 minutes
+        console.log(`🚫 Registration rate limit exceeded for IP: ${req.ip} (${isDevelopment ? 'DEV' : 'PROD'} mode)`);
         res.status(429).json({
-            error: 'Too many accounts created from this IP, please try again after an hour',
+            error: 'Too many registration attempts from this IP, please try again after 5 minutes',
             code: 'RATE_LIMIT_EXCEEDED',
-            retryAfter: 60 * 60
+            retryAfter: retryAfter
         });
     }
 });

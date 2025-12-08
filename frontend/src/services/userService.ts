@@ -11,6 +11,18 @@ export interface UpdateProfileData {
   bio?: string;
 }
 
+export interface SavedAddress {
+  id?: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  region: string;
+  additionalInfo?: string;
+  isDefault?: boolean;
+}
+
 export const userService = {
   async getUserProfile(userId: string) {
     try {
@@ -102,6 +114,62 @@ export const userService = {
     } catch (error: any) {
       console.error('❌ Failed to fetch verification documents:', error);
       throw new Error(error.message || 'Failed to fetch verification documents');
+    }
+  },
+
+  // Address management
+  async getSavedAddresses(): Promise<SavedAddress[]> {
+    try {
+      console.log('🔧 Fetching saved addresses...');
+      const response = await api.request('/users/addresses');
+      return response.data || [];
+    } catch (error: any) {
+      console.error('❌ Failed to fetch saved addresses:', error);
+      // Return empty array if endpoint doesn't exist yet
+      return [];
+    }
+  },
+
+  async saveAddress(addressData: SavedAddress): Promise<SavedAddress> {
+    try {
+      console.log('🔧 Saving address:', addressData);
+      const response = await api.request('/users/addresses', {
+        method: 'POST',
+        data: addressData,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to save address:', error);
+      // For now, store in localStorage as fallback
+      const addresses = this.getLocalAddresses();
+      const newAddress = { ...addressData, id: Date.now().toString() };
+      addresses.push(newAddress);
+      localStorage.setItem('savedAddresses', JSON.stringify(addresses));
+      return newAddress;
+    }
+  },
+
+  async deleteAddress(addressId: string): Promise<void> {
+    try {
+      console.log('🔧 Deleting address:', addressId);
+      await api.request(`/users/addresses/${addressId}`, {
+        method: 'DELETE',
+      });
+    } catch (error: any) {
+      console.error('❌ Failed to delete address:', error);
+      // Fallback to localStorage
+      const addresses = this.getLocalAddresses().filter(a => a.id !== addressId);
+      localStorage.setItem('savedAddresses', JSON.stringify(addresses));
+    }
+  },
+
+  // Local storage fallback for addresses
+  getLocalAddresses(): SavedAddress[] {
+    try {
+      const stored = localStorage.getItem('savedAddresses');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
     }
   },
 };

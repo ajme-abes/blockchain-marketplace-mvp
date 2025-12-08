@@ -167,7 +167,7 @@ const fetchUsers = async (page = 1, search = '') => {
       params.append('verification', verificationFilter);
     }
 
-    const response = await fetch(`http://localhost:5000/api/admin/users?${params}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users?${params}`, {
       headers: { 
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -256,7 +256,7 @@ const fetchUsers = async (page = 1, search = '') => {
           break;
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/${endpoint}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${userId}/${endpoint}`, {
         method,
         headers: { 
           'Authorization': `Bearer ${token}`,

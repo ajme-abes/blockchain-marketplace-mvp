@@ -2,6 +2,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const emailVerificationService = require('../services/emailVerificationService');
+const { emailVerificationLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 // Verify email with token (public route)
@@ -42,15 +43,52 @@ router.post('/verify', async (req, res) => {
   }
 });
 
-// Resend verification email (protected route)
-router.post('/resend', authenticateToken, async (req, res) => {
+// Resend verification email (public route - accepts email, with rate limiting)
+router.post('/resend', emailVerificationLimiter, async (req, res) => {
   try {
-    const result = await emailVerificationService.resendVerificationEmail(req.user.id);
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is required',
+        code: 'EMAIL_REQUIRED'
+      });
+    }
+
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user by email
+    const { prisma } = require('../config/database');
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, emailVerified: true }
+    });
+
+    if (!user) {
+      // Don't reveal if user exists or not (security)
+      return res.json({
+        status: 'success',
+        message: 'If an account exists with this email, a verification link has been sent.'
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is already verified',
+        code: 'ALREADY_VERIFIED'
+      });
+    }
+
+    const result = await emailVerificationService.resendVerificationEmail(user.id);
 
     if (!result.success) {
       return res.status(400).json({
         status: 'error',
-        message: result.error
+        message: result.error,
+        code: 'RESEND_FAILED'
       });
     }
 
@@ -63,7 +101,8 @@ router.post('/resend', authenticateToken, async (req, res) => {
     console.error('Resend verification email error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to resend verification email'
+      message: 'Failed to resend verification email',
+      code: 'RESEND_ERROR'
     });
   }
 });
@@ -72,7 +111,7 @@ router.post('/resend', authenticateToken, async (req, res) => {
 router.get('/status', authenticateToken, async (req, res) => {
   try {
     const { prisma } = require('../config/database');
-    
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {

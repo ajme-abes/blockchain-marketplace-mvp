@@ -40,12 +40,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Search, 
-  Package, 
-  Eye, 
-  Download, 
-  RefreshCw, 
+import {
+  Search,
+  Package,
+  Eye,
+  Download,
+  RefreshCw,
   MoreVertical,
   Filter,
   TrendingUp,
@@ -115,7 +115,6 @@ interface ProductStats {
     activeProducts: number;
     inactiveProducts: number;
     outOfStockProducts: number;
-    pendingReviewProducts: number;
     totalProducers: number;
   };
   categories: Array<{
@@ -171,7 +170,7 @@ const ProductManagement = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20'
@@ -190,8 +189,8 @@ const ProductManagement = () => {
         params.append('verificationStatus', verificationFilter);
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/products?${params}`, {
-        headers: { 
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products?${params}`, {
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -200,7 +199,7 @@ const ProductManagement = () => {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         if (result.status === 'success') {
           setProducts(result.data.products || []);
           setPagination(result.data.pagination || {
@@ -236,8 +235,8 @@ const ProductManagement = () => {
       setStatsLoading(true);
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch('http://localhost:5000/api/admin/products/stats', {
-        headers: { 
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/stats`, {
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -266,7 +265,7 @@ const ProductManagement = () => {
   const handleProductAction = async (action: string, productId: string, reason?: string) => {
     try {
       const token = localStorage.getItem('authToken');
-      
+
       let endpoint = 'status';
       let method = 'PATCH';
       let body: any = {};
@@ -290,9 +289,9 @@ const ProductManagement = () => {
           break;
       }
 
-      const response = await fetch(`http://localhost:5000/api/admin/products/${productId}/${endpoint}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/${productId}/${endpoint}`, {
         method,
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -301,16 +300,16 @@ const ProductManagement = () => {
       });
 
       if (response.ok) {
-        const actionText = action === 'activate' ? 'activated' : 
-                          action === 'deactivate' ? 'deactivated' :
-                          action === 'approve' ? 'approved' :
-                          action === 'reject' ? 'rejected' : 'deleted';
-        
+        const actionText = action === 'activate' ? 'activated' :
+          action === 'deactivate' ? 'deactivated' :
+            action === 'approve' ? 'approved' :
+              action === 'reject' ? 'rejected' : 'deleted';
+
         toast({
           title: `Product ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}`,
           description: `Product has been ${actionText} successfully.`,
         });
-        
+
         fetchProducts(pagination.page, searchQuery);
         fetchProductStats();
         setActionDialogOpen(false);
@@ -335,9 +334,9 @@ const ProductManagement = () => {
     try {
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch('http://localhost:5000/api/admin/products/bulk-actions', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/products/bulk-actions`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -351,12 +350,12 @@ const ProductManagement = () => {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         toast({
           title: 'Bulk Action Completed',
           description: result.message || `Bulk action completed successfully`,
         });
-        
+
         fetchProducts(pagination.page, searchQuery);
         fetchProductStats();
         setBulkActionDialogOpen(false);
@@ -411,7 +410,7 @@ const ProductManagement = () => {
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.INACTIVE;
-    
+
     return (
       <Badge variant={config.variant} className={config.className}>
         {config.label}
@@ -428,7 +427,7 @@ const ProductManagement = () => {
     };
 
     const badgeConfig = config[status as keyof typeof config] || config.PENDING;
-    
+
     return (
       <Badge variant={badgeConfig.variant} className={badgeConfig.className}>
         {badgeConfig.label}
@@ -453,13 +452,13 @@ const ProductManagement = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
+          <PageHeader
             title="Product Management"
             description="Manage all products, approve listings, and monitor product performance"
             action={
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     fetchProducts(1, searchQuery);
                     fetchProductStats();
@@ -469,13 +468,6 @@ const ProductManagement = () => {
                   <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => navigate('/admin/products/pending-review')}
-                >
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Pending Review ({stats?.overview.pendingReviewProducts || 0})
-                </Button>
               </div>
             }
           />
@@ -484,7 +476,7 @@ const ProductManagement = () => {
             <div className="space-y-6">
               {/* Statistics Cards */}
               {!statsLoading && stats && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
@@ -507,19 +499,6 @@ const ProductManagement = () => {
                         <div>
                           <div className="text-2xl font-bold">{stats.overview.activeProducts}</div>
                           <div className="text-sm text-muted-foreground">Active</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-100 rounded-lg">
-                          <AlertTriangle className="h-6 w-6 text-yellow-600" />
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold">{stats.overview.pendingReviewProducts}</div>
-                          <div className="text-sm text-muted-foreground">Pending</div>
                         </div>
                       </div>
                     </CardContent>
@@ -588,7 +567,7 @@ const ProductManagement = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedBulkAction('activate');
                                 setBulkActionDialogOpen(true);
@@ -597,7 +576,7 @@ const ProductManagement = () => {
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Activate Selected
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedBulkAction('deactivate');
                                 setBulkActionDialogOpen(true);
@@ -607,7 +586,7 @@ const ProductManagement = () => {
                               Deactivate Selected
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedBulkAction('approve');
                                 setBulkActionDialogOpen(true);
@@ -616,7 +595,7 @@ const ProductManagement = () => {
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Approve Selected
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedBulkAction('reject');
                                 setBulkActionDialogOpen(true);
@@ -626,7 +605,7 @@ const ProductManagement = () => {
                               Reject Selected
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedBulkAction('delete');
                                 setBulkActionDialogOpen(true);
@@ -638,8 +617,8 @@ const ProductManagement = () => {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => setSelectedProducts([])}
                         >
@@ -664,7 +643,7 @@ const ProductManagement = () => {
                         className="pl-9"
                       />
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="w-[140px]">
@@ -778,8 +757,8 @@ const ProductManagement = () => {
                                     <div className="flex items-center gap-3">
                                       <Avatar className="h-10 w-10">
                                         {product.imageUrl ? (
-                                          <AvatarImage 
-                                            src={product.imageUrl} 
+                                          <AvatarImage
+                                            src={product.imageUrl}
                                             alt={product.name}
                                             className="object-cover"
                                           />
@@ -816,10 +795,9 @@ const ProductManagement = () => {
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
-                                    <div className={`text-sm font-medium ${
-                                      product.quantityAvailable > 10 ? 'text-green-600' :
+                                    <div className={`text-sm font-medium ${product.quantityAvailable > 10 ? 'text-green-600' :
                                       product.quantityAvailable > 0 ? 'text-orange-600' : 'text-red-600'
-                                    }`}>
+                                      }`}>
                                       {product.quantityAvailable} units
                                     </div>
                                   </TableCell>
@@ -844,9 +822,9 @@ const ProductManagement = () => {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => {
                                           setSelectedProduct(product);
                                           setProductDetailOpen(true);
@@ -855,7 +833,7 @@ const ProductManagement = () => {
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      
+
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" size="sm">
@@ -863,16 +841,16 @@ const ProductManagement = () => {
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                        <DropdownMenuItem 
-  onClick={() => navigate(`/products/${product.id}`)} 
->
-  <Eye className="h-4 w-4 mr-2" />
-  View in Marketplace
-</DropdownMenuItem>
-                                          
+                                          <DropdownMenuItem
+                                            onClick={() => navigate(`/products/${product.id}`)}
+                                          >
+                                            <Eye className="h-4 w-4 mr-2" />
+                                            View in Marketplace
+                                          </DropdownMenuItem>
+
                                           {product.status === 'PENDING_REVIEW' && (
                                             <>
-                                              <DropdownMenuItem 
+                                              <DropdownMenuItem
                                                 onClick={() => {
                                                   setSelectedProduct(product);
                                                   setSelectedAction('approve');
@@ -882,7 +860,7 @@ const ProductManagement = () => {
                                                 <CheckCircle className="h-4 w-4 mr-2" />
                                                 Approve Product
                                               </DropdownMenuItem>
-                                              <DropdownMenuItem 
+                                              <DropdownMenuItem
                                                 onClick={() => {
                                                   setSelectedProduct(product);
                                                   setSelectedAction('reject');
@@ -896,7 +874,7 @@ const ProductManagement = () => {
                                           )}
 
                                           {product.status === 'ACTIVE' && (
-                                            <DropdownMenuItem 
+                                            <DropdownMenuItem
                                               onClick={() => {
                                                 setSelectedProduct(product);
                                                 setSelectedAction('deactivate');
@@ -909,7 +887,7 @@ const ProductManagement = () => {
                                           )}
 
                                           {(product.status === 'INACTIVE' || product.status === 'REJECTED') && (
-                                            <DropdownMenuItem 
+                                            <DropdownMenuItem
                                               onClick={() => {
                                                 setSelectedProduct(product);
                                                 setSelectedAction('activate');
@@ -922,7 +900,7 @@ const ProductManagement = () => {
                                           )}
 
                                           <DropdownMenuSeparator />
-                                          <DropdownMenuItem 
+                                          <DropdownMenuItem
                                             onClick={() => {
                                               setSelectedProduct(product);
                                               setSelectedAction('delete');
@@ -998,15 +976,15 @@ const ProductManagement = () => {
               Detailed information about the product and its performance.
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedProduct && (
             <div className="space-y-6">
               {/* Product Header */}
               <div className="flex items-start gap-4">
                 <Avatar className="h-20 w-20 flex-shrink-0">
                   {selectedProduct.imageUrl ? (
-                    <AvatarImage 
-                      src={selectedProduct.imageUrl} 
+                    <AvatarImage
+                      src={selectedProduct.imageUrl}
                       alt={selectedProduct.name}
                       className="object-cover"
                     />
@@ -1032,14 +1010,14 @@ const ProductManagement = () => {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 flex-shrink-0">
-                <Button 
-  variant="outline" 
-  size="sm"
-  onClick={() => navigate(`/products/${selectedProduct.id}`)} 
->
-  <Eye className="h-4 w-4 mr-2" />
-  View in Marketplace
-</Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/products/${selectedProduct.id}`)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View in Marketplace
+                  </Button>
                 </div>
               </div>
 
@@ -1215,8 +1193,8 @@ const ProductManagement = () => {
             </Button>
             <Button
               variant={
-                selectedAction === 'delete' || selectedAction === 'reject' 
-                  ? 'destructive' 
+                selectedAction === 'delete' || selectedAction === 'reject'
+                  ? 'destructive'
                   : 'default'
               }
               onClick={() => {
@@ -1248,7 +1226,7 @@ const ProductManagement = () => {
               Bulk {selectedBulkAction.charAt(0).toUpperCase() + selectedBulkAction.slice(1)} Products
             </DialogTitle>
             <DialogDescription>
-              You are about to {selectedBulkAction} {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''}. 
+              You are about to {selectedBulkAction} {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''}.
               {selectedBulkAction === 'delete' && ' This action cannot be undone.'}
             </DialogDescription>
           </DialogHeader>
@@ -1278,8 +1256,8 @@ const ProductManagement = () => {
             </Button>
             <Button
               variant={
-                selectedBulkAction === 'delete' || selectedBulkAction === 'reject' 
-                  ? 'destructive' 
+                selectedBulkAction === 'delete' || selectedBulkAction === 'reject'
+                  ? 'destructive'
                   : 'default'
               }
               onClick={() => {

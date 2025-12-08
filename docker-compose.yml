@@ -1,58 +1,44 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
-  database:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: marketplace_db
-      POSTGRES_USER: ${DB_USER:-marketplace_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-marketplace_password}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - marketplace_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-marketplace_user}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # Backend API
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.docker
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${DB_USER:-marketplace_user}:${DB_PASSWORD:-marketplace_password}@database:5432/marketplace_db
-      - JWT_SECRET=your_production_jwt_secret_here
-      - PORT=5000
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:934608@host.docker.internal:5432/marketplace_db
     ports:
       - "5000:5000"
-    depends_on:
-      database:
-        condition: service_healthy
+      - "5555:5555"
     networks:
       - marketplace_network
     volumes:
+      - ./backend:/app
+      - /app/node_modules
       - ./contract-info.json:/app/contract-info.json
-    command: sh -c "npx prisma db push && npm start"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Frontend React App
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
-      - "3000:80"
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:
       - marketplace_network
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
 
 volumes:
   postgres_data:
