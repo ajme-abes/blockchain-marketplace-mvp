@@ -832,3 +832,22 @@ enum ContactMessageStatus {
   RESPONDED
   ARCHIVED
 }
+
+model TeamMember {
+  id          String   @id @default(uuid())
+  name        String
+  role        String
+  bio         String?
+  imageUrl    String?
+  order       Int      @default(0) // For sorting team members
+  isActive    Boolean  @default(true)
+  email       String?
+  linkedin    String?
+  twitter     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+  @@index([isActive])
+  @@map("team_members")
+}
