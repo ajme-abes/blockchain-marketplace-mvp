@@ -536,10 +536,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-**Developer**: Ajmel Abes  
-**GitHub**: [@ajme-abes](https://github.com/ajme-abes)
-**Developer**: Semir Yusuf
-**GitHub**: [@Semir Yusuf](https://github.com/semiryu)
+- **Developer**: Ajmel Abes  
+- **GitHub**: [@ajme-abes](https://github.com/ajme-abes)
+- **Developer**: Semir Yusuf
+- **GitHub**: [@Semir Yusuf](https://github.com/semiryu)
 
 ---
 
