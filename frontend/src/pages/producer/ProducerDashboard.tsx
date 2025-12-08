@@ -202,18 +202,6 @@ const ProducerDashboard = () => {
           <PageHeader
             title={t('producer.dashboard.title')}
             description={t('producer.dashboard.subtitle')}
-            action={
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => navigate('/producer/orders')}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  {t('producer.dashboard.viewAllOrders')}
-                </Button>
-                <Button onClick={() => navigate('/producer/add-product')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('producer.dashboard.addProduct')}
-                </Button>
-              </div>
-            }
           />
 
           <main className="flex-1 p-6">

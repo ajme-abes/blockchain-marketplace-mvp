@@ -508,24 +508,21 @@ class BlockchainService {
       // ✅ UPDATED: USE USER IDENTIFIERS (NOW ASYNC AND STORED IN DB)
       const buyerIdentifier = await systemWalletService.getBuyerIdentifier(buyerUserId);
 
-      // For blockchain recording, use primary producer (first one) or concatenate all
-      // Option 1: Use primary producer (simplest, current approach)
-      const primaryProducer = producers[0];
-      const producerIdentifier = await systemWalletService.getProducerIdentifier(primaryProducer.producerUserId);
-
-      // Option 2: Concatenate all producers (if you want to record all)
-      // const allProducerIds = await Promise.all(
-      //   producers.map(p => systemWalletService.getProducerIdentifier(p.producerUserId))
-      // );
-      // const producerIdentifier = allProducerIds.join(','); // Store as comma-separated
+      // ✅ OPTION A: Record ALL producers on blockchain (comma-separated)
+      const allProducerIds = await Promise.all(
+        producers.map(p => systemWalletService.getProducerIdentifier(p.producerUserId))
+      );
+      const producerIdentifier = allProducerIds.join(','); // Store as comma-separated
 
       console.log('👥 User identifiers for blockchain recording:', {
         buyer: buyerIdentifier,
         producer: producerIdentifier,
+        allProducers: allProducerIds,
         buyerUserId: buyerUserId,
-        primaryProducerUserId: primaryProducer.producerUserId,
         totalProducers: producers.length,
-        note: producers.length > 1 ? `Multi-producer order (${producers.length} producers)` : 'Single producer order'
+        note: producers.length > 1
+          ? `Multi-producer order (${producers.length} producers) - ALL recorded on blockchain`
+          : 'Single producer order'
       });
 
       // Prepare transaction data matching your NEW contract
@@ -547,13 +544,15 @@ class BlockchainService {
 
         // ✅ FIXED: Use transaction to update both Order and create BlockchainRecord
         await prisma.$transaction(async (tx) => {
-          // Update order with blockchain info
+          // Update order with blockchain info including block number and timestamp
           await tx.order.update({
             where: { id: orderId },
             data: {
               blockchainTxHash: result.transactionHash,
               blockchainRecorded: true,
               blockchainError: null,
+              blockchainOrderId: result.contractTxHash || result.transactionHash,
+              blockchainRecordedAt: new Date(),
               updatedAt: new Date()
             }
           });
@@ -646,13 +645,23 @@ class BlockchainService {
 
     try {
       const transaction = await this.contract.getTransaction(orderId);
+
+      // ✅ Parse producer field - can be single or comma-separated multiple producers
+      const producerField = transaction[4];
+      const producerIds = producerField.includes(',')
+        ? producerField.split(',').map(id => id.trim())
+        : [producerField];
+
       return {
         exists: true,
         orderId: transaction[0],
         paymentReference: transaction[1],
         amountETB: transaction[2],
         buyerId: transaction[3],
-        producerId: transaction[4],
+        producerId: producerField, // Original field (may contain multiple)
+        producerIds: producerIds,   // ✅ NEW: Array of producer IDs
+        isMultiProducer: producerIds.length > 1, // ✅ NEW: Flag for multi-producer
+        producerCount: producerIds.length, // ✅ NEW: Count of producers
         timestamp: new Date(Number(transaction[5]) * 1000),
         txHash: transaction[6],
         isVerified: transaction[7],
