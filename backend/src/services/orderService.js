@@ -98,9 +98,9 @@ class OrderService {
         }
       });
 
-      // 4. Update product quantities
+      // 4. Update product quantities and check stock
       for (const item of items) {
-        await tx.product.update({
+        const updatedProduct = await tx.product.update({
           where: { id: item.productId },
           data: {
             quantityAvailable: {
@@ -108,6 +108,18 @@ class OrderService {
             }
           }
         });
+
+        // ✅ NEW: Auto-set to OUT_OF_STOCK if quantity reaches 0
+        if (updatedProduct.quantityAvailable <= 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              status: 'OUT_OF_STOCK',
+              quantityAvailable: 0 // Ensure it's exactly 0, not negative
+            }
+          });
+          console.log(`📦 Product ${item.productId} is now OUT_OF_STOCK`);
+        }
       }
 
       return newOrder;
