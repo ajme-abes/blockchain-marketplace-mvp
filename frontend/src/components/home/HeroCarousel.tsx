@@ -228,7 +228,7 @@ export const HeroCarousel = () => {
                 variant="outline"
                 className="rounded-full px-8 py-6 text-lg font-semibold border-2 hover:border-primary/50 transition-all duration-300"
               >
-                {t('common.learnMore')}
+                Learn More
               </Button>
             </Link>
           </div>

@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Star, Quote, Loader2, MessageSquare } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Star, Quote, Loader2, MessageSquare, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { toast } from 'sonner';
 import api from '@/services/api';
 
 interface Testimonial {
@@ -16,20 +13,19 @@ interface Testimonial {
   message: string;
   rating: number;
   photo?: string;
+  userId?: string;
   createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
 }
 
 export const TestimonialsSection = () => {
   const { t } = useLanguage();
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    role: 'BUYER',
-    message: '',
-    rating: 5
-  });
 
   useEffect(() => {
     fetchTestimonials();
@@ -38,7 +34,7 @@ export const TestimonialsSection = () => {
   const fetchTestimonials = async () => {
     try {
       setLoading(true);
-      const response = await api.getPublishedTestimonials(3);
+      const response = await api.getPublishedTestimonials(6);
 
       if (response.status === 'success' && response.data) {
         setTestimonials(response.data);
@@ -50,88 +46,119 @@ export const TestimonialsSection = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name || !formData.message) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const response = await api.createTestimonial(formData);
-
-      if (response.status === 'success') {
-        toast.success('Thank you for sharing your experience! Your testimonial will be published after review.');
-        setFormData({ name: '', role: 'BUYER', message: '', rating: 5 });
-      }
-    } catch (error: any) {
-      console.error('Error submitting testimonial:', error);
-      toast.error(error.message || 'Failed to submit testimonial');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <section className="py-16 bg-gradient-to-b from-muted/20 to-background">
-      <div className="container mx-auto px-4">
+    <section className="py-20 bg-gradient-to-b from-background via-muted/10 to-background relative overflow-hidden">
+      {/* Background Decorations */}
+      <div className="absolute inset-0 bg-gradient-subtle opacity-50" />
+      <div className="absolute top-20 right-10 w-72 h-72 bg-accent/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 left-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      
+      <div className="container mx-auto px-4 relative z-10">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-4">
-            <MessageSquare className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Testimonials</span>
+        <div className="text-center mb-16 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary rounded-full mb-4 shadow-lg">
+            <MessageSquare className="h-4 w-4 text-white" />
+            <span className="text-sm font-bold text-white">Customer Stories</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
-            What Our Customers Say
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent [-webkit-text-fill-color:transparent] [paint-order:stroke_fill]" style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Trusted By Our Community
+            </span>
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Real feedback from producers and buyers using our platform
+          <p className="text-muted-foreground max-w-3xl mx-auto text-lg leading-relaxed">
+            Real experiences from verified producers and buyers who trust our platform
           </p>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading testimonials...</p>
           </div>
         )}
 
-        {/* Testimonials Grid */}
+        {/* Testimonials Grid with Staggered Animation */}
         {!loading && testimonials.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {testimonials.map((testimonial) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
               <Card
                 key={testimonial.id}
-                className="border border-border hover:shadow-lg transition-all duration-300 hover:border-primary/30"
+                className="group relative overflow-hidden border-2 border-border hover:border-primary/50 shadow-card hover:shadow-card-hover transition-all duration-500 hover-lift animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
               >
-                <CardContent className="p-6">
-                  <Quote className="h-8 w-8 text-primary/20 mb-4" />
+                {/* Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-subtle opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <CardContent className="relative p-6 space-y-4">
+                  {/* Quote Icon */}
+                  <div className="relative">
+                    <Quote className="h-10 w-10 text-primary/10 group-hover:text-primary/20 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-primary/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  </div>
 
-                  <div className="flex items-start gap-4 mb-4">
-                    <Avatar className="w-12 h-12 border-2 border-primary/20">
-                      <AvatarImage src={testimonial.photo} />
-                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {testimonial.name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-foreground">{testimonial.name}</h4>
-                      <p className="text-sm text-muted-foreground capitalize">
+                  {/* User Info */}
+                  <div className="flex items-start gap-4">
+                    <div className="relative">
+                      <Avatar className="w-16 h-16 border-2 border-primary/20 group-hover:border-primary/40 transition-all duration-300 group-hover:scale-110">
+                        <AvatarImage 
+                          src={testimonial.user?.avatarUrl || testimonial.photo} 
+                          alt={testimonial.name}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="gradient-primary text-white font-bold text-xl">
+                          {testimonial.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {testimonial.userId && (
+                        <div className="absolute -bottom-1 -right-1 bg-success rounded-full p-1.5 shadow-lg animate-pulse-slow">
+                          <ShieldCheck className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="font-bold text-foreground text-lg group-hover:text-primary transition-colors">
+                          {testimonial.name}
+                        </h4>
+                        {testimonial.userId && (
+                          <Badge variant="success" className="text-xs px-2 py-0.5 shadow-sm">
+                            ✓ Verified
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground capitalize font-medium">
                         {testimonial.role.toLowerCase()}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex gap-1 mb-3">
-                    {Array.from({ length: testimonial.rating }).map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  {/* Rating Stars */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star 
+                        key={i} 
+                        className={`h-5 w-5 transition-all duration-300 ${
+                          i < testimonial.rating
+                            ? 'fill-yellow-400 text-yellow-400 group-hover:scale-110'
+                            : 'text-gray-300'
+                        }`}
+                        style={{ transitionDelay: `${i * 50}ms` }}
+                      />
                     ))}
                   </div>
 
-                  <p className="text-muted-foreground text-sm leading-relaxed line-clamp-4">
-                    {testimonial.message}
+                  {/* Testimonial Message */}
+                  <p className="text-muted-foreground leading-relaxed line-clamp-4 group-hover:text-foreground transition-colors duration-300">
+                    "{testimonial.message}"
+                  </p>
+
+                  {/* Date */}
+                  <p className="text-xs text-muted-foreground/60 pt-2 border-t border-border/50">
+                    {new Date(testimonial.createdAt).toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric'
+                    })}
                   </p>
                 </CardContent>
               </Card>
@@ -141,97 +168,16 @@ export const TestimonialsSection = () => {
 
         {/* Empty State */}
         {!loading && testimonials.length === 0 && (
-          <div className="text-center py-12">
-            <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No testimonials yet. Be the first to share your experience!</p>
+          <div className="text-center py-20 animate-fade-in">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
+              <MessageSquare className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-2xl font-bold mb-2">No Testimonials Yet</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Be the first to share your experience with our marketplace community!
+            </p>
           </div>
         )}
-
-        {/* Share Experience Section */}
-        <div className="max-w-2xl mx-auto">
-          <Card className="border-2 border-primary/20 shadow-lg">
-            <CardContent className="p-8">
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2 text-foreground">Share Your Experience</h3>
-                <p className="text-muted-foreground">
-                  Help others discover the benefits of our marketplace
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    placeholder="Your Name *"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    className="bg-background"
-                  />
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    value={formData.role}
-                    onChange={e => setFormData({ ...formData, role: e.target.value })}
-                  >
-                    <option value="BUYER">Buyer</option>
-                    <option value="PRODUCER">Producer</option>
-                  </select>
-                </div>
-
-                {/* Rating */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Rating</label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((rating) => (
-                      <button
-                        key={rating}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, rating })}
-                        className="transition-transform hover:scale-110"
-                      >
-                        <Star
-                          className={`h-6 w-6 ${rating <= formData.rating
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                            }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <Textarea
-                  placeholder="Tell us about your experience... *"
-                  value={formData.message}
-                  onChange={e => setFormData({ ...formData, message: e.target.value })}
-                  rows={4}
-                  required
-                  className="bg-background resize-none"
-                />
-
-                <div className="text-center">
-                  <Button
-                    type="submit"
-                    className="w-full md:w-auto px-8"
-                    disabled={submitting}
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      'Submit Testimonial'
-                    )}
-                  </Button>
-                </div>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  Your testimonial will be reviewed before being published
-                </p>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </section>
   );

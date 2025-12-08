@@ -9,7 +9,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main>
+      <main className="overflow-hidden">
         <HeroSection />
         <FeaturedProducts />
         <AboutPreview />

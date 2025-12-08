@@ -92,19 +92,26 @@ export const FeaturedProducts = () => {
   };
 
   return (
-    <section className="py-16 bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4">
+    <section className="py-20 bg-gradient-to-b from-background via-muted/10 to-background relative overflow-hidden">
+      {/* Background Decorations */}
+      <div className="absolute inset-0 bg-gradient-subtle opacity-50" />
+      <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      
+      <div className="container mx-auto px-4 relative z-10">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-4">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Featured Products</span>
+        <div className="text-center mb-16 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary rounded-full mb-4 shadow-lg">
+            <TrendingUp className="h-4 w-4 text-white" />
+            <span className="text-sm font-bold text-white">Featured Products</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            {t('featured.title')}
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent [-webkit-text-fill-color:transparent] [paint-order:stroke_fill]" style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Discover Quality Ethiopian Products
+            </span>
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Discover high-quality products directly from Ethiopian producers, verified on the blockchain
+          <p className="text-muted-foreground max-w-3xl mx-auto text-lg leading-relaxed">
+            Explore authentic products directly from verified Ethiopian producers, secured by blockchain technology
           </p>
         </div>
 
