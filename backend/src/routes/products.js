@@ -114,7 +114,7 @@ router.post(
       console.log('🔧 Product data:', req.body);
       console.log(`🔧 Files received: ${req.files?.length || 0}`);
 
-      const { name, description, price, category, quantity } = req.body;
+      const { name, description, price, category, quantity, unit, region } = req.body;
 
       // Validate required fields
       if (!name || !price || !category || !quantity) {
@@ -158,7 +158,9 @@ router.post(
         category,
         quantityAvailable: parseInt(quantity), // ✅ Maps to quantityAvailable in service
         producerId: req.user.id,
-        imageCids // ✅ Pass the CIDs to create proper imageUrl
+        imageCids, // ✅ Pass the CIDs to create proper imageUrl
+        unit: unit || 'unit', // ✅ Include unit
+        region: region || '' // ✅ Include region
       };
 
       console.log('🔧 Creating product with data:', productData);
