@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, Lock, Sparkles, Eye, EyeOff, CheckCircle, XCircle, Moon, Sun } from 'lucide-react';
+import { User, Mail, Phone, Lock,  Eye, EyeOff, CheckCircle, XCircle, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';

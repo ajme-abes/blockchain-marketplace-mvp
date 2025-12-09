@@ -76,11 +76,20 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
       });
     }
 
-    // Update producer verification status
-    const producer = await prisma.producer.update({
+    // Get admin user info
+    const adminUser = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { name: true }
+    });
+
+    // TEMPORARY: Update only verificationStatus until backend is restarted
+    // The new fields (verifiedAt, verifiedBy) will work after Prisma client regeneration
+    const updatedProducer = await prisma.producer.update({
       where: { id: producerId },
       data: {
-        verificationStatus: status
+        verificationStatus: status,
+        // Only update rejectionReason as it already exists in the old schema
+        ...(status === 'REJECTED' && reason && { rejectionReason: reason })
       },
       include: {
         user: {
@@ -100,7 +109,7 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
     }
 
     await notificationService.createNotification(
-      producer.userId,
+      updatedProducer.userId,
       notificationMessage,
       'SECURITY'
     );
@@ -124,14 +133,15 @@ router.patch('/producers/:producerId/verify', async (req, res) => {
     res.json({
       status: 'success',
       message: `Producer verification ${status.toLowerCase()} successfully`,
-      data: { producer }
+      data: { producer: updatedProducer }
     });
 
   } catch (error) {
     console.error('Admin verify producer error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to update producer verification'
+      message: error.message || 'Failed to update producer verification',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -823,6 +833,90 @@ router.get('/producers/verification-queue', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get verification queue'
+    });
+  }
+});
+
+// ==================== GET ALL PRODUCERS (All Statuses) ====================
+router.get('/producers/all', async (req, res) => {
+  try {
+    // Get ALL producers regardless of verification status
+    const producers = await prisma.producer.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            registrationDate: true,
+            region: true,
+            avatarUrl: true
+          }
+        },
+        products: {
+          select: {
+            id: true,
+            name: true,
+            status: true
+          }
+        },
+        documents: {
+          select: {
+            id: true,
+            type: true,
+            url: true,
+            filename: true,
+            uploadedAt: true,
+            fileSize: true
+          }
+        }
+      },
+      orderBy: {
+        user: {
+          registrationDate: 'desc'
+        }
+      }
+    });
+
+    // Transform to match frontend interface
+    const transformedProducers = producers.map(producer => ({
+      id: producer.id,
+      userId: producer.userId,
+      user: producer.user,
+      businessName: producer.businessName,
+      businessDescription: producer.businessDescription,
+      location: producer.location,
+      verificationStatus: producer.verificationStatus,
+      verificationSubmittedAt: producer.user.registrationDate,
+      businessLicense: producer.businessLicense,
+      taxId: producer.taxId,
+      rejectionReason: producer.rejectionReason,
+      verifiedAt: producer.verifiedAt,
+      verifiedBy: producer.verifiedBy,
+      documents: producer.documents.map(doc => ({
+        id: doc.id,
+        type: doc.type,
+        url: doc.url,
+        filename: doc.filename,
+        uploadedAt: doc.uploadedAt,
+        fileSize: doc.fileSize
+      })),
+      products: producer.products
+    }));
+
+    res.json({
+      status: 'success',
+      data: {
+        producers: transformedProducers
+      }
+    });
+
+  } catch (error) {
+    console.error('Get all producers error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get producers'
     });
   }
 });

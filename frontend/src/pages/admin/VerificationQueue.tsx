@@ -45,8 +45,10 @@ import {
   Store,
   AlertTriangle,
   RefreshCw,
-  Images
+  Images,
+  Shield
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
 interface Producer {
@@ -60,7 +62,7 @@ interface Producer {
     registrationDate: string;
     region?: string;
     avatarUrl?: string;
-    fileSize?: number; 
+    fileSize?: number;
   };
   businessName: string;
   businessDescription?: string;
@@ -75,6 +77,7 @@ interface Producer {
     url: string;
     filename: string;
     uploadedAt: string;
+    fileSize?: number;
   }>;
   rejectionReason?: string;
   verifiedAt?: string;
@@ -97,6 +100,7 @@ const VerificationQueue = () => {
   const [selectedAction, setSelectedAction] = useState<'verify' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'VERIFIED' | 'REJECTED'>('PENDING');
   const [currentDocument, setCurrentDocument] = useState<any>(null);
 
   const { toast } = useToast();
@@ -109,8 +113,9 @@ const VerificationQueue = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
+      // Fetch ALL producers, not just pending
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/verification-queue`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/producers/all`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -123,16 +128,16 @@ const VerificationQueue = () => {
       if (response.ok) {
         const result = await response.json();
         if (result.status === 'success') {
-          setProducers(result.data.producers || []);
+          setProducers(result.data.producers || result.data || []);
         }
       } else {
-        throw new Error('Failed to fetch verification queue');
+        throw new Error('Failed to fetch producers');
       }
     } catch (error) {
-      console.error('Error fetching verification queue:', error);
+      console.error('Error fetching producers:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load verification queue',
+        description: 'Failed to load producers',
         variant: 'destructive',
       });
     } finally {
@@ -193,12 +198,29 @@ const VerificationQueue = () => {
     // In a real app, you would debounce this and make an API call
   };
 
-  const filteredProducers = producers.filter(producer =>
-    producer.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    producer.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    producer.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    producer.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter by active tab and search query
+  const filteredProducers = producers.filter(producer => {
+    // Filter by verification status (tab)
+    if (producer.verificationStatus !== activeTab) return false;
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        producer.businessName.toLowerCase().includes(query) ||
+        producer.user.name.toLowerCase().includes(query) ||
+        producer.user.email.toLowerCase().includes(query) ||
+        producer.location.toLowerCase().includes(query)
+      );
+    }
+
+    return true;
+  });
+
+  // Get counts for each tab
+  const pendingCount = producers.filter(p => p.verificationStatus === 'PENDING').length;
+  const verifiedCount = producers.filter(p => p.verificationStatus === 'VERIFIED').length;
+  const rejectedCount = producers.filter(p => p.verificationStatus === 'REJECTED').length;
 
   const getDaysInQueue = (submittedAt: string) => {
     const submittedDate = new Date(submittedAt);
@@ -276,12 +298,12 @@ const VerificationQueue = () => {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-yellow-100 rounded-lg">
+                      <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
                         <Clock className="h-6 w-6 text-yellow-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-bold">{producers.length}</div>
-                        <div className="text-sm text-muted-foreground">Pending Verification</div>
+                        <div className="text-2xl font-bold">{pendingCount}</div>
+                        <div className="text-sm text-muted-foreground">Pending</div>
                       </div>
                     </div>
                   </CardContent>
@@ -289,14 +311,12 @@ const VerificationQueue = () => {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-red-100 rounded-lg">
-                        <AlertTriangle className="h-6 w-6 text-red-600" />
+                      <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <CheckCircle className="h-6 w-6 text-green-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-bold">
-                          {producers.filter(p => getDaysInQueue(p.verificationSubmittedAt) > 7).length}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Overdue ({'>'}7 days)</div>
+                        <div className="text-2xl font-bold">{verifiedCount}</div>
+                        <div className="text-sm text-muted-foreground">Verified</div>
                       </div>
                     </div>
                   </CardContent>
@@ -304,29 +324,25 @@ const VerificationQueue = () => {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
+                      <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                        <XCircle className="h-6 w-6 text-red-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold">{rejectedCount}</div>
+                        <div className="text-sm text-muted-foreground">Rejected</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                         <Store className="h-6 w-6 text-blue-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-bold">
-                          {producers.filter(p => getDaysInQueue(p.verificationSubmittedAt) <= 3).length}
-                        </div>
-                        <div className="text-sm text-muted-foreground">New (≤3 days)</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <UserCheck className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold">
-                          {producers.filter(p => p.documents && p.documents.length > 0).length}
-                        </div>
-                        <div className="text-sm text-muted-foreground">With Documents</div>
+                        <div className="text-2xl font-bold">{producers.length}</div>
+                        <div className="text-sm text-muted-foreground">Total Producers</div>
                       </div>
                     </div>
                   </CardContent>
@@ -356,150 +372,230 @@ const VerificationQueue = () => {
                 </CardContent>
               </Card>
 
-              {/* Verification Queue Table */}
+              {/* Verification Queue with Tabs */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="h-5 w-5" />
-                      Pending Verifications ({filteredProducers.length})
-                    </div>
-                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700">
-                      {producers.filter(p => getDaysInQueue(p.verificationSubmittedAt) > 7).length} Overdue
-                    </Badge>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5" />
+                    Producer Verification Management
                   </CardTitle>
+                  <CardDescription>
+                    Review and manage producer verification requests across all statuses
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {filteredProducers.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Business</TableHead>
-                            <TableHead>Owner</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Submitted</TableHead>
-                            <TableHead>Days in Queue</TableHead>
-                            <TableHead>Documents</TableHead>
-                            <TableHead>Priority</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredProducers.map((producer) => {
-                            const daysInQueue = getDaysInQueue(producer.verificationSubmittedAt);
-                            return (
-                              <TableRow key={producer.id} className="hover:bg-muted/50">
-                                <TableCell>
-                                  <div className="flex items-center gap-3">
-                                    <Avatar>
-                                      <AvatarFallback className="bg-blue-100 text-blue-600">
-                                        {producer.businessName[0].toUpperCase()}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <div className="font-medium">{producer.businessName}</div>
-                                      {producer.businessDescription && (
-                                        <div className="text-sm text-muted-foreground truncate max-w-[200px]">
-                                          {producer.businessDescription}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{producer.user.name}</div>
-                                    <div className="text-sm text-muted-foreground">{producer.user.email}</div>
-                                    {producer.user.phone && (
-                                      <div className="text-sm text-muted-foreground">{producer.user.phone}</div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="h-3 w-3 text-muted-foreground" />
-                                    <span>{producer.location}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {new Date(producer.verificationSubmittedAt).toLocaleDateString()}
-                                </TableCell>
-                                <TableCell>
-                                  <div className={`font-medium ${daysInQueue > 7 ? 'text-red-600' : daysInQueue > 3 ? 'text-yellow-600' : 'text-green-600'}`}>
-                                    {daysInQueue} days
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <FileText className="h-3 w-3 text-muted-foreground" />
-                                    <span>{producer.documents?.length || 0}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {getPriorityBadge(daysInQueue)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedProducer(producer);
-                                        setDetailDialogOpen(true);
-                                      }}
-                                      title="View Details"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedProducer(producer);
-                                        setSelectedAction('verify');
-                                        setActionDialogOpen(true);
-                                      }}
-                                      title="Verify Producer"
-                                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    >
-                                      <CheckCircle className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedProducer(producer);
-                                        setSelectedAction('reject');
-                                        setActionDialogOpen(true);
-                                      }}
-                                      title="Reject Verification"
-                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
+                  <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+                    <TabsList className="grid w-full grid-cols-3 mb-4">
+                      <TabsTrigger value="PENDING" className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Pending ({pendingCount})
+                      </TabsTrigger>
+                      <TabsTrigger value="VERIFIED" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Verified ({verifiedCount})
+                      </TabsTrigger>
+                      <TabsTrigger value="REJECTED" className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        Rejected ({rejectedCount})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value={activeTab} className="mt-0">
+                      {filteredProducers.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Business</TableHead>
+                                <TableHead>Owner</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>
+                                  {activeTab === 'PENDING' && 'Submitted'}
+                                  {activeTab === 'VERIFIED' && 'Verified Date'}
+                                  {activeTab === 'REJECTED' && 'Rejected Date'}
+                                </TableHead>
+                                {activeTab === 'PENDING' && <TableHead>Days in Queue</TableHead>}
+                                {activeTab === 'VERIFIED' && <TableHead>Verified By</TableHead>}
+                                {activeTab === 'REJECTED' && <TableHead>Rejection Reason</TableHead>}
+                                <TableHead>Documents</TableHead>
+                                {activeTab === 'PENDING' && <TableHead>Priority</TableHead>}
+                                <TableHead className="text-right">Actions</TableHead>
                               </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <UserCheck className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No Pending Verifications</h3>
-                      <p className="text-muted-foreground mb-4">
-                        {searchQuery ? 'No producers match your search' : 'All producer verifications have been processed'}
-                      </p>
-                      {searchQuery && (
-                        <Button variant="outline" onClick={() => setSearchQuery('')}>
-                          Clear Search
-                        </Button>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredProducers.map((producer) => {
+                                const daysInQueue = getDaysInQueue(producer.verificationSubmittedAt);
+                                return (
+                                  <TableRow key={producer.id} className="hover:bg-muted/50">
+                                    <TableCell>
+                                      <div className="flex items-center gap-3">
+                                        <Avatar>
+                                          <AvatarImage
+                                            src={producer.user.avatarUrl}
+                                            alt={producer.businessName}
+                                            className="object-cover"
+                                          />
+                                          <AvatarFallback className="bg-blue-100 text-blue-600">
+                                            {producer.businessName[0].toUpperCase()}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                          <div className="font-medium">{producer.businessName}</div>
+                                          {producer.businessDescription && (
+                                            <div className="text-sm text-muted-foreground truncate max-w-[200px]">
+                                              {producer.businessDescription}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <div className="font-medium">{producer.user.name}</div>
+                                        <div className="text-sm text-muted-foreground">{producer.user.email}</div>
+                                        {producer.user.phone && (
+                                          <div className="text-sm text-muted-foreground">{producer.user.phone}</div>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                                        <span>{producer.location}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {activeTab === 'PENDING' && new Date(producer.verificationSubmittedAt).toLocaleDateString()}
+                                      {activeTab === 'VERIFIED' && producer.verifiedAt && new Date(producer.verifiedAt).toLocaleDateString()}
+                                      {activeTab === 'REJECTED' && producer.verificationSubmittedAt && new Date(producer.verificationSubmittedAt).toLocaleDateString()}
+                                    </TableCell>
+                                    {activeTab === 'PENDING' && (
+                                      <TableCell>
+                                        <div className={`font-medium ${daysInQueue > 7 ? 'text-red-600' : daysInQueue > 3 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                          {daysInQueue} days
+                                        </div>
+                                      </TableCell>
+                                    )}
+                                    {activeTab === 'VERIFIED' && (
+                                      <TableCell>
+                                        <div className="flex items-center gap-1">
+                                          <Shield className="h-3 w-3 text-green-600" />
+                                          <span className="text-sm">{producer.verifiedBy || 'Admin'}</span>
+                                        </div>
+                                      </TableCell>
+                                    )}
+                                    {activeTab === 'REJECTED' && (
+                                      <TableCell>
+                                        <div className="text-sm text-red-600 truncate max-w-[200px]">
+                                          {producer.rejectionReason || 'No reason provided'}
+                                        </div>
+                                      </TableCell>
+                                    )}
+                                    <TableCell>
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-1">
+                                          <FileText className="h-3 w-3 text-muted-foreground" />
+                                          <span>{producer.documents?.length || 0} docs</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Store className="h-3 w-3" />
+                                          <span>{producer.products?.length || 0} products</span>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    {activeTab === 'PENDING' && (
+                                      <TableCell>
+                                        {getPriorityBadge(daysInQueue)}
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedProducer(producer);
+                                            setDetailDialogOpen(true);
+                                          }}
+                                          title="View Details"
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+
+                                        {/* Show verify/reject buttons for PENDING and REJECTED */}
+                                        {(activeTab === 'PENDING' || activeTab === 'REJECTED') && (
+                                          <>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                setSelectedProducer(producer);
+                                                setSelectedAction('verify');
+                                                setActionDialogOpen(true);
+                                              }}
+                                              title="Verify Producer"
+                                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                            >
+                                              <CheckCircle className="h-4 w-4" />
+                                            </Button>
+                                            {activeTab === 'PENDING' && (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  setSelectedProducer(producer);
+                                                  setSelectedAction('reject');
+                                                  setActionDialogOpen(true);
+                                                }}
+                                                title="Reject Verification"
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                              >
+                                                <XCircle className="h-4 w-4" />
+                                              </Button>
+                                            )}
+                                          </>
+                                        )}
+
+                                        {/* Show status badge for VERIFIED */}
+                                        {activeTab === 'VERIFIED' && (
+                                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                            Verified
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          {activeTab === 'PENDING' && <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />}
+                          {activeTab === 'VERIFIED' && <CheckCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />}
+                          {activeTab === 'REJECTED' && <XCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />}
+                          <h3 className="text-lg font-semibold mb-2">
+                            {activeTab === 'PENDING' && 'No Pending Verifications'}
+                            {activeTab === 'VERIFIED' && 'No Verified Producers'}
+                            {activeTab === 'REJECTED' && 'No Rejected Producers'}
+                          </h3>
+                          <p className="text-muted-foreground mb-4">
+                            {searchQuery ? 'No producers match your search' :
+                              activeTab === 'PENDING' ? 'All producer verifications have been processed' :
+                                activeTab === 'VERIFIED' ? 'No producers have been verified yet' :
+                                  'No producers have been rejected'}
+                          </p>
+                          {searchQuery && (
+                            <Button variant="outline" onClick={() => setSearchQuery('')}>
+                              Clear Search
+                            </Button>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>
@@ -522,6 +618,11 @@ const VerificationQueue = () => {
               {/* Business Header */}
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
+                  <AvatarImage
+                    src={selectedProducer.user.avatarUrl}
+                    alt={selectedProducer.businessName}
+                    className="object-cover"
+                  />
                   <AvatarFallback className="text-lg bg-blue-100 text-blue-600">
                     {selectedProducer.businessName[0].toUpperCase()}
                   </AvatarFallback>
@@ -539,6 +640,24 @@ const VerificationQueue = () => {
                 </div>
               </div>
 
+              {/* Rejection History Warning */}
+              {selectedProducer.rejectionReason && (
+                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-red-800 dark:text-red-400">Previously Rejected</div>
+                      <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        <span className="font-medium">Reason:</span> {selectedProducer.rejectionReason}
+                      </div>
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-2">
+                        This producer has resubmitted their verification request. Please review carefully.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Owner Information */}
               <Card>
                 <CardHeader>
@@ -548,6 +667,11 @@ const VerificationQueue = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                       <Avatar className="h-10 w-10">
+                        <AvatarImage
+                          src={selectedProducer.user.avatarUrl}
+                          alt={selectedProducer.user.name}
+                          className="object-cover"
+                        />
                         <AvatarFallback>
                           {selectedProducer.user.name[0].toUpperCase()}
                         </AvatarFallback>
@@ -600,6 +724,24 @@ const VerificationQueue = () => {
                         {new Date(selectedProducer.verificationSubmittedAt).toLocaleDateString()}
                       </div>
                     </div>
+                    {selectedProducer.businessLicense && (
+                      <div>
+                        <div className="text-sm text-muted-foreground">Business License</div>
+                        <div className="font-medium flex items-center gap-1">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          {selectedProducer.businessLicense}
+                        </div>
+                      </div>
+                    )}
+                    {selectedProducer.taxId && (
+                      <div>
+                        <div className="text-sm text-muted-foreground">Tax ID</div>
+                        <div className="font-medium flex items-center gap-1">
+                          <FileText className="h-4 w-4 text-green-600" />
+                          {selectedProducer.taxId}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {selectedProducer.businessDescription && (
@@ -610,6 +752,32 @@ const VerificationQueue = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Product Count */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Store className="h-5 w-5 text-blue-600" />
+                        <div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {selectedProducer.products?.length || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Products Listed</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-green-600" />
+                        <div>
+                          <div className="text-2xl font-bold text-green-600">
+                            {selectedProducer.documents?.length || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Documents Submitted</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Business Documents */}
                   {selectedProducer.documents && selectedProducer.documents.length > 0 ? (
@@ -630,24 +798,25 @@ const VerificationQueue = () => {
                               <div className="flex-1">
                                 <div className="font-medium">{doc.filename}</div>
                                 <div className="text-sm text-muted-foreground">
-                                  {doc.type} • {Math.round((doc.fileSize || 0) / 1024)} KB •
-                                  {new Date(doc.uploadedAt).toLocaleDateString()}
+                                  {doc.type.split('/')[1]?.toUpperCase() || 'FILE'} •
+                                  {doc.fileSize ? ` ${(doc.fileSize / 1024).toFixed(1)} KB` : ' Size unknown'} •
+                                  {' '}{new Date(doc.uploadedAt).toLocaleDateString()}
                                 </div>
                               </div>
                             </div>
                             <div className="flex gap-2">
                               {/* 🆕 PREVIEW BUTTON */}
                               <Button
-  variant="outline"
-  size="sm"
-  onClick={() => {
-    setCurrentDocument(doc);
-    setPreviewModalOpen(true);
-  }}
->
-  <Eye className="h-4 w-4 mr-1" />
-  Preview
-</Button>
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentDocument(doc);
+                                  setPreviewModalOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
                               {/* 🆕 DOWNLOAD BUTTON */}
                               <Button
                                 variant="outline"
@@ -760,77 +929,80 @@ const VerificationQueue = () => {
               {selectedAction === 'verify' && 'Verify Producer'}
               {selectedAction === 'reject' && 'Reject Verification'}
             </Button>
-            <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
-  <DialogContent className="max-w-4xl max-h-[90vh]">
-    <DialogHeader>
-      <DialogTitle>{currentDocument?.filename}</DialogTitle>
-      <DialogDescription>
-        Document preview - {currentDocument?.type}
-      </DialogDescription>
-    </DialogHeader>
-    
-    {currentDocument && (
-      <div className="flex justify-center">
-        {currentDocument.type.includes('image') ? (
-          // Image Preview
-          <img 
-            src={currentDocument.url} 
-            alt={currentDocument.filename}
-            className="max-w-full max-h-[70vh] object-contain rounded-lg"
-          />
-        ) : currentDocument.type.includes('pdf') ? (
-          // PDF Preview (embedded)
-          <div className="w-full h-[70vh] border rounded-lg">
-            <iframe 
-              src={currentDocument.url} 
-              className="w-full h-full"
-              title={currentDocument.filename}
-            />
-          </div>
-        ) : (
-          // Other file types - download only
-          <div className="text-center py-12">
-            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <div className="text-lg font-medium mb-2">Document Preview Not Available</div>
-            <div className="text-muted-foreground mb-4">
-              This file type cannot be previewed in the browser.
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Preview Modal - Separate from Action Dialog */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{currentDocument?.filename}</DialogTitle>
+            <DialogDescription>
+              Document preview - {currentDocument?.type}
+            </DialogDescription>
+          </DialogHeader>
+
+          {currentDocument && (
+            <div className="flex justify-center">
+              {currentDocument.type.includes('image') ? (
+                // Image Preview
+                <img
+                  src={currentDocument.url}
+                  alt={currentDocument.filename}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                />
+              ) : currentDocument.type.includes('pdf') ? (
+                // PDF Preview (embedded)
+                <div className="w-full h-[70vh] border rounded-lg">
+                  <iframe
+                    src={currentDocument.url}
+                    className="w-full h-full"
+                    title={currentDocument.filename}
+                  />
+                </div>
+              ) : (
+                // Other file types - download only
+                <div className="text-center py-12">
+                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <div className="text-lg font-medium mb-2">Document Preview Not Available</div>
+                  <div className="text-muted-foreground mb-4">
+                    This file type cannot be previewed in the browser.
+                  </div>
+                  <Button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = currentDocument.url;
+                      link.download = currentDocument.filename;
+                      link.click();
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download File
+                  </Button>
+                </div>
+              )}
             </div>
+          )}
+
+          <DialogFooter>
             <Button
+              variant="outline"
               onClick={() => {
-                const link = document.createElement('a');
-                link.href = currentDocument.url;
-                link.download = currentDocument.filename;
-                link.click();
+                if (currentDocument) {
+                  const link = document.createElement('a');
+                  link.href = currentDocument.url;
+                  link.download = currentDocument.filename;
+                  link.click();
+                }
               }}
             >
               <Download className="h-4 w-4 mr-2" />
-              Download File
+              Download
             </Button>
-          </div>
-        )}
-      </div>
-    )}
-    
-    <DialogFooter>
-      <Button
-        variant="outline"
-        onClick={() => {
-          const link = document.createElement('a');
-          link.href = currentDocument.url;
-          link.download = currentDocument.filename;
-          link.click();
-        }}
-      >
-        <Download className="h-4 w-4 mr-2" />
-        Download
-      </Button>
-      <Button onClick={() => setPreviewModalOpen(false)}>
-        Close Preview
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-            
+            <Button onClick={() => setPreviewModalOpen(false)}>
+              Close Preview
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

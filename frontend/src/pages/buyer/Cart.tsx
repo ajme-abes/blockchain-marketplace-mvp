@@ -18,7 +18,6 @@ import {
   Truck,
   Shield,
   CreditCard,
-  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -129,7 +128,7 @@ const Cart: React.FC = () => {
               <div className="flex gap-4">
                 <Link to="/marketplace">
                   <Button size="lg" className="gap-2">
-                    <Sparkles className="h-4 w-4" />
+                    
                     Explore Marketplace
                   </Button>
                 </Link>

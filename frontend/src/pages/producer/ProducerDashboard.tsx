@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2, CreditCard } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, TrendingUp, Eye, Plus, Loader2, CreditCard, XCircle, Clock, Ban } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
@@ -53,10 +53,50 @@ const ProducerDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [producerProfile, setProducerProfile] = useState<{
+    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+    rejectionReason?: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchProducerProfile();
   }, []);
+
+  const fetchProducerProfile = async () => {
+    try {
+      console.log('🔍 Fetching producer profile for user:', user?.id);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/${user?.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Producer profile response:', result);
+        console.log('📋 Producer profile data:', result.data?.producerProfile);
+
+        if (result.data?.producerProfile) {
+          const profile = {
+            verificationStatus: result.data.producerProfile.verificationStatus,
+            rejectionReason: result.data.producerProfile.rejectionReason
+          };
+          console.log('💾 Setting producer profile:', profile);
+          setProducerProfile(profile);
+        } else {
+          console.warn('⚠️ No producerProfile in response');
+        }
+      } else {
+        console.error('❌ Failed to fetch profile, status:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch producer profile:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -205,6 +245,75 @@ const ProducerDashboard = () => {
           />
 
           <main className="flex-1 p-6">
+            {/* Account Status Warnings */}
+            {console.log('🎨 Rendering dashboard, producerProfile:', producerProfile)}
+            {producerProfile?.verificationStatus === 'REJECTED' && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-red-800 dark:text-red-400 mb-1">
+                      Verification Rejected
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300 mb-2">
+                      Your producer account verification was rejected. You cannot list products or receive orders until verified.
+                    </p>
+                    {producerProfile.rejectionReason && (
+                      <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-md mb-3">
+                        <p className="text-sm font-medium text-red-800 dark:text-red-400">
+                          <strong>Reason:</strong> {producerProfile.rejectionReason}
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      Please update your business information and documents, then contact support to resubmit for verification.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {producerProfile?.verificationStatus === 'PENDING' && (
+              <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                    <Clock className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-yellow-800 dark:text-yellow-400 mb-1">
+                      Verification Pending
+                    </h3>
+                    <p className="text-yellow-700 dark:text-yellow-300">
+                      Your producer account is under review. You'll be able to list products and receive orders once verified by our admin team.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {user?.status === 'SUSPENDED' && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <Ban className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-red-800 dark:text-red-400 mb-1">
+                      Account Suspended
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300">
+                      Your account has been suspended. You cannot access most features until the suspension is lifted.
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      Please contact support for more information.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Welcome Section */}
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">

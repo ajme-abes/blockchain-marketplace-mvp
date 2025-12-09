@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, TrendingUp, Target, Sparkles, ArrowRight, CheckCircle, Zap } from 'lucide-react';
+import { Shield, Users, TrendingUp, Target,  ArrowRight, CheckCircle, Zap } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import api from '@/services/api';
 
@@ -90,7 +90,6 @@ export const AboutPreview = () => {
         {/* Header */}
         <div className="text-center mb-16 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary rounded-full mb-4 shadow-lg">
-            <Sparkles className="h-4 w-4 text-white" />
             <span className="text-sm font-bold text-white">About EthioTrust</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold mb-4">

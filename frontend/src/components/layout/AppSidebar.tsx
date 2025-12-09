@@ -21,7 +21,7 @@ import {
   TrendingUp,
   DollarSign,
   Mail,
-  Sparkles,
+
 } from 'lucide-react';
 import {
   Sidebar,
@@ -56,7 +56,7 @@ export const AppSidebar = () => {
 
   // Core links for ALL roles
   const coreLinks = [
-    { title: 'Home', url: '/', icon: Sparkles },
+    { title: 'Home', url: '/', icon: Globe },
     { title: 'sidebar.dashboard', url: '/dashboard', icon: Home },
     { title: 'sidebar.profile', url: '/profile', icon: User },
     { title: 'sidebar.settings', url: '/settings', icon: Settings },

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Globe, Facebook, Instagram, Twitter, Send, Heart, Shield, Sparkles, Moon, Sun } from 'lucide-react';
+import { Globe, Facebook, Instagram, Twitter, Send, Heart, Shield,  Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -42,7 +42,6 @@ export const Footer = () => {
                 <span>Secure Transactions</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Sparkles className="h-4 w-4 text-amber-500" />
                 <span>Verified Products</span>
               </div>
             </div>

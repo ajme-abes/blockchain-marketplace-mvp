@@ -115,7 +115,10 @@ class ProductService {
 
     const where = {
       status: 'ACTIVE',
-      quantityAvailable: { gt: 0 } // ✅ Only show products with stock
+      quantityAvailable: { gt: 0 }, // ✅ Only show products with stock
+      producer: {
+        verificationStatus: 'VERIFIED' // ✅ Only show products from verified producers
+      }
     };
 
     // Apply filters - case-insensitive category match

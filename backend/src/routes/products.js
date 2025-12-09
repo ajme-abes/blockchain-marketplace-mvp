@@ -114,6 +114,30 @@ router.post(
       console.log('🔧 Product data:', req.body);
       console.log(`🔧 Files received: ${req.files?.length || 0}`);
 
+      // ✅ CHECK PRODUCER VERIFICATION STATUS
+      const producer = await prisma.producer.findUnique({
+        where: { userId: req.user.id },
+        select: { verificationStatus: true, rejectionReason: true }
+      });
+
+      if (!producer) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Producer profile not found'
+        });
+      }
+
+      if (producer.verificationStatus !== 'VERIFIED') {
+        return res.status(403).json({
+          status: 'error',
+          message: producer.verificationStatus === 'REJECTED'
+            ? `Your producer account verification was rejected. ${producer.rejectionReason ? `Reason: ${producer.rejectionReason}` : ''} Please contact support to resubmit.`
+            : 'Your producer account is pending verification. You cannot list products until verified.',
+          verificationStatus: producer.verificationStatus,
+          rejectionReason: producer.rejectionReason
+        });
+      }
+
       const { name, description, price, category, quantity, unit, region } = req.body;
 
       // Validate required fields

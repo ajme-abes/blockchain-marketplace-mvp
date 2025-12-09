@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Globe, Shield, Sparkles, Moon, Sun, ShoppingCart, Bell, MessageCircle } from 'lucide-react';
+import { Menu, X, Globe, Shield, Moon, Sun, ShoppingCart, Bell, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { useAuth } from '@/contexts/AuthContext';
@@ -377,7 +377,6 @@ export const Navbar = () => {
                             size="sm"
                             className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-amber-200 dark:hover:shadow-amber-800 transition-all duration-300 font-semibold"
                           >
-                            <Sparkles className="h-4 w-4 mr-2" />
                             {t('nav.register')}
                           </Button>
                         </Link>

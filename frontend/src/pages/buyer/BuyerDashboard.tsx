@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Package, DollarSign, TrendingUp, Eye, Loader2, Sparkles } from 'lucide-react';
+import { ShoppingCart, Package, DollarSign, TrendingUp, Eye, Loader2, Ban } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -41,7 +41,7 @@ const BuyerDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     totalOrders: 0,
     pendingOrders: 0,
@@ -58,7 +58,7 @@ const BuyerDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch buyer orders
       const ordersResponse = await orderService.getUserOrders();
       const orders = ordersResponse?.orders || [];
@@ -66,7 +66,7 @@ const BuyerDashboard = () => {
       console.log('🔧 Buyer orders:', orders);
 
       // Calculate stats
-      const pendingOrders = orders.filter(order => 
+      const pendingOrders = orders.filter(order =>
         ['PENDING', 'CONFIRMED', 'SHIPPED'].includes(order.deliveryStatus)
       ).length;
 
@@ -75,7 +75,7 @@ const BuyerDashboard = () => {
         .reduce((sum, order) => sum + order.totalAmount, 0);
 
       // Mock favorite products count (you can replace with real data)
-      const favoriteProducts = orders.reduce((count, order) => 
+      const favoriteProducts = orders.reduce((count, order) =>
         count + order.items.length, 0
       );
 
@@ -130,31 +130,31 @@ const BuyerDashboard = () => {
   };
 
   const statCards = [
-    { 
-      title: 'Total Orders', 
-      value: stats.totalOrders.toString(), 
-      icon: ShoppingCart, 
+    {
+      title: 'Total Orders',
+      value: stats.totalOrders.toString(),
+      icon: ShoppingCart,
       color: 'text-blue-600',
       description: 'All time purchases'
     },
-    { 
-      title: 'Pending', 
-      value: stats.pendingOrders.toString(), 
-      icon: Package, 
+    {
+      title: 'Pending',
+      value: stats.pendingOrders.toString(),
+      icon: Package,
       color: 'text-orange-600',
       description: 'Active orders'
     },
-    { 
-      title: 'Total Spent', 
-      value: formatPrice(stats.totalSpent), 
-      icon: DollarSign, 
+    {
+      title: 'Total Spent',
+      value: formatPrice(stats.totalSpent),
+      icon: DollarSign,
       color: 'text-green-600',
       description: 'All time spending'
     },
-    { 
-      title: 'Products Bought', 
-      value: stats.favoriteProducts.toString(), 
-      icon: TrendingUp, 
+    {
+      title: 'Products Bought',
+      value: stats.favoriteProducts.toString(),
+      icon: TrendingUp,
       color: 'text-purple-600',
       description: 'Unique items purchased'
     },
@@ -184,12 +184,34 @@ const BuyerDashboard = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
-            title="Buyer Dashboard" 
+          <PageHeader
+            title="Buyer Dashboard"
             description="Track your orders and shopping activity"
           />
 
           <main className="flex-1 p-6">
+            {/* Account Suspension Warning */}
+            {user?.status === 'SUSPENDED' && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <Ban className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-red-800 dark:text-red-400 mb-1">
+                      Account Suspended
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300">
+                      Your account has been suspended. You cannot place new orders or access certain features until the suspension is lifted.
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      Please contact support for more information.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Welcome Section */}
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -251,9 +273,9 @@ const BuyerDashboard = () => {
                           <div className="text-right">
                             <div className="font-semibold text-sm">{formatPrice(order.totalAmount)}</div>
                             <div className="flex gap-1 mt-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="h-6 text-xs"
                                 onClick={() => navigate(`/orders/${order.id}`)}
                               >
@@ -261,9 +283,9 @@ const BuyerDashboard = () => {
                                 View
                               </Button>
                               {order.deliveryStatus === 'DELIVERED' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   className="h-6 text-xs"
                                   onClick={() => navigate(`/my-orders/${order.id}/review`)}
                                 >
@@ -280,7 +302,7 @@ const BuyerDashboard = () => {
                       <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground mb-4">No orders yet</p>
                       <Button onClick={() => navigate('/marketplace')}>
-                        <Sparkles className="h-4 w-4 mr-2" />
+
                         Start Shopping
                       </Button>
                     </div>
@@ -296,32 +318,32 @@ const BuyerDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 mb-6">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-16 flex-col"
                       onClick={() => navigate('/marketplace')}
                     >
-                      <Sparkles className="h-5 w-5 mb-2" />
+
                       <span>Browse Products</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-16 flex-col"
                       onClick={() => navigate('/my-orders')}
                     >
                       <ShoppingCart className="h-5 w-5 mb-2" />
                       <span>My Orders</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-16 flex-col"
                       onClick={() => navigate('/profile')}
                     >
                       <TrendingUp className="h-5 w-5 mb-2" />
                       <span>Profile</span>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-16 flex-col"
                       onClick={() => navigate('/cart')}
                     >

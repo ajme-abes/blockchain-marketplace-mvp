@@ -67,6 +67,11 @@ model Producer {
   location           String
   verificationStatus VerificationStatus @default(PENDING)
   rejectionReason    String?
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  businessLicense    String?
+  taxId              String?
+  businessDescription String?
 
   // Relations
   userId   String    @unique

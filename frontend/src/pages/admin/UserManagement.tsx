@@ -38,18 +38,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Search, 
-  UserCheck, 
-  Ban, 
-  Eye, 
-  Download, 
-  RefreshCw, 
-  UserX, 
-  UserCog, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  Search,
+  UserCheck,
+  Ban,
+  Eye,
+  Download,
+  RefreshCw,
+  UserX,
+  UserCog,
+  Mail,
+  Phone,
+  MapPin,
   Calendar,
   MoreVertical,
   Shield,
@@ -144,83 +144,83 @@ const UserManagement = () => {
 
   // Fetch users from backend
   // Update the fetchUsers function response handling
-const fetchUsers = async (page = 1, search = '') => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('authToken');
-    
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: '20'
-    });
+  const fetchUsers = async (page = 1, search = '') => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
 
-    if (search) {
-      params.append('search', search);
-    }
-    if (roleFilter !== 'all') {
-      params.append('role', roleFilter);
-    }
-    if (statusFilter !== 'all') {
-      params.append('status', statusFilter);
-    }
-    if (verificationFilter !== 'all') {
-      params.append('verification', verificationFilter);
-    }
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20'
+      });
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users?${params}`, {
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include'
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      
-      // FIX: Handle different response structures
-      if (result.status === 'success') {
-        setUsers(result.data.users || result.data || []);
-        setPagination(result.data.pagination || result.pagination || {
-          page: 1,
-          limit: 20,
-          total: result.data.users?.length || 0,
-          pages: 1
-        });
-        
-        // FIX: Handle stats in different response formats
-        const statsData = result.data.stats || result.stats || {
-          total: result.data.users?.length || 0,
-          buyers: result.data.users?.filter((u: User) => u.role === 'BUYER').length || 0,
-          producers: result.data.users?.filter((u: User) => u.role === 'PRODUCER').length || 0,
-          admins: result.data.users?.filter((u: User) => u.role === 'ADMIN').length || 0,
-          pendingVerifications: result.data.users?.filter((u: User) => 
-            u.role === 'PRODUCER' && u.producer?.verificationStatus === 'PENDING'
-          ).length || 0,
-          suspended: result.data.users?.filter((u: User) => u.status === 'SUSPENDED').length || 0
-        };
-        
-        setStats(statsData);
+      if (search) {
+        params.append('search', search);
       }
-    } else {
-      console.error('Failed to fetch users');
+      if (roleFilter !== 'all') {
+        params.append('role', roleFilter);
+      }
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      if (verificationFilter !== 'all') {
+        params.append('verification', verificationFilter);
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // FIX: Handle different response structures
+        if (result.status === 'success') {
+          setUsers(result.data.users || result.data || []);
+          setPagination(result.data.pagination || result.pagination || {
+            page: 1,
+            limit: 20,
+            total: result.data.users?.length || 0,
+            pages: 1
+          });
+
+          // FIX: Handle stats in different response formats
+          const statsData = result.data.stats || result.stats || {
+            total: result.data.users?.length || 0,
+            buyers: result.data.users?.filter((u: User) => u.role === 'BUYER').length || 0,
+            producers: result.data.users?.filter((u: User) => u.role === 'PRODUCER').length || 0,
+            admins: result.data.users?.filter((u: User) => u.role === 'ADMIN').length || 0,
+            pendingVerifications: result.data.users?.filter((u: User) =>
+              u.role === 'PRODUCER' && u.producer?.verificationStatus === 'PENDING'
+            ).length || 0,
+            suspended: result.data.users?.filter((u: User) => u.status === 'SUSPENDED').length || 0
+          };
+
+          setStats(statsData);
+        }
+      } else {
+        console.error('Failed to fetch users');
+        toast({
+          title: 'Error',
+          description: 'Failed to load users',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
       toast({
         title: 'Error',
         description: 'Failed to load users',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to load users',
-      variant: 'destructive',
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -258,7 +258,7 @@ const fetchUsers = async (page = 1, search = '') => {
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${userId}/${endpoint}`, {
         method,
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
@@ -267,16 +267,16 @@ const fetchUsers = async (page = 1, search = '') => {
       });
 
       if (response.ok) {
-        const actionText = action === 'suspend' ? 'suspended' : 
-                          action === 'activate' ? 'activated' :
-                          action === 'verify' ? 'verified' :
-                          action === 'reject' ? 'rejected' : 'deleted';
-        
+        const actionText = action === 'suspend' ? 'suspended' :
+          action === 'activate' ? 'activated' :
+            action === 'verify' ? 'verified' :
+              action === 'reject' ? 'rejected' : 'deleted';
+
         toast({
           title: `User ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}`,
           description: `User has been ${actionText} successfully.`,
         });
-        
+
         fetchUsers(pagination.page, searchQuery);
         setActionDialogOpen(false);
         setUserDetailOpen(false);
@@ -346,26 +346,26 @@ const fetchUsers = async (page = 1, search = '') => {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <PageHeader 
+          <PageHeader
             title="User Management"
             description="Manage all users, verify producers, and handle user accounts"
             action={
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => fetchUsers(1, searchQuery)}
                   disabled={loading}
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                <Button 
-  variant="outline"
-  onClick={() => navigate('/admin/verification-queue')}
->
-  <UserCheck className="h-4 w-4 mr-2" />
-  Verification Queue ({stats.pendingVerifications})
-</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/admin/verification-queue')}
+                >
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Verification Queue ({stats.pendingVerifications})
+                </Button>
               </div>
             }
           />
@@ -467,7 +467,7 @@ const fetchUsers = async (page = 1, search = '') => {
                         className="pl-9"
                       />
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2">
                       <Select value={roleFilter} onValueChange={setRoleFilter}>
                         <SelectTrigger className="w-[140px]">
@@ -603,7 +603,7 @@ const fetchUsers = async (page = 1, search = '') => {
                                   </TableCell>
                                   <TableCell>
                                     <div className="text-sm text-muted-foreground">
-                                      {user.lastLogin 
+                                      {user.lastLogin
                                         ? new Date(user.lastLogin).toLocaleDateString()
                                         : 'Never'
                                       }
@@ -611,9 +611,9 @@ const fetchUsers = async (page = 1, search = '') => {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => {
                                           setSelectedUser(user);
                                           setUserDetailOpen(true);
@@ -622,7 +622,7 @@ const fetchUsers = async (page = 1, search = '') => {
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      
+
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" size="sm">
@@ -630,40 +630,25 @@ const fetchUsers = async (page = 1, search = '') => {
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          <DropdownMenuItem 
+                                          <DropdownMenuItem
                                             onClick={() => navigate(`/admin/users/${user.id}`)}
                                           >
                                             <UserCog className="h-4 w-4 mr-2" />
                                             Manage User
                                           </DropdownMenuItem>
-                                          
-                                          {user.role === 'PRODUCER' && user.producer?.verificationStatus === 'PENDING' && (
-                                            <>
-                                              <DropdownMenuItem 
-                                                onClick={() => {
-                                                  setSelectedUser(user);
-                                                  setSelectedAction('verify');
-                                                  setActionDialogOpen(true);
-                                                }}
-                                              >
-                                                <UserCheck className="h-4 w-4 mr-2" />
-                                                Verify Producer
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem 
-                                                onClick={() => {
-                                                  setSelectedUser(user);
-                                                  setSelectedAction('reject');
-                                                  setActionDialogOpen(true);
-                                                }}
-                                              >
-                                                <XCircle className="h-4 w-4 mr-2" />
-                                                Reject Verification
-                                              </DropdownMenuItem>
-                                            </>
+
+                                          {/* Verification moved to Verification Queue page */}
+                                          {user.role === 'PRODUCER' && (
+                                            <DropdownMenuItem
+                                              onClick={() => navigate('/admin/verification-queue')}
+                                            >
+                                              <UserCheck className="h-4 w-4 mr-2" />
+                                              Go to Verification Queue
+                                            </DropdownMenuItem>
                                           )}
 
                                           {user.status === 'ACTIVE' ? (
-                                            <DropdownMenuItem 
+                                            <DropdownMenuItem
                                               onClick={() => {
                                                 setSelectedUser(user);
                                                 setSelectedAction('suspend');
@@ -675,7 +660,7 @@ const fetchUsers = async (page = 1, search = '') => {
                                               Suspend User
                                             </DropdownMenuItem>
                                           ) : (
-                                            <DropdownMenuItem 
+                                            <DropdownMenuItem
                                               onClick={() => {
                                                 setSelectedUser(user);
                                                 setSelectedAction('activate');
@@ -687,7 +672,7 @@ const fetchUsers = async (page = 1, search = '') => {
                                             </DropdownMenuItem>
                                           )}
 
-                                          <DropdownMenuItem 
+                                          <DropdownMenuItem
                                             onClick={() => {
                                               setSelectedUser(user);
                                               setSelectedAction('delete');
@@ -763,7 +748,7 @@ const fetchUsers = async (page = 1, search = '') => {
               Detailed information about the user account and activities.
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedUser && (
             <div className="space-y-6">
               {/* User Header */}
@@ -783,8 +768,8 @@ const fetchUsers = async (page = 1, search = '') => {
                     {getStatusBadge(selectedUser)}
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => navigate(`/admin/users/${selectedUser.id}`)}
                 >
@@ -802,7 +787,7 @@ const fetchUsers = async (page = 1, search = '') => {
                     <div className="font-medium">{selectedUser.email}</div>
                   </div>
                 </div>
-                
+
                 {selectedUser.phone && (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <Phone className="h-5 w-5 text-muted-foreground" />
@@ -885,23 +870,40 @@ const fetchUsers = async (page = 1, search = '') => {
                     </div>
                   </div>
 
-                  {/* Verification Action */}
+                  {/* Verification Action - Redirect to Verification Queue */}
                   {selectedUser.producer.verificationStatus === 'PENDING' && (
-                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium text-yellow-800">Pending Verification</div>
-                          <div className="text-sm text-yellow-600">This producer account needs verification</div>
+                          <div className="font-medium text-yellow-800 dark:text-yellow-400">Pending Verification</div>
+                          <div className="text-sm text-yellow-600 dark:text-yellow-300">This producer account needs verification</div>
                         </div>
                         <Button
-                          onClick={() => {
-                            setSelectedAction('verify');
-                            setActionDialogOpen(true);
-                          }}
+                          onClick={() => navigate('/admin/verification-queue')}
                           className="bg-yellow-600 hover:bg-yellow-700"
                         >
                           <UserCheck className="h-4 w-4 mr-2" />
-                          Verify Producer
+                          Go to Verification Queue
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedUser.producer.verificationStatus === 'REJECTED' && (
+                    <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-red-800 dark:text-red-400">Verification Rejected</div>
+                          <div className="text-sm text-red-600 dark:text-red-300">
+                            {selectedUser.producer.rejectionReason || 'No reason provided'}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => navigate('/admin/verification-queue')}
+                          variant="outline"
+                          className="border-red-300 text-red-700 hover:bg-red-50"
+                        >
+                          <UserCheck className="h-4 w-4 mr-2" />
+                          Review in Queue
                         </Button>
                       </div>
                     </div>
@@ -973,8 +975,8 @@ const fetchUsers = async (page = 1, search = '') => {
             </Button>
             <Button
               variant={
-                selectedAction === 'delete' || selectedAction === 'suspend' || selectedAction === 'reject' 
-                  ? 'destructive' 
+                selectedAction === 'delete' || selectedAction === 'suspend' || selectedAction === 'reject'
+                  ? 'destructive'
                   : 'default'
               }
               onClick={() => {
