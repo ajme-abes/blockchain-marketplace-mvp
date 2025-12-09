@@ -477,6 +477,7 @@ model Session {
   token        String   @unique
   refreshToken String?  @unique
   expiresAt    DateTime
+  lastActivity DateTime @default(now())
   ipAddress    String?
   userAgent    String?
   isValid      Boolean  @default(true)
@@ -489,6 +490,7 @@ model Session {
   @@index([expiresAt])
   @@index([isValid])
   @@index([createdAt])
+  @@index([lastActivity])
   @@index([userId, isValid])
   @@index([expiresAt, isValid])
   @@map("sessions")

@@ -25,7 +25,7 @@ const authenticateToken = async (req, res, next) => {
   console.log('🔧 Auth middleware - Token received:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
 
   if (!token) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'Access token required',
       code: 'MISSING_TOKEN'
     });
@@ -34,10 +34,10 @@ const authenticateToken = async (req, res, next) => {
   try {
     console.log('🔧 Verifying JWT token...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     if (!prisma) {
       console.error('❌ Prisma client not available in middleware');
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Database connection not available',
         code: 'DATABASE_UNAVAILABLE'
       });
@@ -58,7 +58,7 @@ const authenticateToken = async (req, res, next) => {
 
     if (!user) {
       console.log('❌ User not found for ID:', decoded.userId);
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'User not found',
         code: 'USER_NOT_FOUND'
       });
@@ -67,7 +67,7 @@ const authenticateToken = async (req, res, next) => {
     // 🆕 CHECK USER STATUS IMMEDIATELY
     if (user.status === 'SUSPENDED' || user.status === 'BANNED') {
       console.log(`🚫 Blocked suspended user during auth: ${user.email} (${user.status})`);
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Your account has been suspended. Please contact support.',
         code: 'ACCOUNT_SUSPENDED',
         status: user.status
@@ -76,25 +76,32 @@ const authenticateToken = async (req, res, next) => {
 
     console.log('✅ User authenticated:', { email: user.email, role: user.role, status: user.status });
     req.user = user;
+
+    // 🆕 UPDATE SESSION ACTIVITY (non-blocking)
+    const sessionService = require('../services/sessionService');
+    sessionService.updateActivity(token).catch(err => {
+      console.warn('⚠️ Failed to update session activity:', err.message);
+    });
+
     next();
   } catch (error) {
     console.error('❌ Token verification failed:', error.message);
-    
+
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Token expired',
         code: 'TOKEN_EXPIRED'
       });
     }
-    
+
     if (error.name === 'JsonWebTokenError') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Invalid token signature',
         code: 'INVALID_TOKEN_SIGNATURE'
       });
     }
-    
-    return res.status(403).json({ 
+
+    return res.status(403).json({
       error: 'Invalid token',
       code: 'INVALID_TOKEN',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -109,7 +116,7 @@ const requireRole = (roles) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: `Access denied. Required roles: ${roles.join(', ')}`,
         code: 'INSUFFICIENT_PERMISSIONS'
       });
@@ -136,7 +143,7 @@ const checkUserStatus = async (req, res, next) => {
       });
 
       if (!userWithStatus) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'User account not found',
           code: 'USER_NOT_FOUND'
         });
@@ -145,7 +152,7 @@ const checkUserStatus = async (req, res, next) => {
       // 🆕 CHECK IF USER IS SUSPENDED OR BANNED
       if (userWithStatus.status === 'SUSPENDED' || userWithStatus.status === 'BANNED') {
         console.log(`🚫 Blocked suspended user access: ${userWithStatus.email} (${userWithStatus.status})`);
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Your account has been suspended. Please contact support.',
           code: 'ACCOUNT_SUSPENDED',
           status: userWithStatus.status
@@ -178,13 +185,13 @@ const optionalAuth = async (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       if (prisma) {
         const user = await prisma.user.findUnique({
           where: { id: decoded.userId },
           select: { id: true, email: true, role: true, name: true }
         });
-        
+
         if (user) {
           req.user = user;
         }
@@ -193,14 +200,14 @@ const optionalAuth = async (req, res, next) => {
       // Silently fail for optional auth
     }
   }
-  
+
   next();
 };
 
-module.exports = { 
-  authenticateToken, 
+module.exports = {
+  authenticateToken,
   requireRole,
-  checkUserStatus, 
+  checkUserStatus,
   optionalAuth,
-  requireVerifiedEmail: require('./requireVerifiedEmail').requireVerifiedEmail 
+  requireVerifiedEmail: require('./requireVerifiedEmail').requireVerifiedEmail
 };

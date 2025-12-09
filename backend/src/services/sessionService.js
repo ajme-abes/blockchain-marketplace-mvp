@@ -282,6 +282,85 @@ class SessionService {
             throw new Error('INVALID_TOKEN');
         }
     }
+
+    /**
+     * Update session activity timestamp
+     */
+    async updateActivity(token) {
+        try {
+            await prisma.session.updateMany({
+                where: {
+                    token,
+                    isValid: true
+                },
+                data: {
+                    lastActivity: new Date()
+                }
+            });
+        } catch (error) {
+            console.error('❌ Failed to update activity:', error);
+            // Don't throw - activity tracking shouldn't break requests
+        }
+    }
+
+    /**
+     * Check if session is inactive (no activity for specified duration)
+     * @param {number} inactivityMinutes - Minutes of inactivity before expiring
+     */
+    async invalidateInactiveSessions(inactivityMinutes = 30) {
+        try {
+            const inactivityThreshold = new Date(Date.now() - inactivityMinutes * 60 * 1000);
+
+            const result = await prisma.session.updateMany({
+                where: {
+                    isValid: true,
+                    lastActivity: {
+                        lt: inactivityThreshold
+                    }
+                },
+                data: {
+                    isValid: false
+                }
+            });
+
+            if (result.count > 0) {
+                console.log(`✅ Invalidated ${result.count} inactive sessions (>${inactivityMinutes}min)`);
+            }
+
+            return { success: true, count: result.count };
+        } catch (error) {
+            console.error('❌ Failed to invalidate inactive sessions:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Check if a specific session is inactive
+     */
+    async isSessionInactive(token, inactivityMinutes = 30) {
+        try {
+            const inactivityThreshold = new Date(Date.now() - inactivityMinutes * 60 * 1000);
+
+            const session = await prisma.session.findFirst({
+                where: {
+                    token,
+                    isValid: true
+                },
+                select: {
+                    lastActivity: true
+                }
+            });
+
+            if (!session) {
+                return true; // Session doesn't exist or invalid
+            }
+
+            return session.lastActivity < inactivityThreshold;
+        } catch (error) {
+            console.error('❌ Failed to check session inactivity:', error);
+            return false;
+        }
+    }
 }
 
 module.exports = new SessionService();
