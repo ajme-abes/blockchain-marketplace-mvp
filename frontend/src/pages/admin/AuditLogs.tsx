@@ -150,8 +150,6 @@ const AuditLogs = () => {
         params.append('dateTo', filters.dateTo);
       }
 
-      // For now, we'll use mock data since the audit logs endpoint might not be ready
-      // Replace this URL with your actual audit logs endpoint when available
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/audit-logs?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -160,100 +158,52 @@ const AuditLogs = () => {
         credentials: 'include'
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.status === 'success') {
-          setLogs(result.data.logs || generateMockAuditLogs());
-          setPagination(result.data.pagination || {
-            page: 1,
-            limit: 20,
-            total: result.data.logs?.length || 0,
-            pages: 1
-          });
-          setAvailableFilters(result.data.filters || {
-            actions: ['USER_LOGIN', 'USER_LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'USER_DELETED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CANCELLED', 'PAYMENT_PROCESSED'],
-            entities: ['USER', 'PRODUCT', 'ORDER', 'PAYMENT', 'SYSTEM'],
-            users: ['Admin User', 'System']
-          });
-        }
-      } else {
-        // Fallback to mock data if endpoint not available
-        console.log('Using mock audit logs data');
-        setLogs(generateMockAuditLogs());
-        setPagination({
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLogs(result.data.logs || []);
+        setPagination(result.data.pagination || {
           page: 1,
           limit: 20,
-          total: 50,
-          pages: 3
+          total: 0,
+          pages: 0
         });
-        setAvailableFilters({
-          actions: ['USER_LOGIN', 'USER_LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'USER_DELETED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CANCELLED', 'PAYMENT_PROCESSED'],
-          entities: ['USER', 'PRODUCT', 'ORDER', 'PAYMENT', 'SYSTEM'],
-          users: ['Admin User', 'System']
+        setAvailableFilters(result.data.filters || {
+          actions: [],
+          entities: [],
+          users: []
         });
+      } else {
+        throw new Error(result.message || 'Failed to fetch audit logs');
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      // Fallback to mock data
-      setLogs(generateMockAuditLogs());
+      setLogs([]);
       setPagination({
         page: 1,
         limit: 20,
-        total: 50,
-        pages: 3
+        total: 0,
+        pages: 0
+      });
+      setAvailableFilters({
+        actions: [],
+        entities: [],
+        users: []
       });
       toast({
-        title: 'Info',
-        description: 'Using demo audit logs data. Connect to backend for real data.',
-        variant: 'default',
+        title: 'Error',
+        description: error.message || 'Failed to fetch audit logs. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Generate mock audit logs for demonstration
-  const generateMockAuditLogs = (): AuditLog[] => {
-    const actions = [
-      'USER_LOGIN', 'USER_LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'USER_DELETED',
-      'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED',
-      'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CANCELLED',
-      'PAYMENT_PROCESSED', 'PAYMENT_REFUNDED', 'SETTINGS_UPDATED'
-    ];
 
-    const entities = ['USER', 'PRODUCT', 'ORDER', 'PAYMENT', 'SYSTEM'];
-    const users = [
-      { id: '1', name: 'Admin User', email: 'admin@marketplace.com', role: 'ADMIN' },
-      { id: '2', name: 'System', email: 'system@marketplace.com', role: 'SYSTEM' },
-      { id: '3', name: 'Producer User', email: 'producer@example.com', role: 'PRODUCER' }
-    ];
-
-    const logs: AuditLog[] = [];
-    const now = new Date();
-
-    for (let i = 0; i < 50; i++) {
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      const randomEntity = entities[Math.floor(Math.random() * entities.length)];
-      const randomUser = users[Math.floor(Math.random() * users.length)];
-
-      logs.push({
-        id: `log-${i + 1}`,
-        action: randomAction,
-        entity: randomEntity,
-        entityId: `entity-${Math.floor(Math.random() * 1000)}`,
-        userId: randomUser.id,
-        user: randomUser,
-        ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        timestamp: new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        oldValues: Math.random() > 0.7 ? { status: 'old-value' } : undefined,
-        newValues: Math.random() > 0.7 ? { status: 'new-value' } : undefined
-      });
-    }
-
-    // Sort by timestamp descending
-    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  };
 
   useEffect(() => {
     fetchAuditLogs();
@@ -278,15 +228,35 @@ const AuditLogs = () => {
       'USER_CREATED': 'User Created',
       'USER_UPDATED': 'User Updated',
       'USER_DELETED': 'User Deleted',
+      'USER_SUSPENDED': 'User Suspended',
+      'USER_ACTIVATED': 'User Activated',
+      'LOGIN_SUCCESS': 'Login Success',
+      'LOGIN_FAILED': 'Login Failed',
+      'ACCOUNT_UNLOCKED': 'Account Unlocked',
+      'PRODUCER_VERIFIED': 'Producer Verified',
+      'PRODUCER_REJECTED': 'Producer Rejected',
+      'UPDATE_PRODUCER_PROFILE': 'Producer Profile Updated',
       'PRODUCT_CREATED': 'Product Created',
       'PRODUCT_UPDATED': 'Product Updated',
       'PRODUCT_DELETED': 'Product Deleted',
+      'PRODUCT_ACTIVE': 'Product Activated',
+      'PRODUCT_INACTIVE': 'Product Deactivated',
+      'BULK_PRODUCT_ACTIVATE': 'Bulk Product Activation',
+      'BULK_PRODUCT_DEACTIVATE': 'Bulk Product Deactivation',
       'ORDER_CREATED': 'Order Created',
-      'ORDER_UPDATED': 'Order Updated',
-      'ORDER_CANCELLED': 'Order Cancelled',
+      'UPDATE_ORDER_STATUS': 'Order Status Updated',
+      'ADMIN_ORDER_STATUS_UPDATE': 'Admin Order Status Update',
+      'ADMIN_ORDER_CANCELLATION': 'Admin Order Cancellation',
+      'BULK_ORDER_CANCEL': 'Bulk Order Cancellation',
       'PAYMENT_PROCESSED': 'Payment Processed',
-      'PAYMENT_REFUNDED': 'Payment Refunded',
-      'SETTINGS_UPDATED': 'Settings Updated'
+      'WEBHOOK_PROCESSED': 'Webhook Processed',
+      'SCHEDULE_PAYOUT': 'Payout Scheduled',
+      'ADD_BANK_ACCOUNT': 'Bank Account Added',
+      'UPDATE_BANK_ACCOUNT': 'Bank Account Updated',
+      'DELETE_BANK_ACCOUNT': 'Bank Account Deleted',
+      'VERIFY_BANK_ACCOUNT': 'Bank Account Verified',
+      'REJECT_BANK_ACCOUNT': 'Bank Account Rejected',
+      'ADMIN_CREATED': 'Admin Created'
     };
 
     return actionMap[action] || action.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());

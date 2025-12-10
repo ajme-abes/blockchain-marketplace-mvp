@@ -1,10 +1,181 @@
 const express = require('express');
 const { authenticateToken, requireRole, checkUserStatus } = require('../middleware/auth');
 const adminService = require('../services/adminService');
+const { prisma } = require('../config/database');
 const router = express.Router();
 
 // All admin routes require ADMIN role
 router.use(authenticateToken, checkUserStatus, requireRole(['ADMIN']));
+
+// ==================== AUDIT LOGS ====================
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      action,
+      entity,
+      userId,
+      search,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where = {};
+
+    if (action && action !== 'all') {
+      where.action = action;
+    }
+
+    if (entity && entity !== 'all') {
+      where.entity = entity;
+    }
+
+    if (userId && userId !== 'all') {
+      where.userId = userId;
+    }
+
+    if (search) {
+      where.OR = [
+        { action: { contains: search, mode: 'insensitive' } },
+        { entity: { contains: search, mode: 'insensitive' } },
+        { entityId: { contains: search, mode: 'insensitive' } },
+        { ipAddress: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    if (dateFrom || dateTo) {
+      where.timestamp = {};
+      if (dateFrom) where.timestamp.gte = new Date(dateFrom);
+      if (dateTo) where.timestamp.lte = new Date(dateTo);
+    }
+
+    console.log('🔍 Fetching audit logs with filters:', where);
+
+    // Fetch logs with user info
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.auditLog.count({ where })
+    ]);
+
+    console.log(`✅ Found ${logs.length} audit logs (total: ${total})`);
+
+    // Get unique actions, entities, and users for filters
+    const [actions, entities, users] = await Promise.all([
+      prisma.auditLog.findMany({
+        select: { action: true },
+        distinct: ['action'],
+        orderBy: { action: 'asc' }
+      }),
+      prisma.auditLog.findMany({
+        select: { entity: true },
+        distinct: ['entity'],
+        orderBy: { entity: 'asc' }
+      }),
+      prisma.user.findMany({
+        where: {
+          auditLogs: {
+            some: {}
+          }
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        },
+        take: 50
+      })
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        logs,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        },
+        filters: {
+          actions: actions.map(a => a.action),
+          entities: entities.map(e => e.entity),
+          users: users.map(u => u.name)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get audit logs error:', error);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get audit logs',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Get audit log detail
+router.get('/audit-logs/:logId', async (req, res) => {
+  try {
+    const { logId } = req.params;
+
+    const log = await prisma.auditLog.findUnique({
+      where: { id: logId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+
+    if (!log) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Audit log not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: { log }
+    });
+
+  } catch (error) {
+    console.error('Get audit log detail error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get audit log details'
+    });
+  }
+});
 
 // ==================== DASHBOARD STATISTICS ====================
 router.get('/dashboard/stats', async (req, res) => {
