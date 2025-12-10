@@ -2804,6 +2804,45 @@ class AdminService {
       };
     }
   }
+  // ==================== AUDIT LOGGING ====================
+
+  /**
+   * Log an audit action
+   * @param {string} userId - ID of the user performing the action
+   * @param {string} action - Action being performed
+   * @param {string} entity - Entity type (e.g., 'SYSTEM', 'USER', 'PRODUCT')
+   * @param {string} entityId - ID of the entity being acted upon
+   * @param {object} oldValues - Previous values (for updates)
+   * @param {object} newValues - New values (for updates)
+   * @param {string} ipAddress - IP address of the user
+   * @param {string} userAgent - User agent string
+   */
+  async logAuditAction(userId, action, entity, entityId, oldValues = null, newValues = null, ipAddress = null, userAgent = null) {
+    try {
+      console.log('📝 Creating audit log:', { userId, action, entity, entityId });
+
+      const auditLog = await prisma.auditLog.create({
+        data: {
+          action,
+          entity,
+          entityId,
+          oldValues: oldValues ? JSON.stringify(oldValues) : null,
+          newValues: newValues ? JSON.stringify(newValues) : null,
+          userId,
+          ipAddress,
+          userAgent,
+          timestamp: new Date()
+        }
+      });
+
+      console.log('✅ Audit log created:', auditLog.id);
+      return auditLog;
+    } catch (error) {
+      console.error('❌ Failed to create audit log:', error);
+      // Don't throw error - audit logging should not break the main operation
+      return null;
+    }
+  }
 }
 
 module.exports = new AdminService();

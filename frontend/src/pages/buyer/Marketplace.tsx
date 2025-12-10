@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ShieldCheck, Star, Filter, Search, X, Loader2, ShoppingCart, Eye, Zap } from 'lucide-react';
-import { categories, regions } from '@/lib/mockData';
+import { categories, regions } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';

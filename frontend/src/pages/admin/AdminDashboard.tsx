@@ -104,8 +104,8 @@ const AdminDashboard = () => {
           setOverview(result.data);
         } else {
           console.error('❌ Backend error:', result.message);
-          // Fallback to mock data only if backend fails
-          setOverview(getFallbackData());
+          // Don't use fallback data - show error state instead
+          setOverview(null);
         }
       } else {
         // Handle different error cases
@@ -116,52 +116,20 @@ const AdminDashboard = () => {
         } else {
           console.error('❌ Server error:', response.status);
         }
-        setOverview(getFallbackData());
+        // Don't use fallback data - show error state instead
+        setOverview(null);
       }
     } catch (error) {
       console.error('🚨 Network error fetching admin data:', error);
-      setOverview(getFallbackData());
+      // Don't use fallback data - show error state instead
+      setOverview(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Fallback data function (only used when backend fails)
-  const getFallbackData = () => {
-    console.warn('⚠️ Using fallback data - Backend connection failed');
-    return {
-      totalUsers: 0,
-      verifiedProducers: 0,
-      activeProducts: 0,
-      ordersToday: 0,
-      openDisputes: 0,
-      pendingPayments: 0,
-      systemAlerts: 1,
-      totalRevenue: 0,
-      userGrowth: 0,
-      revenueGrowth: 0,
-      recentActivity: [
-        {
-          id: 'fallback-1',
-          action: 'Backend Connection Required',
-          user: 'System',
-          entityId: 'connection',
-          timestamp: new Date().toISOString(),
-          type: 'USER_REGISTERED'
-        }
-      ],
-      systemAlertsList: [
-        {
-          id: 'connection-alert',
-          title: 'Backend Connection Required',
-          description: 'Connect to backend to see real data',
-          severity: 'HIGH',
-          timestamp: new Date().toISOString()
-        }
-      ]
-    };
-  };
+
 
   useEffect(() => {
     fetchAdminOverview();
@@ -197,7 +165,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // KPI data from real backend or fallback to mock
+  // KPI data from real backend
   const kpis = overview ? [
     {
       title: 'Total Users',
@@ -319,6 +287,68 @@ const AdminDashboard = () => {
                 <p className="text-muted-foreground">Loading admin dashboard...</p>
                 <p className="text-sm text-muted-foreground mt-2">Fetching real-time platform data</p>
               </div>
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // Show error state when data fails to load
+  if (!overview) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col">
+            <PageHeader
+              title="Admin Dashboard"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Retry
+                </Button>
+              }
+            />
+            <main className="flex-1 p-6 flex items-center justify-center">
+              <Card className="max-w-md w-full border-destructive">
+                <CardContent className="p-8 text-center">
+                  <AlertCircle className="h-16 w-16 mx-auto mb-4 text-destructive" />
+                  <h3 className="text-xl font-semibold mb-2 text-destructive">Dashboard Data Unavailable</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Unable to load admin dashboard data. This could be due to:
+                  </p>
+                  <ul className="text-sm text-muted-foreground text-left mb-6 space-y-1">
+                    <li>• Backend server connection issues</li>
+                    <li>• Authentication token expired</li>
+                    <li>• Insufficient admin permissions</li>
+                    <li>• Database connectivity problems</li>
+                  </ul>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                      className="w-full"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                      {refreshing ? 'Retrying...' : 'Try Again'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate('/admin/settings')}
+                      className="w-full"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Check System Settings
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </main>
           </div>
         </div>

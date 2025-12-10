@@ -6,7 +6,7 @@
  * Falls back to localhost for development
  */
 export const getApiUrl = (): string => {
-    return import.meta.env.VITE_API_URL || '${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}';
+    return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 };
 
 /**
@@ -14,7 +14,7 @@ export const getApiUrl = (): string => {
  * Used for direct fetch calls
  */
 export const getBackendUrl = (): string => {
-    const apiUrl = import.meta.env.VITE_API_URL || '${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     // Remove /api suffix if present
     return apiUrl.replace(/\/api$/, '');
 };

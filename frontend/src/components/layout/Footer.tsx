@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Globe, Facebook, Instagram, Twitter, Send, Heart, Shield,  Moon, Sun } from 'lucide-react';
+import { Globe, Facebook, Instagram, Twitter, Send, Heart, Shield, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -106,7 +106,7 @@ export const Footer = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-lg font-bold text-amber-600 dark:text-amber-400">+251 911 234 567</div>
+              <div className="text-lg font-bold text-amber-600 dark:text-amber-400">+251910816201</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">24/7 Customer Support</div>
             </div>
           </div>

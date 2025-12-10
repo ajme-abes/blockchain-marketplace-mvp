@@ -118,8 +118,9 @@ const SystemMonitor = () => {
           setAlerts(systemAlerts);
         }
 
-        // Generate mock performance metrics (in real app, this would come from your backend)
-        setMetrics(generateMockMetrics());
+        // Fetch real performance metrics
+        const performanceMetrics = await fetchPerformanceMetrics();
+        setMetrics(performanceMetrics);
 
         setLastUpdate(new Date());
       } else {
@@ -191,16 +192,31 @@ const SystemMonitor = () => {
     return alerts;
   };
 
-  // Generate mock performance metrics (replace with real API calls)
-  const generateMockMetrics = (): PerformanceMetrics => {
-    return {
-      cpuUsage: Math.random() * 30 + 10, // 10-40%
-      memoryUsage: Math.random() * 40 + 30, // 30-70%
-      diskUsage: Math.random() * 20 + 60, // 60-80%
-      activeConnections: Math.floor(Math.random() * 50) + 10, // 10-60
-      responseTime: Math.random() * 50 + 50, // 50-100ms
-      requestCount: Math.floor(Math.random() * 1000) + 500 // 500-1500
-    };
+  // Fetch performance metrics from backend (real implementation needed)
+  const fetchPerformanceMetrics = async (): Promise<PerformanceMetrics | null> => {
+    try {
+      const token = localStorage.getItem('authToken');
+
+      // TODO: Implement real performance metrics endpoint
+      // const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/system/metrics`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json'
+      //   },
+      //   credentials: 'include'
+      // });
+
+      // if (response.ok) {
+      //   const result = await response.json();
+      //   return result.data;
+      // }
+
+      // For now, return null to indicate metrics are not available
+      return null;
+    } catch (error) {
+      console.error('Error fetching performance metrics:', error);
+      return null;
+    }
   };
 
   // Handle alert resolution
@@ -554,20 +570,20 @@ const SystemMonitor = () => {
                             <div
                               key={alert.id}
                               className={`p-4 border rounded-lg ${alert.resolved
-                                  ? 'bg-gray-50 border-gray-200'
-                                  : alert.severity === 'CRITICAL'
-                                    ? 'bg-red-50 border-red-200'
-                                    : alert.severity === 'HIGH'
-                                      ? 'bg-orange-50 border-orange-200'
-                                      : 'bg-blue-50 border-blue-200'
+                                ? 'bg-gray-50 border-gray-200'
+                                : alert.severity === 'CRITICAL'
+                                  ? 'bg-red-50 border-red-200'
+                                  : alert.severity === 'HIGH'
+                                    ? 'bg-orange-50 border-orange-200'
+                                    : 'bg-blue-50 border-blue-200'
                                 }`}
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
                                     <h4 className={`font-semibold ${alert.resolved ? 'text-gray-600' :
-                                        alert.severity === 'CRITICAL' ? 'text-red-800' :
-                                          alert.severity === 'HIGH' ? 'text-orange-800' : 'text-blue-800'
+                                      alert.severity === 'CRITICAL' ? 'text-red-800' :
+                                        alert.severity === 'HIGH' ? 'text-orange-800' : 'text-blue-800'
                                       }`}>
                                       {alert.title}
                                     </h4>
@@ -579,8 +595,8 @@ const SystemMonitor = () => {
                                     )}
                                   </div>
                                   <p className={`text-sm ${alert.resolved ? 'text-gray-600' :
-                                      alert.severity === 'CRITICAL' ? 'text-red-700' :
-                                        alert.severity === 'HIGH' ? 'text-orange-700' : 'text-blue-700'
+                                    alert.severity === 'CRITICAL' ? 'text-red-700' :
+                                      alert.severity === 'HIGH' ? 'text-orange-700' : 'text-blue-700'
                                     }`}>
                                     {alert.description}
                                   </p>
@@ -600,7 +616,7 @@ const SystemMonitor = () => {
                                 </div>
                                 {!alert.resolved && (
                                   <AlertCircle className={`h-5 w-5 ${alert.severity === 'CRITICAL' ? 'text-red-600' :
-                                      alert.severity === 'HIGH' ? 'text-orange-600' : 'text-blue-600'
+                                    alert.severity === 'HIGH' ? 'text-orange-600' : 'text-blue-600'
                                     }`} />
                                 )}
                               </div>
@@ -632,7 +648,11 @@ const SystemMonitor = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {metrics ? (
+                        {loading ? (
+                          <div className="flex justify-center items-center h-48">
+                            <RefreshCw className="h-8 w-8 animate-spin" />
+                          </div>
+                        ) : metrics ? (
                           <div className="space-y-6">
                             {/* CPU Usage */}
                             <div>
@@ -680,8 +700,22 @@ const SystemMonitor = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center h-48 text-muted-foreground">
-                            No performance data available
+                          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                            <Activity className="h-12 w-12 mb-4 opacity-50" />
+                            <div className="text-lg font-medium">Performance Monitoring Unavailable</div>
+                            <div className="text-sm text-center max-w-md">
+                              Real-time performance metrics are not currently available.
+                              This feature requires additional backend monitoring infrastructure.
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={fetchSystemMonitor}
+                              className="mt-4"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Check Again
+                            </Button>
                           </div>
                         )}
                       </CardContent>
@@ -698,7 +732,11 @@ const SystemMonitor = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {metrics ? (
+                        {loading ? (
+                          <div className="flex justify-center items-center h-48">
+                            <RefreshCw className="h-8 w-8 animate-spin" />
+                          </div>
+                        ) : metrics ? (
                           <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                               <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -743,8 +781,13 @@ const SystemMonitor = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center h-48 text-muted-foreground">
-                            No network data available
+                          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                            <Network className="h-12 w-12 mb-4 opacity-50" />
+                            <div className="text-lg font-medium">Network Monitoring Unavailable</div>
+                            <div className="text-sm text-center max-w-md">
+                              Network performance metrics are not currently available.
+                              This feature requires additional monitoring infrastructure.
+                            </div>
                           </div>
                         )}
                       </CardContent>
@@ -766,7 +809,7 @@ const SystemMonitor = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {/* Mock event logs - replace with real data from your backend */}
+                        {/* Static event logs - replace with real data from your backend */}
                         <div className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center gap-3">
                             <CheckCircle className="h-4 w-4 text-green-600" />

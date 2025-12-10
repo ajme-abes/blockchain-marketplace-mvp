@@ -205,35 +205,24 @@ const SystemSettings = () => {
           });
         }
       } else {
-        // Fallback to mock data if API fails
-        console.log('Using mock system data');
-        setSystemStatus({
-          databaseSize: '2.4 GB',
-          totalUsers: 0,
-          totalProducts: 0,
-          totalOrders: 0,
-          systemLoad: 34,
-          lastBackup: 'Never',
-          uptime: 'Unknown'
+        // Show error state instead of fake data
+        console.error('Failed to fetch system data from backend');
+        setSystemStatus(null);
+        toast({
+          title: 'Failed to Load System Data',
+          description: 'Unable to fetch system status from backend. Please check your connection and try again.',
+          variant: 'destructive',
         });
       }
 
     } catch (error) {
       console.error('Error fetching system data:', error);
-      // Fallback to mock data
-      setSystemStatus({
-        databaseSize: '2.4 GB',
-        totalUsers: 0,
-        totalProducts: 0,
-        totalOrders: 0,
-        systemLoad: 34,
-        lastBackup: 'Never',
-        uptime: 'Unknown'
-      });
+      // Show error state instead of fake data
+      setSystemStatus(null);
       toast({
-        title: 'Info',
-        description: 'Using demo system data. Connect to backend for real data.',
-        variant: 'default',
+        title: 'Error Loading System Data',
+        description: error.message || 'Failed to connect to backend. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -261,18 +250,42 @@ const SystemSettings = () => {
       setSaving(true);
       const token = localStorage.getItem('authToken');
 
-      // Simulate API call to save settings
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('💾 Saving system settings:', settings);
 
-      toast({
-        title: 'Settings Saved',
-        description: 'System settings have been updated successfully.',
+      // Make real API call to save settings
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/settings`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(settings)
       });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Settings saved successfully:', result);
+
+        toast({
+          title: 'Settings Saved',
+          description: 'System settings have been updated successfully.',
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to save settings:', errorData);
+
+        toast({
+          title: 'Error',
+          description: errorData.message || 'Failed to save settings',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('🚨 Network error saving settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save settings',
+        description: 'Network error: Failed to save settings',
         variant: 'destructive',
       });
     } finally {
@@ -335,25 +348,50 @@ const SystemSettings = () => {
   const performBackup = async () => {
     try {
       setLoading(true);
-      // Simulate backup process
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      const token = localStorage.getItem('authToken');
 
-      setBackupDialog(false);
-      toast({
-        title: 'Backup Completed',
-        description: 'System backup has been created successfully.',
+      console.log('💾 Creating system backup...');
+
+      // Make real API call to create backup
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/settings/backup`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
-      // Update last backup time
-      setSystemStatus(prev => prev ? {
-        ...prev,
-        lastBackup: new Date().toLocaleString()
-      } : null);
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Backup created successfully:', result);
+
+        setBackupDialog(false);
+        toast({
+          title: 'Backup Completed',
+          description: `System backup created successfully. Size: ${result.data?.size || 'Unknown'}`,
+        });
+
+        // Update last backup time
+        setSystemStatus(prev => prev ? {
+          ...prev,
+          lastBackup: new Date().toLocaleString()
+        } : null);
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to create backup:', errorData);
+
+        toast({
+          title: 'Backup Failed',
+          description: errorData.message || 'Failed to create system backup.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
-      console.error('Error performing backup:', error);
+      console.error('🚨 Network error creating backup:', error);
       toast({
         title: 'Backup Failed',
-        description: 'Failed to create system backup.',
+        description: 'Network error: Failed to create system backup.',
         variant: 'destructive',
       });
     } finally {
@@ -365,19 +403,44 @@ const SystemSettings = () => {
   const clearCache = async () => {
     try {
       setLoading(true);
-      // Simulate cache clearing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const token = localStorage.getItem('authToken');
 
-      setCacheDialog(false);
-      toast({
-        title: 'Cache Cleared',
-        description: 'System cache has been cleared successfully.',
+      console.log('🗑️ Clearing system cache...');
+
+      // Make real API call to clear cache
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/settings/cache/clear`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Cache cleared successfully:', result);
+
+        setCacheDialog(false);
+        toast({
+          title: 'Cache Cleared',
+          description: `System cache cleared successfully. Size: ${result.data?.cacheSize || 'Unknown'}`,
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to clear cache:', errorData);
+
+        toast({
+          title: 'Cache Clear Failed',
+          description: errorData.message || 'Failed to clear system cache.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      console.error('🚨 Network error clearing cache:', error);
       toast({
         title: 'Cache Clear Failed',
-        description: 'Failed to clear system cache.',
+        description: 'Network error: Failed to clear system cache.',
         variant: 'destructive',
       });
     } finally {
@@ -426,7 +489,7 @@ const SystemSettings = () => {
           <main className="flex-1 p-6">
             <div className="space-y-6">
               {/* System Status Overview */}
-              {systemStatus && (
+              {systemStatus ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="p-4">
@@ -485,6 +548,31 @@ const SystemSettings = () => {
                     </CardContent>
                   </Card>
                 </div>
+              ) : !loading && (
+                <Card className="border-destructive">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center space-x-4">
+                      <div className="p-3 bg-destructive/10 rounded-full">
+                        <XCircle className="h-8 w-8 text-destructive" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-lg font-semibold text-destructive">System Data Unavailable</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Unable to load system status. Please check your connection and try refreshing.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={fetchSystemData}
+                          className="mt-3"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Settings Tabs */}

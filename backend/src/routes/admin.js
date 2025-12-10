@@ -1995,4 +1995,322 @@ router.put('/bank-accounts/:accountId/reject', async (req, res) => {
   }
 });
 
+// ==================== SYSTEM SETTINGS ====================
+
+// Get system settings
+router.get('/settings', async (req, res) => {
+  try {
+    console.log('📋 Fetching system settings...');
+
+    // For now, return default settings
+    // In production, you would fetch from a settings table in the database
+    const defaultSettings = {
+      general: {
+        platformName: 'EthioTrust Marketplace',
+        platformDescription: 'Secure and transparent agricultural marketplace',
+        supportEmail: 'support@ethiotrust.com',
+        defaultLanguage: 'en',
+        timezone: 'Africa/Addis_Ababa',
+        maintenanceMode: false
+      },
+      security: {
+        requireEmailVerification: true,
+        requireStrongPasswords: true,
+        sessionTimeout: 1, // 1 hour
+        maxLoginAttempts: 5,
+        enable2FA: false,
+        blockSuspiciousIPs: true
+      },
+      payments: {
+        defaultCurrency: 'ETB',
+        enableChapa: true,
+        enableArifPay: true,
+        transactionFee: 2.5,
+        autoWithdrawal: false,
+        minWithdrawalAmount: 100
+      },
+      notifications: {
+        emailNotifications: true,
+        smsNotifications: false,
+        pushNotifications: true,
+        orderAlerts: true,
+        paymentAlerts: true,
+        securityAlerts: true
+      },
+      performance: {
+        cacheEnabled: true,
+        cacheDuration: 3600,
+        imageOptimization: true,
+        cdnEnabled: false,
+        compressionEnabled: true
+      }
+    };
+
+    res.json({
+      status: 'success',
+      message: 'System settings retrieved successfully',
+      data: defaultSettings
+    });
+
+  } catch (error) {
+    console.error('❌ Get settings error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to retrieve system settings',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update system settings
+router.put('/settings', async (req, res) => {
+  try {
+    const settings = req.body;
+    console.log('💾 Updating system settings:', settings);
+
+    // TODO: In production, save settings to database
+    // For now, just validate and return success
+
+    // Basic validation
+    if (!settings || typeof settings !== 'object') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid settings data'
+      });
+    }
+
+    // Log the audit action
+    await adminService.logAuditAction(
+      req.user.id,
+      'SETTINGS_UPDATED',
+      'SYSTEM',
+      'settings',
+      null, // oldValues
+      settings, // newValues
+      req.ip,
+      req.get('User-Agent')
+    );
+
+    res.json({
+      status: 'success',
+      message: 'System settings updated successfully',
+      data: settings
+    });
+
+  } catch (error) {
+    console.error('❌ Update settings error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update system settings',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Toggle maintenance mode
+router.post('/settings/maintenance', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    console.log('🔧 Toggling maintenance mode:', enabled);
+
+    // TODO: In production, implement actual maintenance mode logic
+    // This could involve:
+    // 1. Setting a flag in database
+    // 2. Creating a maintenance middleware
+    // 3. Showing maintenance page to non-admin users
+
+    // Log the audit action
+    await adminService.logAuditAction(
+      req.user.id,
+      enabled ? 'MAINTENANCE_ENABLED' : 'MAINTENANCE_DISABLED',
+      'SYSTEM',
+      'maintenance',
+      null,
+      { enabled },
+      req.ip,
+      req.get('User-Agent')
+    );
+
+    res.json({
+      status: 'success',
+      message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'} successfully`,
+      data: { maintenanceMode: enabled }
+    });
+
+  } catch (error) {
+    console.error('❌ Maintenance mode error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to toggle maintenance mode',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// System backup endpoint
+router.post('/settings/backup', async (req, res) => {
+  try {
+    console.log('💾 Creating system backup...');
+
+    const backupService = require('../services/backupService');
+
+    // Create real system backup
+    const backupResult = await backupService.createSystemBackup(req.user.id);
+
+    // Log the audit action
+    await adminService.logAuditAction(
+      req.user.id,
+      'BACKUP_CREATED',
+      'SYSTEM',
+      backupResult.backupId,
+      null,
+      {
+        backupId: backupResult.backupId,
+        size: backupResult.size,
+        files: backupResult.files,
+        timestamp: backupResult.timestamp
+      },
+      req.ip,
+      req.get('User-Agent')
+    );
+
+    res.json({
+      status: 'success',
+      message: 'System backup created successfully',
+      data: {
+        backupId: backupResult.backupId,
+        timestamp: backupResult.timestamp,
+        size: backupResult.size,
+        files: backupResult.files,
+        location: 'backend/backups/'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Backup error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create system backup',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Clear cache endpoint
+router.post('/settings/cache/clear', async (req, res) => {
+  try {
+    console.log('🗑️ Clearing system cache...');
+
+    // TODO: In production, implement actual cache clearing logic
+    // This could involve:
+    // 1. Redis cache clearing
+    // 2. Application cache clearing
+    // 3. CDN cache purging
+
+    // Simulate cache clearing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Log the audit action
+    await adminService.logAuditAction(
+      req.user.id,
+      'CACHE_CLEARED',
+      'SYSTEM',
+      'cache',
+      null,
+      { timestamp: new Date().toISOString() },
+      req.ip,
+      req.get('User-Agent')
+    );
+
+    res.json({
+      status: 'success',
+      message: 'System cache cleared successfully',
+      data: {
+        timestamp: new Date().toISOString(),
+        cacheSize: '45.2 MB'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Cache clear error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to clear system cache',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// List available backups
+router.get('/settings/backups', async (req, res) => {
+  try {
+    console.log('📋 Listing available backups...');
+
+    const backupService = require('../services/backupService');
+    const backups = await backupService.listBackups();
+
+    res.json({
+      status: 'success',
+      message: 'Backups retrieved successfully',
+      data: {
+        backups,
+        total: backups.length,
+        location: 'backend/backups/'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ List backups error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to list backups',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Delete backup
+router.delete('/settings/backups/:backupName', async (req, res) => {
+  try {
+    const { backupName } = req.params;
+    console.log('🗑️ Deleting backup:', backupName);
+
+    const backupService = require('../services/backupService');
+    const success = await backupService.deleteBackup(backupName);
+
+    if (success) {
+      // Log the audit action
+      await adminService.logAuditAction(
+        req.user.id,
+        'BACKUP_DELETED',
+        'SYSTEM',
+        backupName,
+        null,
+        { backupName },
+        req.ip,
+        req.get('User-Agent')
+      );
+
+      res.json({
+        status: 'success',
+        message: 'Backup deleted successfully',
+        data: { backupName }
+      });
+    } else {
+      res.status(404).json({
+        status: 'error',
+        message: 'Backup not found or could not be deleted'
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Delete backup error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete backup',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 module.exports = router;

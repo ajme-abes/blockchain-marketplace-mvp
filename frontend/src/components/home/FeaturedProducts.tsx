@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { ShieldCheck, Star, ShoppingCart, Eye, Loader2, AlertCircle, TrendingUp, Package } from 'lucide-react';
-import { categories } from '@/lib/mockData';
+import { categories } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import api from '@/services/api';
 
@@ -97,7 +97,7 @@ export const FeaturedProducts = () => {
       <div className="absolute inset-0 bg-gradient-subtle opacity-50" />
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      
+
       <div className="container mx-auto px-4 relative z-10">
         {/* Header */}
         <div className="text-center mb-16 animate-fade-in">

@@ -74,7 +74,7 @@ const BuyerDashboard = () => {
         .filter(order => order.paymentStatus === 'CONFIRMED')
         .reduce((sum, order) => sum + order.totalAmount, 0);
 
-      // Mock favorite products count (you can replace with real data)
+      // Calculate favorite products count from order history
       const favoriteProducts = orders.reduce((count, order) =>
         count + order.items.length, 0
       );
